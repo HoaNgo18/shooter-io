@@ -23,11 +23,11 @@ const HUD = ({ isArena = false }) => {
   const [aliveCount, setAliveCount] = useState(10);
   const [pickupNotif, setPickupNotif] = useState(null);
 
-  // Use interval to poll data from gameScene instead of packet subscription
-  // This prevents re-renders on every packet (20fps -> causes lag)
+  // Use interval to poll data from gameScene
+  // Giảm throttle để inventory responsive hơn
   useEffect(() => {
     let lastUpdate = Date.now();
-    const UPDATE_THROTTLE = 250;
+    const UPDATE_THROTTLE = 100; // Giảm từ 250ms xuống 100ms
 
     const updateInterval = setInterval(() => {
       const now = Date.now();
@@ -40,20 +40,31 @@ const HUD = ({ isArena = false }) => {
       const myPlayer = scene.players?.[socket.myId];
 
       if (myPlayer) {
+        const serverMaxAmmo = myPlayer.maxAmmo || 3;
+        const newInventory = myPlayer.inventory || [null, null, null, null, null];
+        const newSelectedSlot = myPlayer.selectedSlot !== undefined ? myPlayer.selectedSlot : 0;
+
         setStats(prev => {
+          // Check all fields including inventory and selectedSlot
+          const inventoryChanged = JSON.stringify(prev.inventory) !== JSON.stringify(newInventory);
+          const slotChanged = prev.selectedSlot !== newSelectedSlot;
+
           if (prev.lives !== myPlayer.lives ||
             prev.score !== myPlayer.score ||
             prev.currentAmmo !== myPlayer.currentAmmo ||
-            prev.weapon !== myPlayer.weaponType) {
+            prev.weapon !== myPlayer.weaponType ||
+            prev.maxAmmo !== serverMaxAmmo ||
+            inventoryChanged ||
+            slotChanged) {
             return {
               lives: myPlayer.lives || 3,
               maxLives: myPlayer.maxLives || 3,
               score: myPlayer.score || 0,
-              currentAmmo: myPlayer.currentAmmo !== undefined ? myPlayer.currentAmmo : 3,
-              maxAmmo: myPlayer.maxAmmo || 3,
+              currentAmmo: myPlayer.currentAmmo !== undefined ? myPlayer.currentAmmo : serverMaxAmmo,
+              maxAmmo: serverMaxAmmo,
               weapon: myPlayer.weaponType || 'BLUE',
-              inventory: myPlayer.inventory || [null, null, null, null, null],
-              selectedSlot: myPlayer.selectedSlot || 0
+              inventory: newInventory,
+              selectedSlot: newSelectedSlot
             };
           }
           return prev;

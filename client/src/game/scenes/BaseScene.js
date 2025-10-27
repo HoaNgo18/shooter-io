@@ -128,6 +128,13 @@ export class BaseScene extends Phaser.Scene {
         const myPlayer = this.players[socket.myId];
         if (myPlayer && myPlayer.container.visible) {
             const weaponType = myPlayer.weaponType || 'BLUE';
+
+            // RED laser có tầm bắn quá lớn (1000px) -> không vẽ range circle
+            if (weaponType === 'RED') {
+                this.rangeCircle.setVisible(false);
+                return;
+            }
+
             const stats = WEAPON_STATS[weaponType] || WEAPON_STATS.BLUE;
             this.rangeCircle.setPosition(myPlayer.x, myPlayer.y);
             this.rangeCircle.setRadius(stats.range);

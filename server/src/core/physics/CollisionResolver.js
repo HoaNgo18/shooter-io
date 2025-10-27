@@ -101,6 +101,11 @@ export class CollisionResolver {
 
   applyExplosionDamage(player, explosion) {
     player.takeDamage(explosion.damage, explosion.ownerId);
+
+    // Check death after damage
+    if (player.isDead()) {
+      this.handlePlayerDeath(player, explosion.ownerId, explosion.ownerName);
+    }
   }
 
   // --- DEATH LOGIC ---
@@ -120,12 +125,8 @@ export class CollisionResolver {
       killer.sessionKills = (killer.sessionKills || 0) + 1;
 
       if (!killer.isBot) {
-        // Logic tìm Top 1 để thưởng coin
-        const sortedPlayers = Array.from(this.game.players.values()).sort((a, b) => b.score - a.score);
-        const kingId = sortedPlayers.length > 0 ? sortedPlayers[0].id : null;
-        const isKing = (player.id === kingId);
-
-        killer.coins += isKing ? 5 : 1;
+        // Chỉ cộng điểm và save stats, không tự cộng coin
+        // Coin sẽ rơi ra từ enemy drops
         this.game.saveKillerStats(killer);
       }
     }

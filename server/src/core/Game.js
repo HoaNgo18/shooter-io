@@ -54,6 +54,13 @@ export class Game {
     // 4. Physics Collision
     this.physics.checkCollisions();
 
+    // 4.5. Cleanup expired explosions
+    for (let i = this.explosions.length - 1; i >= 0; i--) {
+      if (this.explosions[i].shouldRemove()) {
+        this.explosions.splice(i, 1);
+      }
+    }
+
     this.world.chests.forEach(chest => chest.update(dt));
 
     // 5. World Management (Spawn Food, Chests, Big Chest)

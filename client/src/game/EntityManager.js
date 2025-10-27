@@ -69,11 +69,7 @@ export class EntityManager {
 
         projectilesData.forEach(p => {
             if (p.weaponType === 'BOMB') {
-                const bombSprite = this.scene.add.sprite(p.x, p.y, 'item_bomb');
-                bombSprite.setDisplaySize(32, 32);
-                bombSprite.setDepth(5);
-                bombSprite.rotation = Date.now() * 0.01;
-                this.projectileGroup.add(bombSprite);
+                this.renderBomb(p);
             } else {
                 const stats = WEAPON_STATS[p.weaponType] || WEAPON_STATS.BLUE;
                 const laserSprite = stats.laserSprite || 'laserBlue01';
@@ -86,6 +82,43 @@ export class EntityManager {
         });
     }
 
+    /**
+     * Render bomb đơn giản kiểu Astro Party
+     * - Đặt bomb → hiển thị mine sprite (xoay chậm)
+     * - Enemy vào range → xoay nhanh 0.5s → nổ
+     */
+    renderBomb(p) {
+        const container = this.scene.add.container(p.x, p.y);
+        container.setDepth(5);
+
+        const isTriggered = p.isTriggered;
+        const triggerProgress = p.triggerProgress || 0;
+
+        // Bomb sprite
+        const bombSprite = this.scene.add.sprite(0, 0, 'item_bomb');
+        bombSprite.setDisplaySize(36, 36);
+        container.add(bombSprite);
+
+        // TRIGGERED: Chỉ xoay nhanh, KHÔNG scale
+        if (isTriggered) {
+            // Xoay cực nhanh - tốc độ tăng dần
+            const spinSpeed = 20 + triggerProgress * 40; // 20 -> 60 rad/s
+            bombSprite.setRotation(Date.now() * spinSpeed * 0.001);
+
+            // Flash màu đỏ -> trắng khi sắp nổ
+            if (triggerProgress > 0.7) {
+                bombSprite.setTint(0xFFFFFF);
+            } else {
+                bombSprite.setTint(0xFF6666);
+            }
+        } else {
+            // Idle: xoay chậm nhẹ
+            bombSprite.setRotation(Date.now() * 0.001);
+        }
+
+        this.projectileGroup.add(container);
+    }
+
     // --- EXPLOSION LOGIC ---
     updateExplosions(explosionsData) {
         if (!explosionsData) return;
@@ -94,21 +127,95 @@ export class EntityManager {
             if (this.playedExplosions.has(e.id)) return;
             this.playedExplosions.add(e.id);
 
-            const circle = this.scene.add.circle(e.x, e.y, e.radius, 0xFF4400, 0.4);
-            circle.setStrokeStyle(3, 0xFF0000, 0.8);
+            this.createExplosionEffect(e.x, e.y, e.radius);
+        });
+    }
+
+    /**
+     * Tạo explosion effect với multiple layers
+     */
+    createExplosionEffect(x, y, radius) {
+        // Layer 1: Core flash (trắng sáng)
+        const coreFlash = this.scene.add.circle(x, y, radius * 0.3, 0xFFFFFF, 1);
+        this.scene.tweens.add({
+            targets: coreFlash,
+            scaleX: 2,
+            scaleY: 2,
+            alpha: 0,
+            duration: 150,
+            ease: 'Power2',
+            onComplete: () => coreFlash.destroy()
+        });
+
+        // Layer 2: Inner explosion (cam/đỏ)
+        const innerExplosion = this.scene.add.circle(x, y, radius * 0.5, 0xFF6600, 0.8);
+        this.scene.tweens.add({
+            targets: innerExplosion,
+            scaleX: 1.8,
+            scaleY: 1.8,
+            alpha: 0,
+            duration: 250,
+            ease: 'Power2',
+            onComplete: () => innerExplosion.destroy()
+        });
+
+        // Layer 3: Outer explosion (đỏ đậm)
+        const outerExplosion = this.scene.add.circle(x, y, radius, 0xFF2200, 0.5);
+        outerExplosion.setStrokeStyle(4, 0xFF0000, 0.8);
+        this.scene.tweens.add({
+            targets: outerExplosion,
+            scaleX: 1.5,
+            scaleY: 1.5,
+            alpha: 0,
+            duration: 400,
+            ease: 'Power2',
+            onComplete: () => outerExplosion.destroy()
+        });
+
+        // Layer 4: Shockwave ring
+        const shockwave = this.scene.add.circle(x, y, radius * 0.2, 0xFFFFFF, 0);
+        shockwave.setStrokeStyle(3, 0xFFAA00, 0.8);
+        this.scene.tweens.add({
+            targets: shockwave,
+            scaleX: 3,
+            scaleY: 3,
+            duration: 350,
+            ease: 'Cubic.easeOut',
+            onComplete: () => shockwave.destroy()
+        });
+        this.scene.tweens.add({
+            targets: shockwave,
+            alpha: 0,
+            duration: 350,
+            ease: 'Power2'
+        });
+
+        // Particles (sparks)
+        const particleCount = 8;
+        for (let i = 0; i < particleCount; i++) {
+            const angle = (i / particleCount) * Math.PI * 2;
+            const particle = this.scene.add.circle(x, y, 4, 0xFFAA00, 1);
+
+            const targetX = x + Math.cos(angle) * radius * 1.5;
+            const targetY = y + Math.sin(angle) * radius * 1.5;
 
             this.scene.tweens.add({
-                targets: circle,
-                scaleX: 1.5,
-                scaleY: 1.5,
+                targets: particle,
+                x: targetX,
+                y: targetY,
+                scaleX: 0.2,
+                scaleY: 0.2,
                 alpha: 0,
-                duration: 350,
+                duration: 300 + Math.random() * 150,
                 ease: 'Power2',
-                onComplete: () => circle.destroy()
+                onComplete: () => particle.destroy()
             });
+        }
 
-            this.explosionGroup.add(circle);
-        });
+        this.explosionGroup.add(coreFlash);
+        this.explosionGroup.add(innerExplosion);
+        this.explosionGroup.add(outerExplosion);
+        this.explosionGroup.add(shockwave);
     }
 
     // --- OBSTACLE LOGIC ---

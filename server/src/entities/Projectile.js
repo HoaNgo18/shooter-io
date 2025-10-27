@@ -14,20 +14,43 @@ export class Projectile extends Entity {
     this.damage = damage;
     this.ownerId = ownerId;
     this.ownerName = ownerName;
-    this.weaponType = weaponType; // Lưu loại vũ khí
-    this.range = range;            // Tầm bắn
+    this.weaponType = weaponType;
+    this.range = range;
     this.radius = radius;
-    this.isMine = false;        // Bán kính đạn
+    this.isMine = false;
 
-    this.startX = x;               // Vị trí bắt đầu
+    this.startX = x;
     this.startY = y;
-    this.distanceTraveled = 0;     // Quãng đường đã bay
+    this.distanceTraveled = 0;
 
     this.createdAt = Date.now();
     this.hit = false;
-    this.maxLifetime = 5000; // 5 giây tự hủy (backup)
+    this.maxLifetime = 5000;
+
+    // Bomb trigger state
+    this.isTriggered = false;      // Đã bị kích hoạt?
+    this.triggeredAt = null;       // Thời điểm trigger
+    this.triggerDelay = 500;       // 0.5s delay trước khi nổ
 
     this.id = Math.random().toString(36).substr(2, 9);
+  }
+
+  /**
+   * Trigger bomb - bắt đầu countdown 0.5s trước khi nổ
+   */
+  trigger() {
+    if (!this.isTriggered) {
+      this.isTriggered = true;
+      this.triggeredAt = Date.now();
+    }
+  }
+
+  /**
+   * Kiểm tra bomb đã sẵn sàng nổ chưa (sau 0.5s từ khi trigger)
+   */
+  isReadyToExplode() {
+    if (!this.isTriggered) return false;
+    return Date.now() - this.triggeredAt >= this.triggerDelay;
   }
 
   update(dt) {
@@ -40,10 +63,9 @@ export class Projectile extends Entity {
   }
 
   shouldRemove() {
-    // Xóa khi: trúng đích, vượt range, hết thời gian, hoặc bay ra khỏi map
     return (
       this.hit ||
-      (!this.isMine && this.distanceTraveled >= this.range) || // Kiểm tra range
+      (!this.isMine && this.distanceTraveled >= this.range) ||
       (Date.now() - this.createdAt > this.maxLifetime) ||
       this.x < -MAP_SIZE / 2 || this.x > MAP_SIZE / 2 ||
       this.y < -MAP_SIZE / 2 || this.y > MAP_SIZE / 2
@@ -51,14 +73,32 @@ export class Projectile extends Entity {
   }
 
   serialize() {
-    return {
+    const base = {
       id: this.id,
       x: Math.round(this.x),
       y: Math.round(this.y),
       angle: this.angle,
-      radius: this.radius,          // Gửi radius về client để vẽ
+      radius: this.radius,
       weaponType: this.weaponType,
-      isMine: this.isMine  // Gửi type để client biết màu/style
+      isMine: this.isMine
     };
+
+    // Thêm thông tin cho bomb/mine
+    if (this.isMine) {
+      const now = Date.now();
+      base.isArmed = now > this.armingTime;
+      base.isTriggered = this.isTriggered;
+
+      // Progress calculations
+      const armingDuration = this.armingTime - this.createdAt;
+      base.armingProgress = Math.min(1, (now - this.createdAt) / armingDuration);
+
+      // Trigger countdown progress (0 -> 1 trong 0.5s)
+      if (this.isTriggered) {
+        base.triggerProgress = Math.min(1, (now - this.triggeredAt) / this.triggerDelay);
+      }
+    }
+
+    return base;
   }
 }

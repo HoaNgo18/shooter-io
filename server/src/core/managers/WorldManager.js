@@ -6,6 +6,7 @@ import {
 } from '../../../../shared/src/constants.js';
 import { Chest } from '../../entities/Chest.js';
 import { Item } from '../../entities/Item.js';
+import { SpawnValidator } from '../../utils/SpawnValidator.js';
 
 export class WorldManager {
   constructor() {
@@ -25,12 +26,15 @@ export class WorldManager {
       itemsRemoved: []
     };
 
-    // Init
+    // Spawn validator - khởi tạo sau khi các arrays đã được tạo
+    this.spawnValidator = new SpawnValidator(this);
+
+    // Init - thứ tự quan trọng: obstacles trước (được phép overlap)
     this.initObstacles();
-    this.initFood();
-    this.initStations();
-    this.initChests();
+    this.initStations();  // Stations trước vì to nhất
+    this.initChests();    // Chests sau stations
     this.initNebulas();
+    this.initFood();      // Food cuối vì nhiều và nhỏ
   }
 
   resetDelta() {
@@ -123,10 +127,8 @@ export class WorldManager {
   initStations() {
     for (let i = 0; i < STATION_COUNT; i++) {
       const id = `station_${i}`;
-      const limit = MAP_SIZE / 2 - 100;
-      const x = (Math.random() * limit * 2) - limit;
-      const y = (Math.random() * limit * 2) - limit;
-      const station = new Chest(x, y, id, CHEST_TYPES.STATION);
+      const pos = this.spawnValidator.findStationPosition();
+      const station = new Chest(pos.x, pos.y, id, CHEST_TYPES.STATION);
       this.chests.push(station);
     }
   }
@@ -139,11 +141,11 @@ export class WorldManager {
 
   // --- SPAWNING LOGIC ---
   _createFoodObject() {
-    const max = MAP_SIZE / 2;
+    const pos = this.spawnValidator.findFoodPosition();
     return {
       id: Math.random().toString(36).substr(2, 9),
-      x: (Math.random() * MAP_SIZE) - max,
-      y: (Math.random() * MAP_SIZE) - max,
+      x: pos.x,
+      y: pos.y,
       type: Math.floor(Math.random() * 3)
     };
   }
@@ -165,14 +167,8 @@ export class WorldManager {
   }
 
   _spawnRandomChest(id, type = CHEST_TYPES.NORMAL) {
-    const radius = 25;
-    const max = MAP_SIZE / 2 - radius;
-    return new Chest(
-      (Math.random() * max * 2) - max,
-      (Math.random() * max * 2) - max,
-      id,
-      type
-    );
+    const pos = this.spawnValidator.findChestPosition();
+    return new Chest(pos.x, pos.y, id, type);
   }
 
   spawnNormalChestIfNeeded() {
@@ -188,10 +184,8 @@ export class WorldManager {
     const currentStations = this.chests.filter(c => c.type === CHEST_TYPES.STATION).length;
     if (currentStations < STATION_COUNT) {
       const id = `station_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-      const limit = MAP_SIZE / 2 - 200;
-      const x = (Math.random() * limit * 2) - limit;
-      const y = (Math.random() * limit * 2) - limit;
-      const newStation = new Chest(x, y, id, CHEST_TYPES.STATION);
+      const pos = this.spawnValidator.findStationPosition();
+      const newStation = new Chest(pos.x, pos.y, id, CHEST_TYPES.STATION);
       this.chests.push(newStation);
       this.delta.chestsAdded.push(newStation);
     }
@@ -214,25 +208,24 @@ export class WorldManager {
     // --- LOGIC XÁC ĐỊNH SỐ LƯỢNG VÀ LOẠI ITEM ---
 
     if (sourceType === CHEST_TYPES.STATION || sourceType === 'STATION') {
-      // LOGIC STATION: Rơi 2 món
-      // Món 1: Chắc chắn là Coin (Bronze/Silver/Gold)
-      // Món 2: Random bất kỳ món nào (Weapon, Powerup, Shield, Bomb...)
-      itemsToSpawn.push(this.rollCoinOnly());
-      itemsToSpawn.push(this.rollAnyItem());
-
-      spawnRadius = 60; // Station to nên văng xa hơn
+      // STATION: Rơi 1-2 đồ (coin rate thấp, items/weapons cao)
+      const dropCount = Math.random() < 0.5 ? 1 : 2;
+      for (let i = 0; i < dropCount; i++) {
+        itemsToSpawn.push(this.rollStationDrop());
+      }
+      spawnRadius = 50;
 
     } else if (sourceType === 'ENEMY') {
-      // LOGIC ENEMY: Rơi 1 món random
-      // Tỷ lệ: Tất cả mọi đồ đều có thể xuất hiện
-      itemsToSpawn.push(this.rollAnyItem());
-
-      spawnRadius = 30;
+      // ENEMY (kể cả bot): Rơi 2-3 đồ
+      const dropCount = Math.random() < 0.5 ? 2 : 3;
+      for (let i = 0; i < dropCount; i++) {
+        itemsToSpawn.push(this.rollAnyItem());
+      }
+      spawnRadius = 40;
 
     } else {
-      // LOGIC CHEST THƯỜNG (Mặc định)
-      // Giữ nguyên logic cũ hoặc random tùy bạn, ở đây để common cho cân bằng game đầu
-      itemsToSpawn.push(this.rollCommonDrop());
+      // CHEST THƯỜNG: Rơi 1 đồ, tỷ lệ coin CAO hơn
+      itemsToSpawn.push(this.rollChestDrop());
       spawnRadius = 0;
     }
 
@@ -245,17 +238,15 @@ export class WorldManager {
       let itemX = x;
       let itemY = y;
 
-      // Nếu có nhiều hơn 1 món hoặc là Station/Enemy thì nên văng ra một chút cho đẹp
-      if (itemsToSpawn.length > 1 || sourceType === 'ENEMY') {
+      // Nếu có nhiều hơn 1 món thì văng ra xung quanh
+      if (itemsToSpawn.length > 1) {
         const angle = startAngle + (index * angleStep);
-        const currentRadius = spawnRadius * (0.8 + Math.random() * 0.4); // Random độ xa gần
+        const currentRadius = spawnRadius * (0.8 + Math.random() * 0.4);
         itemX = x + Math.cos(angle) * currentRadius;
         itemY = y + Math.sin(angle) * currentRadius;
       }
 
-      // Tạo ID duy nhất tại Server
       const uniqueId = `item_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-
       const item = new Item(itemX, itemY, itemType);
       item.id = uniqueId;
 
@@ -266,36 +257,57 @@ export class WorldManager {
 
   // --- DROP TABLES ---
 
-  // 1. Chỉ random ra tiền (cho slot 1 của Station)
+  // 1. Chỉ random ra tiền
   rollCoinOnly() {
     const pool = [
-      ITEM_TYPES.COIN_BRONZE, // Tỷ lệ cao
-      ITEM_TYPES.COIN_SILVER, // Tỷ lệ vừa
-      ITEM_TYPES.COIN_GOLD    // Tỷ lệ thấp
+      ITEM_TYPES.COIN_BRONZE,
+      ITEM_TYPES.COIN_SILVER,
+      ITEM_TYPES.COIN_GOLD
     ];
-    // Ghi đè tỷ lệ riêng cho việc roll Coin này nếu muốn, 
-    // hoặc dùng weightedRandom mặc định (dựa theo config global)
     return this.weightedRandom(pool);
   }
 
-  // 2. Random TẤT CẢ mọi thứ (cho slot 2 của Station & Enemy)
+  // 2. Random TẤT CẢ mọi thứ (cho Enemy drops)
   rollAnyItem() {
-    // Lấy tất cả các key trong ITEM_TYPES
     const allItems = Object.values(ITEM_TYPES);
     return this.weightedRandom(allItems);
   }
 
-  // 3. Logic cũ cho rương thường (Giữ lại để game cân bằng lúc đi nhặt rương lẻ)
-  rollCommonDrop() {
-    const pool = [
-      ITEM_TYPES.COIN_BRONZE,
-      ITEM_TYPES.COIN_SILVER,
+  // 3. Station drop - CHỈ items và weapons, KHÔNG coin
+  rollStationDrop() {
+    const itemsAndWeapons = [
       ITEM_TYPES.HEALTH_PACK,
       ITEM_TYPES.SPEED_BOOST,
       ITEM_TYPES.WEAPON_BLUE,
-      ITEM_TYPES.BOMB
+      ITEM_TYPES.WEAPON_GREEN,
+      ITEM_TYPES.WEAPON_RED,
+      ITEM_TYPES.BOMB,
+      ITEM_TYPES.SHIELD,
+      ITEM_TYPES.INVISIBLE
     ];
-    return this.weightedRandom(pool);
+    return itemsAndWeapons[Math.floor(Math.random() * itemsAndWeapons.length)];
+  }
+
+  // 4. Chest drop - tỷ lệ coin CAO hơn (60% coin, 40% items khác)
+  rollChestDrop() {
+    // 60% chance là coin
+    if (Math.random() < 0.6) {
+      return this.rollCoinOnly();
+    }
+    // 40% chance là item khác (không phải coin)
+    const nonCoinItems = [
+      ITEM_TYPES.HEALTH_PACK,
+      ITEM_TYPES.SPEED_BOOST,
+      ITEM_TYPES.WEAPON_BLUE,
+      ITEM_TYPES.BOMB,
+      ITEM_TYPES.SHIELD
+    ];
+    return nonCoinItems[Math.floor(Math.random() * nonCoinItems.length)];
+  }
+
+  // 5. Legacy common drop (deprecated, giữ lại cho compatibility)
+  rollCommonDrop() {
+    return this.rollChestDrop();
   }
 
   weightedRandom(itemTypes) {

@@ -121,9 +121,11 @@ export class ClientPlayer {
         if (count <= 0) return;
 
         const stats = WEAPON_STATS[weaponType] || WEAPON_STATS.BLUE;
+        const actualMax = maxAmmo || stats.maxAmmo || 1;
+
+        // Vẽ orbs xung quanh ship cho tất cả weapon types (BLUE, GREEN, RED)
         const radius = 35;
         const startAngle = -Math.PI / 2;
-        const actualMax = maxAmmo || stats.maxAmmo || 1;
         const angleStep = (Math.PI * 2) / actualMax;
 
         for (let i = 0; i < count; i++) {
@@ -187,6 +189,10 @@ export class ClientPlayer {
             this.lastWeaponType = data.weapon || 'BLUE';
             this.lastMaxAmmo = data.maxAmmo;
         }
+
+        // Sync properties cho HUD access
+        this.currentAmmo = data.currentAmmo;
+        this.maxAmmo = data.maxAmmo;
 
         // Check skin changes
         if (data.skinId && data.skinId !== this.skinId) {
