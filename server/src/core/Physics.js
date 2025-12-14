@@ -34,6 +34,7 @@ export class Physics {
         if (player.id === proj.ownerId) continue;
 
         if (circleCollision(player.x, player.y, PLAYER_RADIUS, proj.x, proj.y, 5)) {
+          console.log(`HIT DETECTED! Bullet hit ${player.name}. Damage: ${proj.damage}`);
           player.takeDamage(proj.damage, proj.ownerId);
           proj.hit = true;
 

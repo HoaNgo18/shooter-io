@@ -5,14 +5,16 @@ class NetworkManager {
   constructor() {
     this.ws = null;
     this.gameScene = null;
-    this.myId = null;
+    
+    // 🟢 QUAN TRỌNG: Biến này để HUD biết ai là người chơi hiện tại
+    this.myId = null; 
+    
     this.isConnected = false;
     this.listeners = [];
   }
 
   connect(username) {
     return new Promise((resolve, reject) => {
-      // 🟢 Đảm bảo URL này đúng với server của bạn
       this.ws = new WebSocket('ws://localhost:3000');
 
       this.ws.onopen = () => {
@@ -61,16 +63,15 @@ class NetworkManager {
       switch (packet.type) {
         case PacketType.UPDATE:
           this.gameScene.handleServerUpdate(packet);
-          
-          // 🟢 FIX LỖI HUD: Gửi nguyên gói tin packet sang React
-          // React HUD sẽ tự lọc 'packet.players' để vẽ Leaderboard
+          // Gửi data sang React HUD
           this.notifyReact(packet);
           break;
 
         case PacketType.INIT:
+          // 🟢 QUAN TRỌNG: Lưu ID của mình khi server cấp
           this.myId = packet.id;
+          
           this.gameScene.initGame(packet);
-          // Gửi cả gói INIT để HUD hiển thị ngay khi vào game
           this.notifyReact(packet);
           break;
 
@@ -84,7 +85,6 @@ class NetworkManager {
       }
     }
 
-    // 2. Ping/Pong
     if (packet.type === PacketType.PING) {
       this.send({ type: PacketType.PONG });
     }
