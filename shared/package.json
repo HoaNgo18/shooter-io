@@ -1,0 +1,11 @@
+{
+  "name": "io-game-shared",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/constants.js",
+  "exports": {
+    "./constants": "./src/constants.js",
+    "./packetTypes": "./src/packetTypes.js",
+    "./utils": "./src/utils.js"
+  }
+}
