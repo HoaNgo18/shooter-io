@@ -1,4 +1,6 @@
-import { TICK_RATE, MAP_SIZE, FOOD_COUNT, OBSTACLE_COUNT, OBSTACLE_RADIUS_MIN, OBSTACLE_RADIUS_MAX } from '../../../shared/src/constants.js'; // Gom import lại cho gọn
+// server/src/core/Game.js
+
+import { TICK_RATE, MAP_SIZE, FOOD_COUNT, OBSTACLE_COUNT, OBSTACLE_RADIUS_MIN, OBSTACLE_RADIUS_MAX } from '../../../shared/src/constants.js';
 import { PacketType } from '../../../shared/src/packetTypes.js';
 import { Player } from '../entities/Player.js';
 import { Physics } from './Physics.js';
@@ -12,12 +14,16 @@ export class Game {
     this.tickInterval = null;
     this.lastTick = Date.now();
     
-    // Quản lý thức ăn
+    // Quản lý thức ăn & Delta
     this.foods = []; 
+    this.removedFoodIds = []; 
+    this.newFoods = [];
+
     this.initFood();
 
-    this.obstacles = []; // 🟢 Mảng chứa chướng ngại vật
-    this.initObstacles(); // Gọi hàm tạo
+    // Quản lý chướng ngại vật
+    this.obstacles = []; 
+    this.initObstacles();
   }
 
   start() {
@@ -28,11 +34,11 @@ export class Game {
 
   initFood() {
     for (let i = 0; i < FOOD_COUNT; i++) {
-      this.foods.push(this.generateRandomFood());
+      // Init ban đầu không cần tracking delta
+      this.foods.push(this._createFoodObject());
     }
   }
 
-  // 🟢 HÀM MỚI: Tạo đá ngẫu nhiên
   initObstacles() {
     for (let i = 0; i < OBSTACLE_COUNT; i++) {
       const radius = Math.floor(Math.random() * (OBSTACLE_RADIUS_MAX - OBSTACLE_RADIUS_MIN + 1)) + OBSTACLE_RADIUS_MIN;
@@ -46,30 +52,34 @@ export class Game {
     }
   }
 
-  generateRandomFood() {
-    // Random vị trí trong map
+  _createFoodObject() {
     const max = MAP_SIZE / 2;
     return {
       id: Math.random().toString(36).substr(2, 9),
       x: (Math.random() * MAP_SIZE) - max,
       y: (Math.random() * MAP_SIZE) - max,
-      type: Math.floor(Math.random() * 3) // 0: Đỏ, 1: Xanh, 2: Lam
+      type: Math.floor(Math.random() * 3)
     };
   }
 
+  generateAndTrackFood() {
+    const food = this._createFoodObject();
+    this.newFoods.push(food);
+    return food;
+  }
+
   tick() {
+    // 1. Reset Delta
+    this.removedFoodIds = [];
+    this.newFoods = [];
+
     const now = Date.now();
     let dt = (now - this.lastTick) / 1000;
     this.lastTick = now;
 
-    // 🟢 SỬA LỖI LAG: Giới hạn dt tối đa (chống nhảy cóc khi lag)
-    if (dt > 0.05) {
-        dt = 0.05;
-    }
+    if (dt > 0.05) dt = 0.05;
 
-    // 🔴 BỎ ĐOẠN CODE UPDATE CŨ Ở ĐÂY ĐI (để tránh update 2 lần)
-
-    // Update projectiles
+    // 2. Update Projectiles
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const proj = this.projectiles[i];
       proj.update(dt);
@@ -79,22 +89,22 @@ export class Game {
       }
     }
 
-    // Update players (Chỉ người sống)
+    // 3. Update Players
     this.players.forEach(player => {
         if (!player.dead) { 
             player.update(dt);
         }
     });
 
-    // Check collisions
+    // 4. Physics (Check va chạm)
     this.physics.checkCollisions();
 
-    // 🟢 SỬA LOGIC FOOD: Chỉ thêm mới nếu thiếu (Logic cũ của bạn đúng rồi)
+    // 5. Respawn Food
     if (this.foods.length < FOOD_COUNT) {
-       this.foods.push(this.generateRandomFood());
+       this.foods.push(this.generateAndTrackFood());
     }
 
-    // Send state updates to all clients
+    // 6. Send Update
     this.sendStateUpdate();
   }
 
@@ -102,14 +112,14 @@ export class Game {
     const player = new Player(clientId, name);
     this.players.set(clientId, player);
 
-    // Send init packet to new player
+    // Gửi INIT: Full foods + Obstacles
     this.server.sendToClient(clientId, {
       type: PacketType.INIT,
       id: clientId,
       player: player.serialize(),
       players: Array.from(this.players.values()).map(p => p.serialize()),
-      foods: this.foods, // 🟢 Gửi luôn food hiện có cho người mới vào
-      obstacles: this.obstacles // 🟢 Gửi chướng ngại vật cho client
+      foods: this.foods,      
+      obstacles: this.obstacles 
     });
 
     this.server.broadcast({
@@ -130,7 +140,6 @@ export class Game {
 
   handleInput(clientId, inputData) {
     const player = this.players.get(clientId);
-    // 🟢 THÊM CHECK: Chỉ xử lý input nếu còn sống
     if (player && !player.dead) {
       player.setInput(inputData);
     }
@@ -139,20 +148,18 @@ export class Game {
   handleAttack(clientId) {
     const player = this.players.get(clientId);
     if (player && !player.dead) {
-        const newProjectiles = player.attack(); // Nhận về mảng hoặc null
-        
+        const newProjectiles = player.attack();
         if (newProjectiles) {
-            // Đẩy tất cả đạn mới vào danh sách chung
             this.projectiles.push(...newProjectiles);
         }
     }
-}
+  }
+
   respawnPlayer(clientId) {
     const player = this.players.get(clientId);
     if (player && player.dead) {
         player.dead = false;
         player.respawn(); 
-        // Logic báo hồi sinh sẽ nằm trong gói tin UPDATE tiếp theo (dead = false)
     }
   }
 
@@ -160,9 +167,11 @@ export class Game {
     const state = {
       type: PacketType.UPDATE,
       t: Date.now(),
-      players: Array.from(this.players.values()).map(p => p.serialize()),
+      // 🟢 QUAN TRỌNG: Gửi mảng players để HUD vẽ Leaderboard
+      players: Array.from(this.players.values()).map(p => p.serialize()), 
       projectiles: this.projectiles.map(p => p.serialize()),
-      foods: this.foods // 🟢 QUAN TRỌNG: Phải gửi mảng food về client mới vẽ được
+      foodsAdded: this.newFoods,
+      foodsRemoved: this.removedFoodIds
     };
 
     this.server.broadcast(state);

@@ -1,9 +1,10 @@
+// client/src/network/socket.js
 import { PacketType } from '@shared/packetTypes';
 
 class NetworkManager {
   constructor() {
     this.ws = null;
-    this.gameScene = null; // Tham chiếu đến Phaser Scene
+    this.gameScene = null;
     this.myId = null;
     this.isConnected = false;
     this.listeners = [];
@@ -11,13 +12,12 @@ class NetworkManager {
 
   connect(username) {
     return new Promise((resolve, reject) => {
+      // 🟢 Đảm bảo URL này đúng với server của bạn
       this.ws = new WebSocket('ws://localhost:3000');
 
       this.ws.onopen = () => {
         this.isConnected = true;
         console.log('✅ Connected via WebSocket');
-        
-        // Gửi gói tin JOIN ngay khi kết nối
         this.send({ type: PacketType.JOIN, name: username });
         resolve();
       };
@@ -48,7 +48,6 @@ class NetworkManager {
 
   subscribe(callback) {
     this.listeners.push(callback);
-    // Trả về hàm cleanup
     return () => {
       this.listeners = this.listeners.filter(l => l !== callback);
     };
@@ -57,41 +56,43 @@ class NetworkManager {
   handleMessage(event) {
     const packet = JSON.parse(event.data);
 
-    // 1. Xử lý các gói tin Logic Game (chuyển cho Phaser)
+    // 1. Xử lý Logic Game (Phaser)
     if (this.gameScene) {
       switch (packet.type) {
         case PacketType.UPDATE:
           this.gameScene.handleServerUpdate(packet);
-          // Tìm thông tin của mình để cập nhật máu/điểm
-          const myData = packet.players.find(p => p.id === this.myId);
-          this.notifyReact({ 
-            type: 'GAME_UPDATE', 
-            me: myData, 
-            leaderboard: this.gameScene.getLeaderboard ? this.gameScene.getLeaderboard() : [] 
-          });
+          
+          // 🟢 FIX LỖI HUD: Gửi nguyên gói tin packet sang React
+          // React HUD sẽ tự lọc 'packet.players' để vẽ Leaderboard
+          this.notifyReact(packet);
           break;
+
         case PacketType.INIT:
           this.myId = packet.id;
           this.gameScene.initGame(packet);
+          // Gửi cả gói INIT để HUD hiển thị ngay khi vào game
+          this.notifyReact(packet);
           break;
+
         case PacketType.PLAYER_JOIN:
           this.gameScene.addPlayer(packet.player);
           break;
+
         case PacketType.PLAYER_LEAVE:
           this.gameScene.removePlayer(packet.id);
           break;
       }
     }
 
-    // 2. Xử lý Ping/Pong (tự động)
+    // 2. Ping/Pong
     if (packet.type === PacketType.PING) {
       this.send({ type: PacketType.PONG });
     }
   }
+
   notifyReact(data) {
     this.listeners.forEach(callback => callback(data));
   }
 }
 
-// Xuất ra một instance duy nhất (Singleton) để dùng chung
 export const socket = new NetworkManager();
