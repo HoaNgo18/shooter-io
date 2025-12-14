@@ -28,20 +28,19 @@ export class Player extends Entity {
     this.lastDamageTime = 0;
     this.lastAttack = 0;
     this.radius = PLAYER_RADIUS;
-    // 🟢 THÊM: Biến quản lý Dash
-    this.dashEndTime = 0;       // Thời điểm kết thúc lướt
-    this.dashCooldownTime = 0;  // Thời điểm hồi chiêu xong
+    this.dashEndTime = 0;   
+    this.dashCooldownTime = 0;  
 
     this.input = {
       up: false, down: false, left: false, right: false,
       mouseX: 0, mouseY: 0,
-      space: false, // 🟢 THÊM: Nút Space
-      num1: false, num2: false, num3: false // Vũ khí số
+      space: false, 
+      num1: false, num2: false, num3: false
     };
   }
 
   setInput(data) {
-    // 1. Cập nhật các phím di chuyển (merge vào input hiện tại để không mất mouseX cũ)
+    // 1. Cập nhật các phím di chuyển 
     if (data.movement) {
         Object.assign(this.input, data.movement);
         if (data.movement.num1) this.weapon = 'PISTOL';
@@ -49,7 +48,7 @@ export class Player extends Entity {
         if (data.movement.num3) this.weapon = 'MACHINEGUN';
     }
 
-    // 2. 🟢 SỬA LỖI: Lưu tọa độ vào 'this.input' chứ không phải 'this'
+    // 2. Cập nhật tọa độ chuột
     if (data.mouseX !== undefined) {
         this.input.mouseX = data.mouseX; 
     }
@@ -62,7 +61,7 @@ export class Player extends Entity {
   update(dt) {
     if (this.dead) return;
 
-    // 🟢 1. Xử lý Input Dash
+    // 1. Xử lý Input Dash
     // Nếu bấm Space VÀ Đã hồi chiêu xong
     if (this.input.space && Date.now() > this.dashCooldownTime) {
       // Bắt đầu Dash
@@ -70,7 +69,7 @@ export class Player extends Entity {
       this.dashCooldownTime = Date.now() + DASH_COOLDOWN;
     }
 
-    // 🟢 2. Tính toán tốc độ
+    // 2. Tính toán tốc độ
     let currentSpeed = PLAYER_SPEED; // Tốc độ gốc
 
     // Tính giảm tốc do kích thước (Code cũ của bạn)
@@ -82,7 +81,7 @@ export class Player extends Entity {
       currentSpeed *= DASH_MULTIPLIER; // Tăng tốc gấp 3
     }
 
-    // 🟢 3. Di chuyển (Code cũ nhưng thay hằng số bằng biến currentSpeed)
+    //  3. Di chuyển (Code cũ nhưng thay hằng số bằng biến currentSpeed)
     let dx = 0;
     let dy = 0;
     if (this.input.up) dy -= 1;

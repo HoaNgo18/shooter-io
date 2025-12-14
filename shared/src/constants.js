@@ -1,7 +1,7 @@
 export const MAP_SIZE = 5000;
 
 export const PLAYER_RADIUS = 20;
-// 🟢 SỬA: Tăng tốc độ lên 300 (Pixel/Giây) để phù hợp với logic * dt
+// Tốc độ di chuyển cơ bản (pixels/giây)
 export const PLAYER_SPEED = 300; 
 export const PLAYER_MAX_HEALTH = 100;
 
@@ -14,21 +14,22 @@ export const FOOD_COUNT = 300;
 export const FOOD_RADIUS = 5; 
 export const XP_PER_FOOD = 10; 
 
+// Hồi máu
 export const REGEN_DELAY = 3000; 
-// 🟢 SỬA: Đổi thành 10 để hồi nhanh hơn (đúng như comment)
 export const REGEN_RATE = 10; 
 
-// 🟢 THÊM CÁC HẰNG SỐ CHO DASH
+//THÊM CÁC HẰNG SỐ CHO DASH
 export const DASH_DURATION = 200; 
 export const DASH_COOLDOWN = 3000; 
 export const DASH_MULTIPLIER = 3; 
 
-export const OBSTACLE_COUNT = 50;  // Số lượng tảng đá
-export const OBSTACLE_RADIUS_MIN = 30; // Kích thước nhỏ nhất
-export const OBSTACLE_RADIUS_MAX = 80; // Kích thước lớn nhất
+// Chướng ngại vật
+export const OBSTACLE_COUNT = 50;  
+export const OBSTACLE_RADIUS_MIN = 30; 
+export const OBSTACLE_RADIUS_MAX = 80;
 
 export const WEAPON_TYPES = {
-  // Súng mặc định (Cung/Súng lục)
+  // Súng mặc định (Súng lục)
   PISTOL: { damage: 15, range: 600, cooldown: 400, projectileSpeed: 600, count: 1, spread: 0 },
   
   // Shotgun: Bắn 5 viên, tản ra, tầm gần, delay lâu

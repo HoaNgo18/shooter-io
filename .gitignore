@@ -5,4 +5,8 @@ dist/
 client/dist/
 .vscode/
 .idea/
+# Chặn file repomix ở BẤT KỲ thư mục nào
 repomix-output.*
+
+# Chặn file hệ thống Mac ở mọi nơi
+.DS_Store
