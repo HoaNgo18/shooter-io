@@ -6,27 +6,23 @@ import { ClientPlayer } from '../entities/ClientPlayer';
 export class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
-        this.players = {}; // Object chứa các instance của ClientPlayer
-        this.foods = {};   // Map quản lý food theo ID để xóa nhanh (O(1))
+        this.players = {}; 
+        this.foods = {};   
         this.keys = null;
         this.projectileGroup = null;
         this.foodGroup = null;
         this.obstacleGroup = null;
-        this.chestGroup = null; // Group chứa sprite Chest
-        this.chests = {};       // Map quản lý Chest
-
-        this.itemGroup = null;  // Group chứa sprite Item
-        this.items = {};        // Map quản lý Item
+        this.chestGroup = null;
+        this.chests = {};       
+        this.itemGroup = null;  
+        this.items = {};        
     }
 
     create() {
-        // 1. Setup Socket
-        socket.setGameScene(this);
-
-        // 2. Background
+        // 1. Background
         this.add.grid(0, 0, 5000, 5000, 100, 100, 0x1a1a1a, 1, 0x2a2a2a, 1);
 
-        // 3. Input Keyboard (Full WASD + Arrow + Space)
+        // 2. Input Keyboard
         this.keys = this.input.keyboard.addKeys({
             W: Phaser.Input.Keyboard.KeyCodes.W,
             A: Phaser.Input.Keyboard.KeyCodes.A,
@@ -39,36 +35,36 @@ export class GameScene extends Phaser.Scene {
             SPACE: Phaser.Input.Keyboard.KeyCodes.SPACE
         });
 
-        // 4. Groups 
+        // 3. Groups (KHỞI TẠO TRƯỚC KHI SOCKET CHẠY)
         this.projectileGroup = this.add.group();
         this.foodGroup = this.add.group();
         this.obstacleGroup = this.add.group();
         this.chestGroup = this.add.group();
         this.itemGroup = this.add.group();
-        // Layering: Food < Item < Chest < Obstacle < Projectile < Player
 
-        // 5. Input Mouse (Click để bắn)
+        // 4. Input Mouse
         this.input.on('pointerdown', (pointer) => {
             socket.send({ type: PacketType.ATTACK });
         });
 
-        console.log('GameScene Created');
+        console.log('GameScene Created - Waiting for socket...');
+
+        // 🟢 5. SETUP SOCKET Ở CUỐI CÙNG (Fix lỗi Initialization Order)
+        socket.setGameScene(this);
     }
 
-    // SỬA: Thêm tham số time, delta để tính toán Lerp
     update(time, delta) {
         if (!socket.isConnected) return;
 
-        // LOGIC LERP: Loop qua các player để di chuyển mượt
+        // Logic Lerp Player
         const dt = delta / 1000;
         Object.values(this.players).forEach(player => {
-            // Kiểm tra xem hàm tick có tồn tại không trước khi gọi (để tránh crash nếu ClientPlayer chưa update)
             if (player.tick) {
                 player.tick(dt);
             }
         });
 
-        // Mouse: Tính lại tọa độ World dựa trên Camera hiện tại
+        // Input Logic
         const pointer = this.input.activePointer;
         const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
 
@@ -90,18 +86,14 @@ export class GameScene extends Phaser.Scene {
     // --- SOCKET HANDLERS ---
 
     initGame(data) {
-        if (data.players) {
-            data.players.forEach(p => this.addPlayer(p));
-        }
+        if (data.players) data.players.forEach(p => this.addPlayer(p));
 
-        // LOGIC MỚI: Init Foods và lưu vào Map
         if (data.foods) {
             this.foodGroup.clear(true, true);
-            this.foods = {}; // Reset map
+            this.foods = {};
             data.foods.forEach(f => this.createFoodSprite(f));
         }
 
-        // Vẽ chướng ngại vật
         if (data.obstacles) {
             data.obstacles.forEach(obs => {
                 const rock = this.add.circle(obs.x, obs.y, obs.radius, 0x888888);
@@ -110,21 +102,18 @@ export class GameScene extends Phaser.Scene {
             });
         }
 
-        // Init Chests
         if (data.chests) {
             this.chestGroup.clear(true, true);
             this.chests = {};
             data.chests.forEach(c => this.createChestSprite(c));
         }
 
-        // Init Items
         if (data.items) {
             this.itemGroup.clear(true, true);
             this.items = {};
             data.items.forEach(i => this.createItemSprite(i));
         }
 
-        // Camera follow
         if (this.players[data.id]) {
             this.cameras.main.startFollow(this.players[data.id].container);
             this.cameras.main.setZoom(1);
@@ -132,41 +121,35 @@ export class GameScene extends Phaser.Scene {
     }
 
     handleServerUpdate(packet) {
+        // 🟢 LỚP BẢO VỆ TUYỆT ĐỐI (Fix lỗi crash: reading 'size' of undefined)
+        if (!this.chestGroup || !this.itemGroup || !this.projectileGroup || !this.foodGroup) {
+            return;
+        }
+
         // 1. Update Players
         if (packet.players) {
             packet.players.forEach(p => {
                 const player = this.players[p.id];
                 if (player) {
-                    // QUAN TRỌNG: Gọi hàm này để set mục tiêu Lerp
-                    if (player.updateServerData) {
-                        player.updateServerData(p);
-                    } else {
-                        player.update(p); // Fallback cho code cũ
-                    }
+                    if (player.updateServerData) player.updateServerData(p);
+                    else player.update(p);
                 } else {
                     this.addPlayer(p);
                 }
             });
         }
 
-        // 2. Update Foods (DELTA OPTIMIZATION)
-        // Xóa food bị ăn (Server gửi id trong mảng foodsRemoved)
-        if (packet.foodsRemoved && packet.foodsRemoved.length > 0) {
+        // 2. Update Foods
+        if (packet.foodsRemoved) {
             packet.foodsRemoved.forEach(id => {
                 if (this.foods[id]) {
-                    this.foods[id].destroy(); // Xóa sprite Phaser
-                    delete this.foods[id];    // Xóa khỏi Map
+                    this.foods[id].destroy();
+                    delete this.foods[id];
                 }
             });
         }
-
-        // Thêm food mới sinh (Server gửi object trong mảng foodsAdded)
-        if (packet.foodsAdded && packet.foodsAdded.length > 0) {
-            packet.foodsAdded.forEach(f => this.createFoodSprite(f));
-        }
-
-        // Hỗ trợ update full list (như code cũ của bạn) nếu server gửi gói tin cũ
-        if (packet.foods) {
+        if (packet.foodsAdded) packet.foodsAdded.forEach(f => this.createFoodSprite(f));
+        if (packet.foods) { // Full sync fallback
             this.foodGroup.clear(true, true);
             this.foods = {};
             packet.foods.forEach(f => this.createFoodSprite(f));
@@ -176,26 +159,25 @@ export class GameScene extends Phaser.Scene {
         if (packet.projectiles) {
             this.projectileGroup.clear(true, true);
             packet.projectiles.forEach(p => {
-                const bullet = this.add.circle(p.x, p.y, 8, 0xFFFF00);
+                // Vẽ đạn dựa trên màu server gửi về (nếu có), mặc định vàng
+                const color = p.color || 0xFFFF00; 
+                const bullet = this.add.circle(p.x, p.y, 8, color);
                 this.projectileGroup.add(bullet);
             });
         }
 
-        // 🟢 Update Chests
+        // 4. Update Chests
         if (packet.chestsRemoved) {
             packet.chestsRemoved.forEach(id => {
                 if (this.chests[id]) {
                     this.chests[id].destroy();
                     delete this.chests[id];
-                    // Thêm hiệu ứng nổ bùm ở đây thì tuyệt
                 }
             });
         }
-        if (packet.chestsAdded) {
-            packet.chestsAdded.forEach(c => this.createChestSprite(c));
-        }
+        if (packet.chestsAdded) packet.chestsAdded.forEach(c => this.createChestSprite(c));
 
-        // 🟢 Update Items
+        // 5. Update Items
         if (packet.itemsRemoved) {
             packet.itemsRemoved.forEach(id => {
                 if (this.items[id]) {
@@ -204,14 +186,11 @@ export class GameScene extends Phaser.Scene {
                 }
             });
         }
-        if (packet.itemsAdded) {
-            packet.itemsAdded.forEach(i => this.createItemSprite(i));
-        }
+        if (packet.itemsAdded) packet.itemsAdded.forEach(i => this.createItemSprite(i));
     }
 
     addPlayer(playerData) {
         if (this.players[playerData.id]) return;
-        // Tạo instance mới của ClientPlayer
         this.players[playerData.id] = new ClientPlayer(this, playerData);
     }
 
@@ -222,29 +201,21 @@ export class GameScene extends Phaser.Scene {
         }
     }
 
-    // Helper: Tách hàm tạo food để tái sử dụng
     createFoodSprite(f) {
-        if (this.foods[f.id]) return; // Đã tồn tại thì bỏ qua
-
+        if (this.foods[f.id]) return;
         let color = 0xFFFFFF;
         if (f.type === 0) color = 0xFF4444;
         if (f.type === 1) color = 0x44FF44;
         if (f.type === 2) color = 0x4444FF;
-
         const food = this.add.circle(f.x, f.y, 5, color);
         this.foodGroup.add(food);
-
-        // Lưu vào Map để quản lý xóa nhanh
         this.foods[f.id] = food;
     }
 
     createChestSprite(c) {
         if (this.chests[c.id]) return;
-
-        // Vẽ Chest: Hình vuông màu nâu/cam (Tượng trưng thùng hàng không gian)
         const chest = this.add.rectangle(c.x, c.y, 40, 40, 0xCD853F);
         chest.setStrokeStyle(2, 0xFFFFFF);
-
         this.chestGroup.add(chest);
         this.chests[c.id] = chest;
     }
@@ -254,94 +225,41 @@ export class GameScene extends Phaser.Scene {
 
         let color = 0xFFFFFF;
         let text = "?";
-        let fontSize = '11px'; // Chữ nhỏ vừa vặn
+        let fontSize = '11px';
 
         switch (i.type) {
-            // --- Vật phẩm hỗ trợ ---
-            case 'HEALTH_PACK':
-                color = 0xFF0000; // Đỏ
-                text = "HP";      // Health
-                break;
-            case 'SHIELD':
-                color = 0x00FFFF; // Cyan
-                text = "SHD";     // Shield
-                break;
-            case 'SPEED':
-                color = 0xFFFF00; // Vàng
-                text = "SPD";     // Speed
-                break;
-
-            // --- Vũ khí (Weapon) ---
-            case 'WEAPON_ROCKET':
-                color = 0xFF4500; // Cam đậm (Rocket)
-                text = "RKT";
-                break;
-            case 'WEAPON_SHOTGUN':
-                color = 0xFFA500; // Cam (Shotgun)
-                text = "SHT";
-                break;
-            case 'WEAPON_MACHINEGUN':
-                color = 0xADFF2F; // Xanh nõn chuối (Machine Gun)
-                text = "MG";
-                break;
-            case 'WEAPON_LASER':
-                color = 0x00BFFF; // Xanh biển (Laser)
-                text = "LSR";
-                break;
-
-            default:
-                // Fallback cho loại lạ
-                if (i.type.includes('WEAPON')) {
-                    color = 0x9933FF;
-                    text = "W";
-                }
+            case 'HEALTH_PACK': color = 0xFF0000; text = "HP"; break;
+            case 'SHIELD': color = 0x00FFFF; text = "SHD"; break;
+            case 'SPEED': color = 0xFFFF00; text = "SPD"; break;
+            case 'WEAPON_ROCKET': color = 0xFF4500; text = "RKT"; break;
+            case 'WEAPON_SHOTGUN': color = 0xFFA500; text = "SHT"; break;
+            case 'WEAPON_MACHINEGUN': color = 0xADFF2F; text = "MG"; break;
+            case 'WEAPON_LASER': color = 0x00BFFF; text = "LSR"; break;
+            default: if (i.type.includes('WEAPON')) { color = 0x9933FF; text = "W"; }
         }
 
-        // Vẽ Item: Tròn nhỏ phát sáng
         const container = this.add.container(i.x, i.y);
-
-        // Vòng tròn nền
         const circle = this.add.circle(0, 0, 15, color);
-        // Thêm viền đen mỏng để chữ dễ đọc hơn trên nền sáng
         circle.setStrokeStyle(2, 0x000000);
-
-        // Chữ viết tắt
-        const label = this.add.text(0, 0, text, {
-            fontSize: fontSize,
-            color: '#000000',
-            fontFamily: 'Arial',
-            fontWeight: 'bold'
-        }).setOrigin(0.5); // Căn giữa chữ vào tâm vòng tròn
+        const label = this.add.text(0, 0, text, { fontSize, color: '#000000', fontFamily: 'Arial', fontWeight: 'bold' }).setOrigin(0.5);
 
         container.add([circle, label]);
-
-        // Tween item nhấp nháy/bay bay cho đẹp
         this.tweens.add({
-            targets: container,
-            scaleX: 1.15,
-            scaleY: 1.15,
-            yoyo: true,
-            repeat: -1,
-            duration: 600,
-            ease: 'Sine.easeInOut'
+            targets: container, scaleX: 1.15, scaleY: 1.15,
+            yoyo: true, repeat: -1, duration: 600, ease: 'Sine.easeInOut'
         });
 
         this.itemGroup.add(container);
         this.items[i.id] = container;
     }
 
-    // Giữ lại hàm cũ trỏ về logic mới để không break code
     updateFoods(foodsData) {
         this.foodGroup.clear(true, true);
         this.foods = {};
         foodsData.forEach(f => this.createFoodSprite(f));
     }
-
+    
     getLeaderboard() {
-        const list = Object.values(this.players).map(p => ({
-            name: p.name, // Giả định ClientPlayer có thuộc tính name
-            score: p.score // Giả định ClientPlayer có thuộc tính score
-        }));
-        return list.sort((a, b) => b.score - a.score).slice(0, 10);
+       return Object.values(this.players).map(p => ({ name: p.name, score: p.score })).sort((a,b) => b.score - a.score).slice(0, 10);
     }
 }
