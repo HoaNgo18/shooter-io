@@ -2,7 +2,7 @@ import { Entity } from './Entity.js';
 import { ENTITY_TYPES, MAP_SIZE } from '../../../shared/src/constants.js';
 
 export class Projectile extends Entity {
-  constructor(x, y, angle, speed, damage, ownerId) {
+  constructor(x, y, angle, speed, damage, ownerId, ownerName) {
     super(x, y, 5); // THÊM: Radius = 5 để Physics check va chạm
     this.type = ENTITY_TYPES.PROJECTILE;
 
@@ -12,6 +12,7 @@ export class Projectile extends Entity {
     this.speed = speed; // Lưu speed gốc (600)
     this.damage = damage;
     this.ownerId = ownerId;
+    this.ownerName = ownerName; // Lưu tên chủ sở hữu
     
     this.createdAt = Date.now();
     this.hit = false;

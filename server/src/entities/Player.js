@@ -157,7 +157,7 @@ export class Player extends Entity {
     }
   }
   
-  attack() {
+ attack() {
     const now = Date.now();
     // Lấy thông số súng dựa trên vũ khí hiện tại
     const stats = WEAPON_STATS[this.weapon] || WEAPON_STATS.PISTOL;
@@ -184,9 +184,10 @@ export class Player extends Entity {
       const p = new Projectile(
         this.x, this.y,
         finalAngle,
-        stats.speed,
-        stats.damage,
-        this.id
+        stats.speed,  // Dùng stats của HEAD (vì biến weaponData không tồn tại ở đây)
+        stats.damage, // Dùng stats của HEAD
+        this.id,
+        this.name     // 🟢 QUAN TRỌNG: Lấy từ nhánh FIX để hiện tên người bắn
       );
       
       // Gán màu để Client vẽ đúng màu súng
@@ -217,12 +218,32 @@ export class Player extends Entity {
     this.x = pos.x;
     this.y = pos.y;
     this.health = this.maxHealth;
-    this.score = Math.max(0, this.score - 50); // Phạt điểm
+
+    // --- MERGE LOGIC ---
+
+    // 1. Logic điểm số (Lấy của HEAD: trừ 50 điểm thay vì về 0)
+    this.score = Math.max(0, this.score - 50); 
     
-    // Reset vũ khí về mặc định khi chết (Tuỳ chọn logic game)
+    // 2. Reset vũ khí & Buffs (Lấy của HEAD)
     this.weapon = 'PISTOL'; 
     this.shieldEndTime = 0;
     this.speedBuffEndTime = 0;
+
+    // 3. Reset Input & Physics (Lấy của FIX - Rất quan trọng để tránh lỗi)
+    this.angle = 0;
+    this.input = {
+      up: false, down: false, left: false, right: false,
+      mouseX: 0, mouseY: 0,
+      space: false,
+      // Đã bỏ num1, num2, num3 vì bạn không dùng nữa
+    };
+    this.dashEndTime = 0;
+    this.dashCooldownTime = 0;
+    this.lastAttack = 0;
+    this.lastDamageTime = 0;
+    
+    // Reset kích thước về ban đầu (FIX) - Nếu không có dòng này, hồi sinh vẫn to đùng
+    this.radius = PLAYER_RADIUS;
   }
 
   clampToMap() {

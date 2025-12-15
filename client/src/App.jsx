@@ -2,29 +2,46 @@ import React, { useState, useEffect } from 'react';
 import GameCanvas from './components/GameCanvas';
 import LoginScreen from './components/LoginScreen';
 import HUD from './components/HUD';
-import DeathScreen from './components/DeathScreen'; // Import
+import DeathScreen from './components/DeathScreen';
 import { socket } from './network/socket';
+import { PacketType } from '@shared/packetTypes';
 
 function App() {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isDead, setIsDead] = useState(false); // Trạng thái chết
+  const [isDead, setIsDead] = useState(false);
   const [killerName, setKillerName] = useState('');
+  const [finalScore, setFinalScore] = useState(0);
+
+  const handleQuitToMenu = () => {
+    setIsDead(false);
+    setKillerName('');
+    setFinalScore(0);
+    setIsPlaying(false);
+  };
 
   useEffect(() => {
     // Lắng nghe sự kiện từ socket để hiện Death Screen
     const unsubscribe = socket.subscribe((data) => {
-      // Khi mình chết
-      if (data.type === 'GAME_UPDATE' && data.me && data.me.dead) {
-         if (!isDead) setIsDead(true); // Chỉ set 1 lần
-      }
-      
-      // Khi mình hồi sinh (Server gửi me.dead = false)
-      if (data.type === 'GAME_UPDATE' && data.me && !data.me.dead && isDead) {
-         setIsDead(false);
-         setKillerName('');
+      // Khi mình chết - Server gửi PLAYER_DIED
+      if (data.type === PacketType.PLAYER_DIED && data.victimId === socket.myId) {
+        setIsDead(true);
+        // Lấy tên kẻ giết mình (nếu có)
+        const killer = data.killerName || 'Unknown';
+        setKillerName(killer);
+        // Lấy score trước khi chết
+        const score = data.score || 0;
+        setFinalScore(score);
       }
 
-      // Lấy tên kẻ giết mình (Optional - Xử lý packet PLAYER_DIED riêng ở socket.js nếu muốn chuẩn hơn)
+      // Khi hồi sinh (nhận UPDATE từ server với player alive)
+      if (data.type === PacketType.UPDATE && isDead) {
+        // Tìm mình trong danh sách players
+        const me = data.players?.find(p => p.id === socket.myId);
+        if (me && !me.dead) {
+          setIsDead(false);
+          setKillerName('');
+        }
+      }
     });
     return () => unsubscribe();
   }, [isDead]);
@@ -39,7 +56,7 @@ function App() {
       {isPlaying && !isDead && <HUD />}
 
       {/* Khi chết thì hiện Death Screen */}
-      {isPlaying && isDead && <DeathScreen killerName={killerName} />}
+      {isPlaying && isDead && <DeathScreen killerName={killerName} score={finalScore} onQuit={handleQuitToMenu} />}
     </div>
   );
 }

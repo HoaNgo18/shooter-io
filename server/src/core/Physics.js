@@ -39,7 +39,7 @@ export class Physics {
           proj.hit = true;
 
           if (player.isDead()) {
-            this.handlePlayerDeath(player, proj.ownerId);
+            this.handlePlayerDeath(player, proj.ownerId, proj.ownerName);
           }
           break;
         }
@@ -187,8 +187,9 @@ export class Physics {
     }
   }
 
-  handlePlayerDeath(player, killerId) {
+  handlePlayerDeath(player, killerId, killerName) {
     const killer = this.game.players.get(killerId);
+    
     if (killer) {
       killer.score += 100;
       killer.health = Math.min(killer.health + 20, killer.maxHealth);
@@ -199,7 +200,9 @@ export class Physics {
     this.game.server.broadcast({
       type: 'player_died',
       victimId: player.id,
-      killerId: killerId
+      killerId: killerId,
+      killerName: killerName || 'Unknown',
+      score: player.score
     });
   }
 }
