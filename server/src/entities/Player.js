@@ -2,12 +2,11 @@ import { Entity } from './Entity.js';
 import {
   PLAYER_SPEED,
   PLAYER_MAX_HEALTH,
-  WEAPON_TYPES,
   MAP_SIZE,
   PLAYER_RADIUS,
-  REGEN_DELAY,
-  REGEN_RATE,
-  DASH_DURATION, DASH_COOLDOWN, DASH_MULTIPLIER
+  REGEN_DELAY, REGEN_RATE,
+  DASH_DURATION, DASH_COOLDOWN, DASH_MULTIPLIER,
+  WEAPON_STATS, ITEM_TYPES
 } from '../../../shared/src/constants.js';
 import { getRandomPosition } from '../../../shared/src/utils.js';
 import { Projectile } from './Projectile.js';
@@ -22,20 +21,26 @@ export class Player extends Entity {
     this.health = PLAYER_MAX_HEALTH;
     this.maxHealth = PLAYER_MAX_HEALTH;
     this.score = 0;
-    this.weapon = 'PISTOL';
+    this.weapon = 'PISTOL'; // Mặc định
     this.angle = 0;
     this.dead = false;
     this.lastDamageTime = 0;
     this.lastAttack = 0;
     this.radius = PLAYER_RADIUS;
+    
+    // Dash logic
     this.dashEndTime = 0;
     this.dashCooldownTime = 0;
 
+    // 🟢 Quản lý Buff
+    this.shieldEndTime = 0;    // Thời gian hết khiên
+    this.speedBuffEndTime = 0; // Thời gian hết tốc chạy
+
+    // Input (Đã bỏ num1, num2, num3)
     this.input = {
       up: false, down: false, left: false, right: false,
       mouseX: 0, mouseY: 0,
-      space: false,
-      num1: false, num2: false, num3: false
+      space: false
     };
   }
 
@@ -43,9 +48,6 @@ export class Player extends Entity {
     // 1. Cập nhật các phím di chuyển 
     if (data.movement) {
       Object.assign(this.input, data.movement);
-      if (data.movement.num1) this.weapon = 'PISTOL';
-      if (data.movement.num2) this.weapon = 'SHOTGUN';
-      if (data.movement.num3) this.weapon = 'MACHINEGUN';
     }
 
     // 2. Cập nhật tọa độ chuột
@@ -62,26 +64,29 @@ export class Player extends Entity {
     if (this.dead) return;
 
     // 1. Xử lý Input Dash
-    // Nếu bấm Space VÀ Đã hồi chiêu xong
     if (this.input.space && Date.now() > this.dashCooldownTime) {
-      // Bắt đầu Dash
       this.dashEndTime = Date.now() + DASH_DURATION;
       this.dashCooldownTime = Date.now() + DASH_COOLDOWN;
     }
 
     // 2. Tính toán tốc độ
-    let currentSpeed = PLAYER_SPEED; // Tốc độ gốc
+    let currentSpeed = PLAYER_SPEED;
 
-    // Tính giảm tốc do kích thước 
+    // Giảm tốc do kích thước (Càng to càng chậm)
     const sizeFactor = this.radius / PLAYER_RADIUS;
     currentSpeed = currentSpeed / Math.sqrt(sizeFactor);
 
-    // Kiểm tra xem có đang trong thời gian Dash không?
+    // Buff Dash
     if (Date.now() < this.dashEndTime) {
-      currentSpeed *= DASH_MULTIPLIER; // Tăng tốc gấp 3
+      currentSpeed *= DASH_MULTIPLIER; 
     }
 
-    //  3. Di chuyển 
+    // 🟢 Buff Speed (Item)
+    if (Date.now() < this.speedBuffEndTime) {
+      currentSpeed *= 2;
+    }
+
+    // 3. Di chuyển 
     let dx = 0;
     let dy = 0;
     if (this.input.up) dy -= 1;
@@ -98,19 +103,17 @@ export class Player extends Entity {
       this.y += dy * currentSpeed * dt;
     }
 
+    // 4. Góc quay
     this.angle = Math.atan2(this.input.mouseY - this.y, this.input.mouseX - this.x);
 
-    this.regenerate(dt); // Hồi máu
-    this.clampToMap();   // Không chạy ra khỏi map
+    // 5. Hồi phục & Giới hạn map
+    this.regenerate(dt); 
+    this.clampToMap();   
   }
 
-  // Hàm check level up
   checkLevelUp() {
-    // Cứ 100 điểm tăng 10% kích thước
-    // Scale = 1 + (Score / 1000)
+    // Scale = 1 + (Score / 500)
     const scaleFactor = 1 + (this.score / 500);
-
-    // Cập nhật bán kính va chạm
     this.radius = PLAYER_RADIUS * scaleFactor;
 
     // Giới hạn max size 
@@ -119,28 +122,60 @@ export class Player extends Entity {
     }
   }
 
+  // 🟢 HÀM QUAN TRỌNG: Xử lý ăn vật phẩm
+  applyItem(type) {
+    switch (type) {
+      case ITEM_TYPES.HEALTH_PACK:
+        // Hồi 50% máu tối đa
+        this.health = Math.min(this.health + (this.maxHealth * 0.5), this.maxHealth);
+        break;
+        
+      case ITEM_TYPES.SHIELD:
+        // Bất tử 5s
+        this.shieldEndTime = Date.now() + 5000;
+        break;
+        
+      case ITEM_TYPES.SPEED:
+        // Tăng tốc 5s
+        this.speedBuffEndTime = Date.now() + 5000;
+        break;
+      
+      // Đổi vũ khí (Pickup & Use)
+      // Lưu ý: Key của WEAPON_STATS phải khớp với chuỗi gán ở đây (ROCKET, SHOTGUN...)
+      case ITEM_TYPES.WEAPON_ROCKET:
+        this.weapon = 'ROCKET';
+        break;
+      case ITEM_TYPES.WEAPON_SHOTGUN:
+        this.weapon = 'SHOTGUN';
+        break;
+      case ITEM_TYPES.WEAPON_MACHINEGUN:
+        this.weapon = 'MACHINEGUN';
+        break;
+      case ITEM_TYPES.WEAPON_LASER:
+        this.weapon = 'LASER';
+        break;
+    }
+  }
+  
   attack() {
     const now = Date.now();
-    const weaponData = WEAPON_TYPES[this.weapon];
+    // Lấy thông số súng dựa trên vũ khí hiện tại
+    const stats = WEAPON_STATS[this.weapon] || WEAPON_STATS.PISTOL;
 
-    if (now - this.lastAttack < weaponData.cooldown) return null;
-
+    if (now - this.lastAttack < stats.cooldown) return null;
     this.lastAttack = now;
 
-    // LOGIC MỚI: Tạo nhiều viên đạn (cho Shotgun)
     const projectiles = [];
-    const count = weaponData.count || 1;
-    const spread = weaponData.spread || 0;
+    const count = stats.count;
+    const spread = stats.spread;
 
     for (let i = 0; i < count; i++) {
-      // Tính góc lệch
-      // Nếu bắn 1 viên -> góc chính giữa
-      // Nếu bắn nhiều -> rải đều từ -spread/2 đến +spread/2
       let angleOffset = 0;
       if (count > 1) {
+        // Chia đều góc nếu bắn nhiều viên (Shotgun)
         angleOffset = -spread / 2 + (spread * i / (count - 1));
       } else {
-        // Machine gun random rung tay một chút
+        // Rung tay ngẫu nhiên nếu bắn 1 viên (Machinegun)
         angleOffset = (Math.random() - 0.5) * spread;
       }
 
@@ -149,22 +184,27 @@ export class Player extends Entity {
       const p = new Projectile(
         this.x, this.y,
         finalAngle,
-        weaponData.projectileSpeed,
-        weaponData.damage,
+        stats.speed,
+        stats.damage,
         this.id
       );
+      
+      // Gán màu để Client vẽ đúng màu súng
+      p.color = stats.color;
       projectiles.push(p);
     }
-
-    return projectiles; // Trả về MẢNG
+    return projectiles;
   }
 
   takeDamage(amount, attackerId) {
+    // Kiểm tra khiên
+    if (Date.now() < this.shieldEndTime) {
+      return; // Bất tử
+    }
+
     this.health -= amount;
-
-    // THÊM: Ghi lại thời điểm bị đánh
     this.lastDamageTime = Date.now();
-
+    
     if (this.health < 0) this.health = 0;
   }
 
@@ -177,7 +217,12 @@ export class Player extends Entity {
     this.x = pos.x;
     this.y = pos.y;
     this.health = this.maxHealth;
-    this.score = Math.max(0, this.score - 50);
+    this.score = Math.max(0, this.score - 50); // Phạt điểm
+    
+    // Reset vũ khí về mặc định khi chết (Tuỳ chọn logic game)
+    this.weapon = 'PISTOL'; 
+    this.shieldEndTime = 0;
+    this.speedBuffEndTime = 0;
   }
 
   clampToMap() {
@@ -185,23 +230,16 @@ export class Player extends Entity {
     this.x = Math.max(-max, Math.min(max, this.x));
     this.y = Math.max(-max, Math.min(max, this.y));
   }
-  // Logic tự hồi máu
+
   regenerate(dt) {
-    // 1. Kiểm tra xem đã đầy máu chưa? Đầy rồi thì thôi
     if (this.health >= this.maxHealth) {
       this.health = this.maxHealth;
       return;
     }
 
-    // 2. Kiểm tra thời gian chờ (Out of combat)
-    // Nếu thời gian hiện tại - lần cuối bị đánh > 3 giây
+    // Nếu không bị đánh trong 3s thì hồi máu
     if (Date.now() - this.lastDamageTime > REGEN_DELAY) {
-
-      // 3. Cộng máu
-      // Công thức: Tốc độ * thời gian trôi qua (để mượt ở mọi FPS)
       this.health += REGEN_RATE * dt;
-
-      // 4. Không được vượt quá Max Health
       if (this.health > this.maxHealth) {
         this.health = this.maxHealth;
       }
@@ -221,7 +259,9 @@ export class Player extends Entity {
       dead: this.dead,
       weapon: this.weapon,
       radius: this.radius,
-      dashCooldown: this.dashCooldownTime // Gửi thời gian hồi xong
+      // Gửi trạng thái Buff về Client để vẽ hiệu ứng
+      hasShield: Date.now() < this.shieldEndTime, 
+      isSpeedUp: Date.now() < this.speedBuffEndTime
     };
   }
 }

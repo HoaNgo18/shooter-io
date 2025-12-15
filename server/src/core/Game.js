@@ -1,9 +1,11 @@
 // server/src/core/Game.js
 
-import { TICK_RATE, MAP_SIZE, FOOD_COUNT, OBSTACLE_COUNT, OBSTACLE_RADIUS_MIN, OBSTACLE_RADIUS_MAX } from '../../../shared/src/constants.js';
+import { TICK_RATE, MAP_SIZE, FOOD_COUNT, OBSTACLE_COUNT, OBSTACLE_RADIUS_MIN, OBSTACLE_RADIUS_MAX, CHEST_COUNT, CHEST_RADIUS, ITEM_TYPES } from '../../../shared/src/constants.js';
 import { PacketType } from '../../../shared/src/packetTypes.js';
 import { Player } from '../entities/Player.js';
 import { Physics } from './Physics.js';
+import { Chest } from '../entities/Chest.js';
+import { Item } from '../entities/Item.js';
 
 export class Game {
   constructor(server) {
@@ -24,6 +26,17 @@ export class Game {
     // Quản lý chướng ngại vật
     this.obstacles = []; 
     this.initObstacles();
+
+    // Quản lý Chest
+    this.chests = [];
+    this.removedChestIds = []; // Delta
+    this.newChests = [];       // Delta
+    this.initChests();
+
+    // Quản lý Items (Rơi trên đất)
+    this.items = [];
+    this.removedItemIds = [];  // Delta
+    this.newItems = [];        // Delta
   }
 
   start() {
@@ -52,6 +65,21 @@ export class Game {
     }
   }
 
+  initChests() {
+    for (let i = 0; i < CHEST_COUNT; i++) {
+        this.chests.push(this._spawnRandomChest(`chest_${i}`));
+    }
+  }
+
+  _spawnRandomChest(id) {
+    const max = MAP_SIZE / 2 - CHEST_RADIUS;
+    return new Chest(
+        (Math.random() * MAP_SIZE) - max,
+        (Math.random() * MAP_SIZE) - max,
+        id
+    );
+  }
+
   _createFoodObject() {
     const max = MAP_SIZE / 2;
     return {
@@ -68,10 +96,25 @@ export class Game {
     return food;
   }
 
+  // 🟢 Hàm tạo item rơi ra (được gọi từ Physics)
+  spawnItem(x, y) {
+    // Random loại item
+    const keys = Object.values(ITEM_TYPES);
+    const randomType = keys[Math.floor(Math.random() * keys.length)];
+    
+    const item = new Item(x, y, randomType);
+    this.items.push(item);
+    this.newItems.push(item); // Báo update
+  }
+
   tick() {
     // 1. Reset Delta
     this.removedFoodIds = [];
     this.newFoods = [];
+    this.removedChestIds = [];
+    this.newChests = [];
+    this.removedItemIds = [];
+    this.newItems = [];
 
     const now = Date.now();
     let dt = (now - this.lastTick) / 1000;
@@ -104,7 +147,15 @@ export class Game {
        this.foods.push(this.generateAndTrackFood());
     }
 
-    // 6. Send Update
+    // 6. Respawn Chests (Nếu bị bắn vỡ thì sinh lại sau frame đó luôn hoặc delay tuỳ ý)
+    // Ở đây làm đơn giản: thiếu là bù luôn
+    while (this.chests.length < CHEST_COUNT) {
+        const newChest = this._spawnRandomChest(Math.random().toString(36).substr(2, 9));
+        this.chests.push(newChest);
+        this.newChests.push(newChest);
+    }
+
+    // 7. Send Update
     this.sendStateUpdate();
   }
 
@@ -119,7 +170,9 @@ export class Game {
       player: player.serialize(),
       players: Array.from(this.players.values()).map(p => p.serialize()),
       foods: this.foods,      
-      obstacles: this.obstacles 
+      obstacles: this.obstacles,
+      chests: this.chests, // Gửi full
+      items: this.items    // Gửi full
     });
 
     this.server.broadcast({
@@ -167,11 +220,17 @@ export class Game {
     const state = {
       type: PacketType.UPDATE,
       t: Date.now(),
-      // QUAN TRỌNG: Gửi mảng players để HUD vẽ Leaderboard
+      // 🟢 QUAN TRỌNG: Gửi mảng players để HUD vẽ Leaderboard
       players: Array.from(this.players.values()).map(p => p.serialize()), 
       projectiles: this.projectiles.map(p => p.serialize()),
       foodsAdded: this.newFoods,
-      foodsRemoved: this.removedFoodIds
+      foodsRemoved: this.removedFoodIds,
+      // Thêm Delta Chests
+      chestsAdded: this.newChests,
+      chestsRemoved: this.removedChestIds,
+      // Thêm Delta Items
+      itemsAdded: this.newItems,
+      itemsRemoved: this.removedItemIds
     };
 
     this.server.broadcast(state);

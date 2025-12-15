@@ -1,7 +1,7 @@
 // server/src/core/Physics.js
 
 import { circleCollision } from '../../../shared/src/utils.js';
-import { PLAYER_RADIUS, MAP_SIZE, FOOD_RADIUS, XP_PER_FOOD } from '../../../shared/src/constants.js';
+import { PLAYER_RADIUS, MAP_SIZE, FOOD_RADIUS, XP_PER_FOOD, CHEST_RADIUS, ITEM_RADIUS } from '../../../shared/src/constants.js';
 import { Quadtree } from '../utils/Quadtree.js';
 
 export class Physics {
@@ -117,6 +117,59 @@ export class Physics {
         }
       }
     }
+    // 🟢 1. Projectile vs Chests (Bắn hòm)
+    // Duyệt ngược đạn
+    for (let i = this.game.projectiles.length - 1; i >= 0; i--) {
+        const proj = this.game.projectiles[i];
+        
+        for (let j = this.game.chests.length - 1; j >= 0; j--) {
+            const chest = this.game.chests[j];
+            
+            // Check va chạm tròn
+            if (circleCollision(proj.x, proj.y, 5, chest.x, chest.y, chest.radius)) {
+                // Trừ máu chest
+                chest.takeDamage(proj.damage);
+                
+                // Xóa đạn
+                this.game.projectiles.splice(i, 1);
+                
+                // Nếu chest vỡ
+                if (chest.dead) {
+                    this.game.spawnItem(chest.x, chest.y); // Rơi đồ
+                    this.game.removedChestIds.push(chest.id); // Báo xóa hình
+                    this.game.chests.splice(j, 1); // Xóa khỏi mảng logic
+                }
+                break; // Đạn đã mất, không check chest khác
+            }
+        }
+    }
+
+    // 🟢 2. Player vs Items (Nhặt đồ)
+    this.game.players.forEach(player => {
+        if (player.dead) return;
+
+        for (let i = this.game.items.length - 1; i >= 0; i--) {
+            const item = this.game.items[i];
+            
+            if (circleCollision(player.x, player.y, player.radius, item.x, item.y, ITEM_RADIUS)) {
+                // Player nhận hiệu ứng
+                player.applyItem(item.type);
+                
+                // Xóa item
+                this.game.removedItemIds.push(item.id);
+                this.game.items.splice(i, 1);
+            }
+        }
+    });
+
+    // ... (Collision Player vs Player, Player vs Obstacles cũ...) ...
+    // ⚠️ LƯU Ý: Nhớ thêm logic chặn Player đi xuyên qua Chest (giống Obstacle)
+    this.game.players.forEach(player => {
+        this.game.chests.forEach(chest => {
+             // Logic đẩy lùi giống obstacle
+             // ...
+        });
+    });
   }
 
   resolvePlayerCollision(p1, p2) {

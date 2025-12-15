@@ -28,15 +28,32 @@ export const OBSTACLE_COUNT = 50;
 export const OBSTACLE_RADIUS_MIN = 30; 
 export const OBSTACLE_RADIUS_MAX = 80;
 
-export const WEAPON_TYPES = {
-  // Súng mặc định (Súng lục)
-  PISTOL: { damage: 15, range: 600, cooldown: 400, projectileSpeed: 600, count: 1, spread: 0 },
-  
-  // Shotgun: Bắn 5 viên, tản ra, tầm gần, delay lâu
-  SHOTGUN: { damage: 10, range: 400, cooldown: 1000, projectileSpeed: 500, count: 5, spread: 0.5 },
-  
-  // Machine Gun: Bắn nhanh, dam bé, hơi tản mát nhẹ
-  MACHINEGUN: { damage: 8, range: 700, cooldown: 100, projectileSpeed: 700, count: 1, spread: 0.1 }
+// Thêm cấu hình Chest (Hòm đồ)
+export const CHEST_COUNT = 15;        // Số lượng hòm trên map
+export const CHEST_RADIUS = 25;
+export const CHEST_HP = 50;           // Máu của hòm
+
+// Định nghĩa các loại Item rơi ra
+export const ITEM_TYPES = {
+  HEALTH_PACK: 'HEALTH_PACK', // Hồi máu
+  SHIELD: 'SHIELD',           // Bất tử
+  SPEED: 'SPEED',             // Tốc chạy
+  // Các loại súng
+  WEAPON_ROCKET: 'WEAPON_ROCKET',
+  WEAPON_SHOTGUN: 'WEAPON_SHOTGUN',
+  WEAPON_MACHINEGUN: 'WEAPON_MACHINEGUN',
+  WEAPON_LASER: 'WEAPON_LASER'
+};
+
+export const ITEM_RADIUS = 15;
+
+// Cấu hình vũ khí (Damage, Speed, Cooldown, v.v.)
+export const WEAPON_STATS = {
+  PISTOL:     { cooldown: 400, damage: 10, speed: 600, count: 1, spread: 0, color: 0xFFFF00 },
+  ROCKET:     { cooldown: 800, damage: 60, speed: 400, count: 1, spread: 0, color: 0xFF4400 }, // Chậm, đau
+  SHOTGUN:    { cooldown: 1000, damage: 15, speed: 500, count: 5, spread: 0.5, color: 0xFFAA00 }, // 5 viên
+  MACHINEGUN: { cooldown: 100, damage: 8,  speed: 700, count: 1, spread: 0.1, color: 0xFFFFAA }, // Bắn siêu nhanh
+  LASER:      { cooldown: 600, damage: 30, speed: 1200, count: 1, spread: 0, color: 0x00FFFF } // Siêu nhanh
 };
 
 export const ENTITY_TYPES = {
