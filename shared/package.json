@@ -1,5 +1,5 @@
 {
-  "name": "io-game-shared",
+  "name": "shared",
   "version": "1.0.0",
   "type": "module",
   "main": "src/constants.js",
