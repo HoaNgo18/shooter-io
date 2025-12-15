@@ -29,8 +29,9 @@ const HUD = () => {
           });
         }
 
-        // 2. CẬP NHẬT LEADERBOARD
-        const sorted = [...packet.players].sort((a, b) => b.score - a.score);
+        // 2. CẬP NHẬT LEADERBOARD (chỉ những người chơi sống)
+        const alivePlayers = packet.players.filter(p => !p.dead);
+        const sorted = [...alivePlayers].sort((a, b) => b.score - a.score);
         setLeaderboard(sorted.slice(0, 10));
       }
     });

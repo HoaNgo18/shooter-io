@@ -151,7 +151,8 @@ export class Player extends Entity {
         finalAngle,
         weaponData.projectileSpeed,
         weaponData.damage,
-        this.id
+        this.id,
+        this.name
       );
       projectiles.push(p);
     }
@@ -177,7 +178,21 @@ export class Player extends Entity {
     this.x = pos.x;
     this.y = pos.y;
     this.health = this.maxHealth;
-    this.score = Math.max(0, this.score - 50);
+    this.score = 0;
+    this.angle = 0;
+    this.weapon = 'PISTOL';
+    this.input = {
+      up: false, down: false, left: false, right: false,
+      mouseX: 0, mouseY: 0,
+      space: false,
+      num1: false, num2: false, num3: false
+    };
+    this.dashEndTime = 0;
+    this.dashCooldownTime = 0;
+    this.lastAttack = 0;
+    this.lastDamageTime = 0;
+    // Reset lại kích thước
+    this.radius = PLAYER_RADIUS;
   }
 
   clampToMap() {

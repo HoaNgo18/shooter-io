@@ -85,6 +85,11 @@ class NetworkManager {
       }
     }
 
+    // 2. Xử lý packet từ React (DeathScreen, HUD)
+    if (packet.type === PacketType.PLAYER_DIED) {
+      this.notifyReact(packet);
+    }
+
     if (packet.type === PacketType.PING) {
       this.send({ type: PacketType.PONG });
     }
