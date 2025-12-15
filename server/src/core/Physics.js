@@ -78,7 +78,7 @@ export class Physics {
           player.score += XP_PER_FOOD;
           player.checkLevelUp();
 
-          // 🟢 Lưu ID để gửi về Client xóa
+          // Lưu ID để gửi về Client xóa
           this.game.removedFoodIds.push(food.id);
           this.game.foods.splice(i, 1);
         }

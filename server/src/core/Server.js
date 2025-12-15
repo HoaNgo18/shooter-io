@@ -56,7 +56,7 @@ export class Server {
           client.player.lastPong = Date.now();
         }
         break;
-      case PacketType.RESPAWN: // 🟢 THÊM CASE NÀY
+      case PacketType.RESPAWN: 
         this.game.respawnPlayer(clientId);
         break;
     }

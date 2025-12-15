@@ -28,13 +28,13 @@ export class Player extends Entity {
     this.lastDamageTime = 0;
     this.lastAttack = 0;
     this.radius = PLAYER_RADIUS;
-    this.dashEndTime = 0;   
-    this.dashCooldownTime = 0;  
+    this.dashEndTime = 0;
+    this.dashCooldownTime = 0;
 
     this.input = {
       up: false, down: false, left: false, right: false,
       mouseX: 0, mouseY: 0,
-      space: false, 
+      space: false,
       num1: false, num2: false, num3: false
     };
   }
@@ -42,19 +42,19 @@ export class Player extends Entity {
   setInput(data) {
     // 1. Cập nhật các phím di chuyển 
     if (data.movement) {
-        Object.assign(this.input, data.movement);
-        if (data.movement.num1) this.weapon = 'PISTOL';
-        if (data.movement.num2) this.weapon = 'SHOTGUN';
-        if (data.movement.num3) this.weapon = 'MACHINEGUN';
+      Object.assign(this.input, data.movement);
+      if (data.movement.num1) this.weapon = 'PISTOL';
+      if (data.movement.num2) this.weapon = 'SHOTGUN';
+      if (data.movement.num3) this.weapon = 'MACHINEGUN';
     }
 
     // 2. Cập nhật tọa độ chuột
     if (data.mouseX !== undefined) {
-        this.input.mouseX = data.mouseX; 
+      this.input.mouseX = data.mouseX;
     }
-    
+
     if (data.mouseY !== undefined) {
-        this.input.mouseY = data.mouseY;
+      this.input.mouseY = data.mouseY;
     }
   }
 
@@ -72,7 +72,7 @@ export class Player extends Entity {
     // 2. Tính toán tốc độ
     let currentSpeed = PLAYER_SPEED; // Tốc độ gốc
 
-    // Tính giảm tốc do kích thước (Code cũ của bạn)
+    // Tính giảm tốc do kích thước 
     const sizeFactor = this.radius / PLAYER_RADIUS;
     currentSpeed = currentSpeed / Math.sqrt(sizeFactor);
 
@@ -81,7 +81,7 @@ export class Player extends Entity {
       currentSpeed *= DASH_MULTIPLIER; // Tăng tốc gấp 3
     }
 
-    //  3. Di chuyển (Code cũ nhưng thay hằng số bằng biến currentSpeed)
+    //  3. Di chuyển 
     let dx = 0;
     let dy = 0;
     if (this.input.up) dy -= 1;
@@ -94,7 +94,6 @@ export class Player extends Entity {
       dx /= length;
       dy /= length;
 
-      // Lưu ý: Đảm bảo công thức này khớp với logic file Game.js của bạn
       this.x += dx * currentSpeed * dt;
       this.y += dy * currentSpeed * dt;
     }
@@ -105,16 +104,16 @@ export class Player extends Entity {
     this.clampToMap();   // Không chạy ra khỏi map
   }
 
-  // 🟢 THÊM: Hàm check level up
+  // Hàm check level up
   checkLevelUp() {
-    // Công thức đơn giản: Cứ 100 điểm tăng 10% kích thước
+    // Cứ 100 điểm tăng 10% kích thước
     // Scale = 1 + (Score / 1000)
     const scaleFactor = 1 + (this.score / 500);
 
     // Cập nhật bán kính va chạm
     this.radius = PLAYER_RADIUS * scaleFactor;
 
-    // Giới hạn max size (ví dụ to gấp 3 thôi)
+    // Giới hạn max size 
     if (this.radius > PLAYER_RADIUS * 3) {
       this.radius = PLAYER_RADIUS * 3;
     }
@@ -125,36 +124,36 @@ export class Player extends Entity {
     const weaponData = WEAPON_TYPES[this.weapon];
 
     if (now - this.lastAttack < weaponData.cooldown) return null;
-    
+
     this.lastAttack = now;
-    
-    // 🟢 LOGIC MỚI: Tạo nhiều viên đạn (cho Shotgun)
+
+    // LOGIC MỚI: Tạo nhiều viên đạn (cho Shotgun)
     const projectiles = [];
     const count = weaponData.count || 1;
     const spread = weaponData.spread || 0;
 
     for (let i = 0; i < count; i++) {
-        // Tính góc lệch
-        // Nếu bắn 1 viên -> góc chính giữa
-        // Nếu bắn nhiều -> rải đều từ -spread/2 đến +spread/2
-        let angleOffset = 0;
-        if (count > 1) {
-            angleOffset = -spread / 2 + (spread * i / (count - 1));
-        } else {
-             // Machine gun random rung tay một chút
-             angleOffset = (Math.random() - 0.5) * spread; 
-        }
+      // Tính góc lệch
+      // Nếu bắn 1 viên -> góc chính giữa
+      // Nếu bắn nhiều -> rải đều từ -spread/2 đến +spread/2
+      let angleOffset = 0;
+      if (count > 1) {
+        angleOffset = -spread / 2 + (spread * i / (count - 1));
+      } else {
+        // Machine gun random rung tay một chút
+        angleOffset = (Math.random() - 0.5) * spread;
+      }
 
-        const finalAngle = this.angle + angleOffset;
-        
-        const p = new Projectile(
-            this.x, this.y, 
-            finalAngle, 
-            weaponData.projectileSpeed, 
-            weaponData.damage, 
-            this.id
-        );
-        projectiles.push(p);
+      const finalAngle = this.angle + angleOffset;
+
+      const p = new Projectile(
+        this.x, this.y,
+        finalAngle,
+        weaponData.projectileSpeed,
+        weaponData.damage,
+        this.id
+      );
+      projectiles.push(p);
     }
 
     return projectiles; // Trả về MẢNG
@@ -163,7 +162,7 @@ export class Player extends Entity {
   takeDamage(amount, attackerId) {
     this.health -= amount;
 
-    // 🟢 THÊM: Ghi lại thời điểm bị đánh
+    // THÊM: Ghi lại thời điểm bị đánh
     this.lastDamageTime = Date.now();
 
     if (this.health < 0) this.health = 0;
@@ -186,7 +185,7 @@ export class Player extends Entity {
     this.x = Math.max(-max, Math.min(max, this.x));
     this.y = Math.max(-max, Math.min(max, this.y));
   }
-  // 🟢 HÀM MỚI: Logic tự hồi máu
+  // Logic tự hồi máu
   regenerate(dt) {
     // 1. Kiểm tra xem đã đầy máu chưa? Đầy rồi thì thôi
     if (this.health >= this.maxHealth) {

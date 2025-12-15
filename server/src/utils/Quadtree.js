@@ -1,4 +1,3 @@
-// server/src/utils/Quadtree.js
 
 export class Quadtree {
   constructor(boundary, capacity) {

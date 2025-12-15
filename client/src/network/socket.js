@@ -1,4 +1,4 @@
-// client/src/network/socket.js
+
 import { PacketType } from '@shared/packetTypes';
 
 class NetworkManager {
@@ -6,7 +6,7 @@ class NetworkManager {
     this.ws = null;
     this.gameScene = null;
     
-    // 🟢 QUAN TRỌNG: Biến này để HUD biết ai là người chơi hiện tại
+    // Biến này để HUD biết ai là người chơi hiện tại
     this.myId = null; 
     
     this.isConnected = false;
@@ -19,13 +19,13 @@ class NetworkManager {
 
       this.ws.onopen = () => {
         this.isConnected = true;
-        console.log('✅ Connected via WebSocket');
+        console.log('Connected via WebSocket');
         this.send({ type: PacketType.JOIN, name: username });
         resolve();
       };
 
       this.ws.onerror = (err) => {
-        console.error('❌ WebSocket error', err);
+        console.error('WebSocket error', err);
         reject(err);
       };
 
@@ -68,7 +68,7 @@ class NetworkManager {
           break;
 
         case PacketType.INIT:
-          // 🟢 QUAN TRỌNG: Lưu ID của mình khi server cấp
+          // QUAN TRỌNG: Lưu ID của mình khi server cấp
           this.myId = packet.id;
           
           this.gameScene.initGame(packet);

@@ -167,7 +167,7 @@ export class Game {
     const state = {
       type: PacketType.UPDATE,
       t: Date.now(),
-      // 🟢 QUAN TRỌNG: Gửi mảng players để HUD vẽ Leaderboard
+      // QUAN TRỌNG: Gửi mảng players để HUD vẽ Leaderboard
       players: Array.from(this.players.values()).map(p => p.serialize()), 
       projectiles: this.projectiles.map(p => p.serialize()),
       foodsAdded: this.newFoods,

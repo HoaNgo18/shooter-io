@@ -1,17 +1,17 @@
 import Phaser from 'phaser';
 import { socket } from '../../network/socket';
 import { PacketType } from '@shared/packetTypes';
-import { ClientPlayer } from '../entities/ClientPlayer'; // 🟢 Giữ nguyên path này
+import { ClientPlayer } from '../entities/ClientPlayer'; 
 
 export class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
         this.players = {}; // Object chứa các instance của ClientPlayer
-        this.foods = {};   // 🟢 Mới: Map quản lý food theo ID để xóa nhanh (O(1))
+        this.foods = {};   // Map quản lý food theo ID để xóa nhanh (O(1))
         this.keys = null;
         this.projectileGroup = null;
         this.foodGroup = null;
-        this.obstacleGroup = null; // 🟢 Đảm bảo khai báo group này
+        this.obstacleGroup = null;
     }
 
     create() {
@@ -21,7 +21,7 @@ export class GameScene extends Phaser.Scene {
         // 2. Background
         this.add.grid(0, 0, 5000, 5000, 100, 100, 0x1a1a1a, 1, 0x2a2a2a, 1);
 
-        // 3. Input Keyboard (Full WASD + Arrow + Space) - GIỮ NGUYÊN
+        // 3. Input Keyboard (Full WASD + Arrow + Space)
         this.keys = this.input.keyboard.addKeys({
             W: Phaser.Input.Keyboard.KeyCodes.W,
             A: Phaser.Input.Keyboard.KeyCodes.A,
@@ -37,24 +37,24 @@ export class GameScene extends Phaser.Scene {
             THREE: Phaser.Input.Keyboard.KeyCodes.THREE
         });
 
-        // 4. Groups - GIỮ NGUYÊN
+        // 4. Groups 
         this.projectileGroup = this.add.group();
         this.foodGroup = this.add.group();
         this.obstacleGroup = this.add.group();
 
-        // 5. Input Mouse (Click để bắn) - GIỮ NGUYÊN
+        // 5. Input Mouse (Click để bắn)
         this.input.on('pointerdown', (pointer) => {
             socket.send({ type: PacketType.ATTACK });
         });
 
-        console.log('🎮 GameScene Created');
+        console.log('GameScene Created');
     }
 
-    // 🟢 SỬA: Thêm tham số time, delta để tính toán Lerp
+    // SỬA: Thêm tham số time, delta để tính toán Lerp
     update(time, delta) {
         if (!socket.isConnected) return;
 
-        // 🟢 LOGIC LERP: Loop qua các player để di chuyển mượt
+        // LOGIC LERP: Loop qua các player để di chuyển mượt
         const dt = delta / 1000;
         Object.values(this.players).forEach(player => {
             // Kiểm tra xem hàm tick có tồn tại không trước khi gọi (để tránh crash nếu ClientPlayer chưa update)
@@ -63,7 +63,7 @@ export class GameScene extends Phaser.Scene {
             }
         });
 
-        // 🟢 FIX LỖI GHIM CHUỘT: Tính lại tọa độ World dựa trên Camera hiện tại
+        // Mouse: Tính lại tọa độ World dựa trên Camera hiện tại
         const pointer = this.input.activePointer;
         const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
 
@@ -92,14 +92,14 @@ export class GameScene extends Phaser.Scene {
             data.players.forEach(p => this.addPlayer(p));
         }
         
-        // 🟢 LOGIC MỚI: Init Foods và lưu vào Map
+        // LOGIC MỚI: Init Foods và lưu vào Map
         if (data.foods) {
             this.foodGroup.clear(true, true);
             this.foods = {}; // Reset map
             data.foods.forEach(f => this.createFoodSprite(f));
         }
 
-        // 🟢 Vẽ chướng ngại vật
+        // Vẽ chướng ngại vật
         if (data.obstacles) {
             data.obstacles.forEach(obs => {
                 const rock = this.add.circle(obs.x, obs.y, obs.radius, 0x888888);
@@ -121,9 +121,7 @@ export class GameScene extends Phaser.Scene {
             packet.players.forEach(p => {
                 const player = this.players[p.id];
                 if (player) {
-                    // 🟢 QUAN TRỌNG: Gọi hàm này để set mục tiêu Lerp
-                    // Nếu bạn chưa sửa ClientPlayer, hãy đảm bảo ClientPlayer có method 'updateServerData'
-                    // hoặc đổi tên hàm này về 'update' nếu bạn muốn giữ code cũ trong ClientPlayer
+                    // QUAN TRỌNG: Gọi hàm này để set mục tiêu Lerp
                     if (player.updateServerData) {
                         player.updateServerData(p); 
                     } else {
@@ -135,7 +133,7 @@ export class GameScene extends Phaser.Scene {
             });
         }
 
-        // 🟢 2. Update Foods (DELTA OPTIMIZATION)
+        // 2. Update Foods (DELTA OPTIMIZATION)
         // Xóa food bị ăn (Server gửi id trong mảng foodsRemoved)
         if (packet.foodsRemoved && packet.foodsRemoved.length > 0) {
             packet.foodsRemoved.forEach(id => {
@@ -170,7 +168,7 @@ export class GameScene extends Phaser.Scene {
 
     addPlayer(playerData) {
         if (this.players[playerData.id]) return;
-        // 🟢 Tạo instance mới của ClientPlayer
+        // Tạo instance mới của ClientPlayer
         this.players[playerData.id] = new ClientPlayer(this, playerData);
     }
 
@@ -181,7 +179,7 @@ export class GameScene extends Phaser.Scene {
         }
     }
 
-    // 🟢 HELPER: Tách hàm tạo food để tái sử dụng
+    // Helper: Tách hàm tạo food để tái sử dụng
     createFoodSprite(f) {
         if (this.foods[f.id]) return; // Đã tồn tại thì bỏ qua
 

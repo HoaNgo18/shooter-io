@@ -3,13 +3,13 @@ import { ENTITY_TYPES, MAP_SIZE } from '../../../shared/src/constants.js';
 
 export class Projectile extends Entity {
   constructor(x, y, angle, speed, damage, ownerId) {
-    super(x, y, 5); // 🟢 THÊM: Radius = 5 để Physics check va chạm
+    super(x, y, 5); // THÊM: Radius = 5 để Physics check va chạm
     this.type = ENTITY_TYPES.PROJECTILE;
 
     this.x = x;
     this.y = y;
     this.angle = angle;
-    this.speed = speed; // 🟢 SỬA: Lưu speed gốc (600), KHÔNG nhân 60 nữa
+    this.speed = speed; // Lưu speed gốc (600)
     this.damage = damage;
     this.ownerId = ownerId;
     
@@ -21,7 +21,7 @@ export class Projectile extends Entity {
     this.id = Math.random().toString(36).substr(2, 9);
   }
 
-  // 🟢 QUAN TRỌNG: Phải có hàm này đạn mới bay được
+  // QUAN TRỌNG: Phải có hàm này đạn mới bay được
   update(dt) {
     const moveDist = this.speed * dt; // Tốc độ * Thời gian trôi qua
 

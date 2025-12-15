@@ -12,7 +12,7 @@ export class ClientPlayer {
         this.x = playerData.x;
         this.y = playerData.y;
 
-        // 🟢 QUAN TRỌNG: Biến lưu vị trí đích (Target) để Lerp
+        // Biến lưu vị trí đích (Target) để Lerp
         this.targetX = playerData.x;
         this.targetY = playerData.y;
 
@@ -45,7 +45,7 @@ export class ClientPlayer {
         }).setOrigin(0.5);
         this.text.setDepth(2);
 
-        // 🟢 BỔ SUNG: Thanh máu (Thêm mới)
+        // BỔ SUNG: Thanh máu (Thêm mới)
         // Nền đen
         this.healthBarBg = scene.add.rectangle(playerData.x, playerData.y - 25, 40, 6, 0x000000);
         this.healthBarBg.setDepth(2);
@@ -55,7 +55,7 @@ export class ClientPlayer {
         this.healthBar.setDepth(2);
     }
 
-    // 🟢 HÀM 1: Nhận dữ liệu từ Server (Chỉ lưu đích đến & State)
+    //  Hàm 1: Nhận dữ liệu từ Server (Chỉ lưu đích đến & State)
     updateServerData(data) {
         // 1. Xử lý Chết/Sống
         if (data.dead) {
@@ -82,7 +82,7 @@ export class ClientPlayer {
         // 3. Cập nhật dữ liệu game (Score)
         this.score = data.score;
 
-        // 🟢 BỔ SUNG: Cập nhật Thanh Máu
+        // BỔ SUNG: Cập nhật Thanh Máu
         if (data.maxHealth) {
             // Tính phần trăm máu (Max là 40px chiều rộng)
             const percent = Math.max(0, data.health / data.maxHealth);
@@ -104,7 +104,7 @@ export class ClientPlayer {
         }
     }
 
-    // 🟢 HÀM 2: Chạy mỗi frame để di chuyển mượt (Lerp)
+    // HÀM 2: Chạy mỗi frame để di chuyển mượt (Lerp)
     tick(dt) {
         // Nếu nhân vật đang ẩn (chết) thì không cần tính toán di chuyển
         if (!this.container.visible) return;
@@ -126,7 +126,7 @@ export class ClientPlayer {
         this.text.x = this.container.x;
         this.text.y = this.container.y - (40 * currentScale);
 
-        // 2. 🟢 BỔ SUNG: Thanh máu chạy theo người
+        // 2. BỔ SUNG: Thanh máu chạy theo người
         this.healthBarBg.x = this.container.x;
         this.healthBarBg.y = this.container.y - (25 * currentScale);
 
@@ -137,7 +137,7 @@ export class ClientPlayer {
     destroy() {
         this.container.destroy();
         this.text.destroy();
-        // 🟢 BỔ SUNG: Xóa thanh máu khi player thoát/chết hẳn
+        // BỔ SUNG: Xóa thanh máu khi player thoát/chết hẳn
         this.healthBar.destroy();
         this.healthBarBg.destroy();
     }
