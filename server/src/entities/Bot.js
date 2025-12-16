@@ -19,7 +19,7 @@ export class Bot extends Player {
     this.changeDirTime = 0;
     this.lastShot = 0;
     
-    // 🆕 Thêm skill level (0-1)
+    // Thêm skill level (0-1)
     this.accuracy = 0.3 + Math.random() * 0.4; // 30-70% cơ hội bắn
     this.aggression = Math.random(); // 0 = nhút, 1 = hung hăng
   }
@@ -43,9 +43,9 @@ export class Bot extends Player {
     let closestDist = Infinity;
     let newTarget = null;
 
-    // 🆕 A. CHỈ TÌM NGƯỜI CHƠI THẬT (không tìm Bot khác)
+    // CHỈ TÌM NGƯỜI CHƠI THẬT (không tìm Bot khác)
     game.players.forEach(other => {
-      // ✅ Bỏ qua chính mình & Bot khác
+      // Bỏ qua chính mình & Bot khác
       if (other.id === this.id || other.isBot || other.dead) return;
 
       const d = distance(this.x, this.y, other.x, other.y);
@@ -97,7 +97,7 @@ export class Bot extends Player {
     // Nếu quá gần người chơi → Lùi lại (khoảng cách an toàn 200px)
     const isTooClose = this.target.isPlayer && dist < 200;
     
-    // ✅ Tính hướng di chuyển đúng cho WASD
+    // Tính hướng di chuyển đúng cho WASD
     if (isTooClose) {
       // Lùi lại
       this.input.up = (dy > 10);
