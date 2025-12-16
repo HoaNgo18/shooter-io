@@ -13,6 +13,7 @@ function App() {
   const [finalScore, setFinalScore] = useState(0);
 
   const handleQuitToMenu = () => {
+    socket.disconnect();  
     setIsDead(false);
     setKillerName('');
     setFinalScore(0);

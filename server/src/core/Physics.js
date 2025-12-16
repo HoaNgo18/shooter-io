@@ -239,8 +239,12 @@ export class Physics {
       killer.score += 100;
       killer.health = Math.min(killer.health + 20, killer.maxHealth);
     }
+
     player.dead = true;
     player.health = 0;
+    this.game.savePlayerScore(player);
+    this.game.saveKillerStats(killer);
+
     this.game.server.broadcast({
       type: 'player_died',
       victimId: player.id,

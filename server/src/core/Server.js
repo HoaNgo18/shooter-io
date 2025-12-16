@@ -1,13 +1,16 @@
 import { WebSocketServer } from 'ws';
 import { PacketType } from '../../../shared/src/packetTypes.js';
 import { Game } from './Game.js';
+import jwt from 'jsonwebtoken';
+import config from '../config.js'; // Import config để lấy JWT_SECRET
+import { User } from '../db/models/User.model.js'; // Import Model User
 
 export class Server {
   constructor(port = 3000) {
     this.wss = new WebSocketServer({ port });
     this.game = new Game(this);
     this.clients = new Map();
-    
+
     console.log(`WebSocket server running on port ${port}`);
     this.setupWSS();
   }
@@ -16,7 +19,7 @@ export class Server {
     this.wss.on('connection', (ws) => {
       const clientId = this.generateId();
       console.log(`Client connected: ${clientId}`);
-      
+
       this.clients.set(clientId, { ws, id: clientId, player: null });
 
       ws.on('message', (data) => {
@@ -42,7 +45,25 @@ export class Server {
   handleMessage(clientId, packet) {
     switch (packet.type) {
       case PacketType.JOIN:
-        this.game.addPlayer(clientId, packet.name || 'Anonymous');
+        let playerName = packet.name || 'Anonymous';
+        let userId = null;
+        // Nếu có token -> Verify
+        if (packet.token) {
+          try {
+            const decoded = jwt.verify(packet.token, config.JWT_SECRET);
+            userId = decoded.id;
+
+            // (Optional) Lấy tên thật từ DB nếu muốn chắc chắn
+            // const user = await User.findById(userId);
+            // if (user) playerName = user.username;
+
+            console.log(`User ${userId} logged in via token`);
+          } catch (err) {
+            console.log('Invalid token, playing as guest');
+          }
+        }
+        // Gọi hàm addPlayer với userId (để sau này cộng điểm)
+        this.game.addPlayer(clientId, playerName, userId);
         break;
       case PacketType.INPUT:
         this.game.handleInput(clientId, packet.data);
@@ -56,7 +77,7 @@ export class Server {
           client.player.lastPong = Date.now();
         }
         break;
-      case PacketType.RESPAWN: 
+      case PacketType.RESPAWN:
         this.game.respawnPlayer(clientId);
         break;
     }

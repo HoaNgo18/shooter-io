@@ -8,7 +8,7 @@ import { getRandomPosition } from '../../../shared/src/utils.js';
 import { Projectile } from './Projectile.js';
 
 export class Player extends Entity {
-  constructor(id, name) {
+  constructor(id, name, userId = null) {
     const pos = getRandomPosition(MAP_SIZE);
     super(pos.x, pos.y);
 
@@ -23,6 +23,7 @@ export class Player extends Entity {
     this.lastDamageTime = 0;
     this.lastAttack = 0;
     this.radius = PLAYER_RADIUS;
+    this.userId = userId; // Lưu trữ ID người dùng từ DB
 
     // Dash logic
     this.dashEndTime = 0;
@@ -225,7 +226,7 @@ export class Player extends Entity {
     this.x = pos.x;
     this.y = pos.y;
     this.health = this.maxHealth;
-    this.score = Math.max(0, this.score - 50);
+    this.score = Math.floor(this.score * 0.1);
     this.weapon = 'PISTOL';
     this.shieldEndTime = 0;
     this.speedBuffEndTime = 0;

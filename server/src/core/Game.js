@@ -1,4 +1,3 @@
-// server/src/core/Game.js
 
 import { TICK_RATE, MAP_SIZE, FOOD_COUNT, OBSTACLE_COUNT, OBSTACLE_RADIUS_MIN, OBSTACLE_RADIUS_MAX, CHEST_COUNT, CHEST_RADIUS, ITEM_TYPES } from '../../../shared/src/constants.js';
 import { PacketType } from '../../../shared/src/packetTypes.js';
@@ -6,6 +5,7 @@ import { Player } from '../entities/Player.js';
 import { Physics } from './Physics.js';
 import { Chest } from '../entities/Chest.js';
 import { Item } from '../entities/Item.js';
+import { User } from '../db/models/User.model.js';
 
 export class Game {
   constructor(server) {
@@ -177,8 +177,8 @@ export class Game {
     this.sendStateUpdate();
   }
 
-  addPlayer(clientId, name) {
-    const player = new Player(clientId, name);
+  addPlayer(clientId, name, userId = null) {
+    const player = new Player(clientId, name, userId);
     this.players.set(clientId, player);
 
     // Gửi INIT: Full foods + Obstacles
@@ -198,7 +198,7 @@ export class Game {
       player: player.serialize()
     }, clientId);
 
-    console.log(`Player joined: ${name} (${clientId})`);
+    console.log(`Player joined: ${name} (DB_ID: ${userId})`);
   }
 
   removePlayer(clientId) {
@@ -233,6 +233,46 @@ export class Game {
       player.respawn();
     }
   }
+
+  async savePlayerScore(player) {
+    if (!player.userId) return; // Khách thì không lưu
+
+    try {
+      const user = await User.findById(player.userId);
+      if (user) {
+        // Cộng dồn coins (ví dụ: 1 điểm = 1 coin)
+        user.coins += player.score;
+
+        // Cập nhật điểm cao nhất
+        if (player.score > user.highScore) {
+          user.highScore = player.score;
+        }
+
+        // Tăng số lần chết
+        user.totalDeaths += 1;
+
+        await user.save();
+        console.log(`Saved score for ${user.username}: Score=${player.score}, HighScore=${user.highScore}`);
+      }
+    } catch (err) {
+      console.error('Error saving score:', err);
+    }
+  }
+
+  async saveKillerStats(player) {
+  if (!player.userId) return; // Nếu là khách (không đăng nhập) thì bỏ qua
+
+  try {
+    const user = await User.findById(player.userId);
+    if (user) {
+      user.totalKills = (user.totalKills || 0) + 1; // Cộng thêm 1 kill
+      await user.save();
+      console.log(`Updated totalKills for ${user.username}: ${user.totalKills}`);
+    }
+  } catch (err) {
+    console.error('Error saving killer stats:', err);
+  }
+}
 
   sendStateUpdate() {
     const state = {
