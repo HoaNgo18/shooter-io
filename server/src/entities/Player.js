@@ -1,11 +1,7 @@
 import { Entity } from './Entity.js';
 import {
-  PLAYER_SPEED,
-  PLAYER_MAX_HEALTH,
-  MAP_SIZE,
-  PLAYER_RADIUS,
-  REGEN_DELAY, REGEN_RATE,
-  DASH_DURATION, DASH_COOLDOWN, DASH_MULTIPLIER,
+  PLAYER_SPEED, PLAYER_MAX_HEALTH, MAP_SIZE, PLAYER_RADIUS,
+  REGEN_DELAY, REGEN_RATE, DASH_DURATION, DASH_COOLDOWN, DASH_MULTIPLIER,
   WEAPON_STATS, ITEM_TYPES
 } from '../../../shared/src/constants.js';
 import { getRandomPosition } from '../../../shared/src/utils.js';
@@ -27,20 +23,23 @@ export class Player extends Entity {
     this.lastDamageTime = 0;
     this.lastAttack = 0;
     this.radius = PLAYER_RADIUS;
-    
+
     // Dash logic
     this.dashEndTime = 0;
     this.dashCooldownTime = 0;
 
-    // 🟢 Quản lý Buff
+    // Quản lý Buff
     this.shieldEndTime = 0;    // Thời gian hết khiên
     this.speedBuffEndTime = 0; // Thời gian hết tốc chạy
+
+    // Tracking movement cho Sniper
+    this.lastMoveTime = 0;
+    this.isMoving = false;
 
     // Input (Đã bỏ num1, num2, num3)
     this.input = {
       up: false, down: false, left: false, right: false,
-      mouseX: 0, mouseY: 0,
-      space: false
+      mouseX: 0, mouseY: 0, space: false
     };
   }
 
@@ -78,10 +77,10 @@ export class Player extends Entity {
 
     // Buff Dash
     if (Date.now() < this.dashEndTime) {
-      currentSpeed *= DASH_MULTIPLIER; 
+      currentSpeed *= DASH_MULTIPLIER;
     }
 
-    // 🟢 Buff Speed (Item)
+    // Buff Speed (Item)
     if (Date.now() < this.speedBuffEndTime) {
       currentSpeed *= 2;
     }
@@ -101,47 +100,45 @@ export class Player extends Entity {
 
       this.x += dx * currentSpeed * dt;
       this.y += dy * currentSpeed * dt;
+
+      // Đánh dấu đang di chuyển
+      this.isMoving = true;
+      this.lastMoveTime = Date.now();
+    } else {
+      // Đứng yên sau 100ms không nhấn phím
+      if (Date.now() - this.lastMoveTime > 100) {
+        this.isMoving = false;
+      }
     }
 
     // 4. Góc quay
     this.angle = Math.atan2(this.input.mouseY - this.y, this.input.mouseX - this.x);
 
     // 5. Hồi phục & Giới hạn map
-    this.regenerate(dt); 
-    this.clampToMap();   
+    this.regenerate(dt);
+    this.clampToMap();
   }
 
   checkLevelUp() {
-    // Scale = 1 + (Score / 500)
     const scaleFactor = 1 + (this.score / 500);
     this.radius = PLAYER_RADIUS * scaleFactor;
-
-    // Giới hạn max size 
     if (this.radius > PLAYER_RADIUS * 3) {
       this.radius = PLAYER_RADIUS * 3;
     }
   }
 
-  // 🟢 HÀM QUAN TRỌNG: Xử lý ăn vật phẩm
+  // HÀM QUAN TRỌNG: Xử lý ăn vật phẩm
   applyItem(type) {
     switch (type) {
       case ITEM_TYPES.HEALTH_PACK:
-        // Hồi 50% máu tối đa
         this.health = Math.min(this.health + (this.maxHealth * 0.5), this.maxHealth);
         break;
-        
       case ITEM_TYPES.SHIELD:
-        // Bất tử 5s
         this.shieldEndTime = Date.now() + 5000;
         break;
-        
       case ITEM_TYPES.SPEED:
-        // Tăng tốc 5s
         this.speedBuffEndTime = Date.now() + 5000;
         break;
-      
-      // Đổi vũ khí (Pickup & Use)
-      // Lưu ý: Key của WEAPON_STATS phải khớp với chuỗi gán ở đây (ROCKET, SHOTGUN...)
       case ITEM_TYPES.WEAPON_ROCKET:
         this.weapon = 'ROCKET';
         break;
@@ -151,18 +148,28 @@ export class Player extends Entity {
       case ITEM_TYPES.WEAPON_MACHINEGUN:
         this.weapon = 'MACHINEGUN';
         break;
-      case ITEM_TYPES.WEAPON_LASER:
-        this.weapon = 'LASER';
+      case ITEM_TYPES.WEAPON_SNIPER: // 
+        this.weapon = 'SNIPER';
+        break;
+      case ITEM_TYPES.WEAPON_PISTOL: // 
+        this.weapon = 'PISTOL';
         break;
     }
   }
-  
- attack() {
+
+  attack() {
     const now = Date.now();
-    // Lấy thông số súng dựa trên vũ khí hiện tại
     const stats = WEAPON_STATS[this.weapon] || WEAPON_STATS.PISTOL;
 
     if (now - this.lastAttack < stats.cooldown) return null;
+
+    const isBusyMoving = this.isMoving || this.hasMovementInput();
+
+    // KIỂM TRA SNIPER: PHẢI ĐỨNG YÊN
+    if (stats.requireStill && isBusyMoving) {
+      return null; // Không bắn được nếu đang di chuyển
+    }
+
     this.lastAttack = now;
 
     const projectiles = [];
@@ -172,25 +179,26 @@ export class Player extends Entity {
     for (let i = 0; i < count; i++) {
       let angleOffset = 0;
       if (count > 1) {
-        // Chia đều góc nếu bắn nhiều viên (Shotgun)
         angleOffset = -spread / 2 + (spread * i / (count - 1));
       } else {
-        // Rung tay ngẫu nhiên nếu bắn 1 viên (Machinegun)
         angleOffset = (Math.random() - 0.5) * spread;
       }
 
       const finalAngle = this.angle + angleOffset;
 
+      // Tạo projectile với đầy đủ thông tin
       const p = new Projectile(
         this.x, this.y,
         finalAngle,
-        stats.speed,  // Dùng stats của HEAD (vì biến weaponData không tồn tại ở đây)
-        stats.damage, // Dùng stats của HEAD
+        stats.speed,
+        stats.damage,
         this.id,
-        this.name     // 🟢 QUAN TRỌNG: Lấy từ nhánh FIX để hiện tên người bắn
+        this.name,
+        this.weapon,      // Weapon type
+        stats.range,      // Range
+        stats.radius      // Radius
       );
-      
-      // Gán màu để Client vẽ đúng màu súng
+
       p.color = stats.color;
       projectiles.push(p);
     }
@@ -198,14 +206,9 @@ export class Player extends Entity {
   }
 
   takeDamage(amount, attackerId) {
-    // Kiểm tra khiên
-    if (Date.now() < this.shieldEndTime) {
-      return; // Bất tử
-    }
-
+    if (Date.now() < this.shieldEndTime) return;
     this.health -= amount;
     this.lastDamageTime = Date.now();
-    
     if (this.health < 0) this.health = 0;
   }
 
@@ -213,37 +216,28 @@ export class Player extends Entity {
     return this.health <= 0;
   }
 
+  hasMovementInput() {
+    return this.input.up || this.input.down || this.input.left || this.input.right;
+  }
+
   respawn() {
     const pos = getRandomPosition(MAP_SIZE);
     this.x = pos.x;
     this.y = pos.y;
     this.health = this.maxHealth;
-
-    // --- MERGE LOGIC ---
-
-    // 1. Logic điểm số (Lấy của HEAD: trừ 50 điểm thay vì về 0)
-    this.score = Math.max(0, this.score - 50); 
-    
-    // 2. Reset vũ khí & Buffs (Lấy của HEAD)
-    this.weapon = 'PISTOL'; 
+    this.score = Math.max(0, this.score - 50);
+    this.weapon = 'PISTOL';
     this.shieldEndTime = 0;
     this.speedBuffEndTime = 0;
-
-    // 3. Reset Input & Physics (Lấy của FIX - Rất quan trọng để tránh lỗi)
     this.angle = 0;
-    this.input = {
-      up: false, down: false, left: false, right: false,
-      mouseX: 0, mouseY: 0,
-      space: false,
-      // Đã bỏ num1, num2, num3 vì bạn không dùng nữa
-    };
+    this.input = { up: false, down: false, left: false, right: false, mouseX: 0, mouseY: 0, space: false };
     this.dashEndTime = 0;
     this.dashCooldownTime = 0;
     this.lastAttack = 0;
     this.lastDamageTime = 0;
-    
-    // Reset kích thước về ban đầu (FIX) - Nếu không có dòng này, hồi sinh vẫn to đùng
     this.radius = PLAYER_RADIUS;
+    this.isMoving = false;
+    this.lastMoveTime = 0;
   }
 
   clampToMap() {
@@ -257,8 +251,6 @@ export class Player extends Entity {
       this.health = this.maxHealth;
       return;
     }
-
-    // Nếu không bị đánh trong 3s thì hồi máu
     if (Date.now() - this.lastDamageTime > REGEN_DELAY) {
       this.health += REGEN_RATE * dt;
       if (this.health > this.maxHealth) {
@@ -280,9 +272,9 @@ export class Player extends Entity {
       dead: this.dead,
       weapon: this.weapon,
       radius: this.radius,
-      // Gửi trạng thái Buff về Client để vẽ hiệu ứng
-      hasShield: Date.now() < this.shieldEndTime, 
-      isSpeedUp: Date.now() < this.speedBuffEndTime
+      hasShield: Date.now() < this.shieldEndTime,
+      isSpeedUp: Date.now() < this.speedBuffEndTime,
+      isMoving: this.isMoving // Gửi về client để hiển thị trạng thái
     };
   }
 }

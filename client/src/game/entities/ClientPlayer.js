@@ -16,16 +16,19 @@ export class ClientPlayer {
         this.targetX = playerData.x;
         this.targetY = playerData.y;
 
+        this.weaponType = playerData.weapon || 'PISTOL';
+        this.isMoving = playerData.isMoving || false;
+
         // --- 1. Tạo Container ---
         this.container = scene.add.container(playerData.x, playerData.y);
 
         // Xác định màu: Mình (Xanh), Địch (Đỏ)
-        this.isMe = (this.id === socket.myId); 
+        this.isMe = (this.id === socket.myId);
         const color = this.isMe ? 0x4CAF50 : 0xE53935;
 
         // Vẽ thân (Circle)
         const circle = scene.add.circle(0, 0, 20, color);
-        
+
         // Vẽ súng (Rectangle)
         const weapon = scene.add.rectangle(15, 0, 20, 8, 0xFFFFFF);
 
@@ -33,7 +36,7 @@ export class ClientPlayer {
         this.container.setDepth(1); // Lớp dưới
 
         // --- 2. Tạo Tên & Thanh Máu ---
-        
+
         // Tên (Giữ nguyên code của bạn)
         this.text = scene.add.text(playerData.x, playerData.y - 40, this.name, {
             fontSize: '14px',
@@ -49,7 +52,13 @@ export class ClientPlayer {
         // Nền đen
         this.healthBarBg = scene.add.rectangle(playerData.x, playerData.y - 25, 40, 6, 0x000000);
         this.healthBarBg.setDepth(2);
-        
+
+        //Shield bar
+        this.shieldCircle = scene.add.circle(0, 0, 25, 0x00FFFF, 0);
+        this.shieldCircle.setStrokeStyle(3, 0x00FFFF, 0.6);
+        this.container.add(this.shieldCircle); // Add vào container để tự động follow
+        this.shieldCircle.setVisible(false); // Ẩn mặc định
+
         // Thanh máu xanh (Máu thực tế)
         this.healthBar = scene.add.rectangle(playerData.x, playerData.y - 25, 40, 4, 0x00FF00);
         this.healthBar.setDepth(2);
@@ -65,7 +74,7 @@ export class ClientPlayer {
             this.healthBarBg.setVisible(false); // Ẩn nền máu
             return;
         }
-        
+
         // Nếu đang sống thì hiện lên
         this.container.setVisible(true);
         this.text.setVisible(true);
@@ -81,6 +90,10 @@ export class ClientPlayer {
 
         // 3. Cập nhật dữ liệu game (Score)
         this.score = data.score;
+
+        //  Cập nhật weapon type & movement state
+        this.weaponType = data.weapon || 'PISTOL';
+        this.isMoving = data.isMoving || false;
 
         // BỔ SUNG: Cập nhật Thanh Máu
         if (data.maxHealth) {
@@ -101,6 +114,15 @@ export class ClientPlayer {
             const defaultRadius = 20;
             const scale = data.radius / defaultRadius;
             this.container.setScale(scale);
+        }
+
+        // BỔ SUNG: Hiệu ứng Shield
+        // Cập nhật shield visual
+        if (data.hasShield) {
+            this.shieldCircle.setVisible(true);
+            this.shieldCircle.radius = (data.radius || 20) + 8; // Lớn hơn player 1 chút
+        } else {
+            this.shieldCircle.setVisible(false);
         }
     }
 
@@ -140,5 +162,6 @@ export class ClientPlayer {
         // BỔ SUNG: Xóa thanh máu khi player thoát/chết hẳn
         this.healthBar.destroy();
         this.healthBarBg.destroy();
+        this.shieldCircle.destroy();
     }
 }

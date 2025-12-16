@@ -12,19 +12,20 @@ export class Game {
     this.server = server;
     this.players = new Map();
     this.projectiles = [];
+    this.explosions = [];
     this.physics = new Physics(this);
     this.tickInterval = null;
     this.lastTick = Date.now();
-    
+
     // Quản lý thức ăn & Delta
-    this.foods = []; 
-    this.removedFoodIds = []; 
+    this.foods = [];
+    this.removedFoodIds = [];
     this.newFoods = [];
 
     this.initFood();
 
     // Quản lý chướng ngại vật
-    this.obstacles = []; 
+    this.obstacles = [];
     this.initObstacles();
 
     // Quản lý Chest
@@ -67,16 +68,16 @@ export class Game {
 
   initChests() {
     for (let i = 0; i < CHEST_COUNT; i++) {
-        this.chests.push(this._spawnRandomChest(`chest_${i}`));
+      this.chests.push(this._spawnRandomChest(`chest_${i}`));
     }
   }
 
   _spawnRandomChest(id) {
     const max = MAP_SIZE / 2 - CHEST_RADIUS;
     return new Chest(
-        (Math.random() * MAP_SIZE) - max,
-        (Math.random() * MAP_SIZE) - max,
-        id
+      (Math.random() * MAP_SIZE) - max,
+      (Math.random() * MAP_SIZE) - max,
+      id
     );
   }
 
@@ -101,7 +102,7 @@ export class Game {
     // Random loại item
     const keys = Object.values(ITEM_TYPES);
     const randomType = keys[Math.floor(Math.random() * keys.length)];
-    
+
     const item = new Item(x, y, randomType);
     this.items.push(item);
     this.newItems.push(item); // Báo update
@@ -126,36 +127,53 @@ export class Game {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const proj = this.projectiles[i];
       proj.update(dt);
-      
+
+      // Kiểm tra range TRƯỚC khi shouldRemove
+      if (proj.distanceTraveled >= proj.range) {
+        if (proj.weaponType === 'ROCKET') {
+          console.log(`Rocket reached max range, exploding!`);
+          this.physics.createExplosion(proj);
+        }
+        this.projectiles.splice(i, 1);
+        continue;
+      }
+
       if (proj.shouldRemove()) {
         this.projectiles.splice(i, 1);
       }
     }
 
-    // 3. Update Players
+    // 3. Update Explosions (Tự xóa sau lifetime)
+    for (let i = this.explosions.length - 1; i >= 0; i--) {
+      if (this.explosions[i].shouldRemove()) {
+        this.explosions.splice(i, 1);
+      }
+    }
+
+    // 4. Update Players
     this.players.forEach(player => {
-        if (!player.dead) { 
-            player.update(dt);
-        }
+      if (!player.dead) {
+        player.update(dt);
+      }
     });
 
-    // 4. Physics (Check va chạm)
+    // 5. Physics (Check va chạm)
     this.physics.checkCollisions();
 
-    // 5. Respawn Food
+    // 6. Respawn Food
     if (this.foods.length < FOOD_COUNT) {
-       this.foods.push(this.generateAndTrackFood());
+      this.foods.push(this.generateAndTrackFood());
     }
 
-    // 6. Respawn Chests (Nếu bị bắn vỡ thì sinh lại sau frame đó luôn hoặc delay tuỳ ý)
+    // 7. Respawn Chests (Nếu bị bắn vỡ thì sinh lại sau frame đó luôn hoặc delay tuỳ ý)
     // Ở đây làm đơn giản: thiếu là bù luôn
     while (this.chests.length < CHEST_COUNT) {
-        const newChest = this._spawnRandomChest(Math.random().toString(36).substr(2, 9));
-        this.chests.push(newChest);
-        this.newChests.push(newChest);
+      const newChest = this._spawnRandomChest(Math.random().toString(36).substr(2, 9));
+      this.chests.push(newChest);
+      this.newChests.push(newChest);
     }
 
-    // 7. Send Update
+    // 8. Send Update
     this.sendStateUpdate();
   }
 
@@ -169,7 +187,7 @@ export class Game {
       id: clientId,
       player: player.serialize(),
       players: Array.from(this.players.values()).map(p => p.serialize()),
-      foods: this.foods,      
+      foods: this.foods,
       obstacles: this.obstacles,
       chests: this.chests, // Gửi full
       items: this.items    // Gửi full
@@ -201,18 +219,18 @@ export class Game {
   handleAttack(clientId) {
     const player = this.players.get(clientId);
     if (player && !player.dead) {
-        const newProjectiles = player.attack();
-        if (newProjectiles) {
-            this.projectiles.push(...newProjectiles);
-        }
+      const newProjectiles = player.attack();
+      if (newProjectiles) {
+        this.projectiles.push(...newProjectiles);
+      }
     }
   }
 
   respawnPlayer(clientId) {
     const player = this.players.get(clientId);
     if (player && player.dead) {
-        player.dead = false;
-        player.respawn(); 
+      player.dead = false;
+      player.respawn();
     }
   }
 
@@ -220,9 +238,10 @@ export class Game {
     const state = {
       type: PacketType.UPDATE,
       t: Date.now(),
-      // 🟢 QUAN TRỌNG: Gửi mảng players để HUD vẽ Leaderboard
-      players: Array.from(this.players.values()).map(p => p.serialize()), 
+      // QUAN TRỌNG: Gửi mảng players để HUD vẽ Leaderboard
+      players: Array.from(this.players.values()).map(p => p.serialize()),
       projectiles: this.projectiles.map(p => p.serialize()),
+      explosions: this.explosions.map(e => e.serialize()),
       foodsAdded: this.newFoods,
       foodsRemoved: this.removedFoodIds,
       // Thêm Delta Chests

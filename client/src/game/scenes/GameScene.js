@@ -2,20 +2,27 @@ import Phaser from 'phaser';
 import { socket } from '../../network/socket';
 import { PacketType } from '@shared/packetTypes';
 import { ClientPlayer } from '../entities/ClientPlayer';
+import { WEAPON_STATS } from '@shared/constants';
 
 export class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
-        this.players = {}; 
-        this.foods = {};   
+        this.players = {};
+        this.foods = {};
         this.keys = null;
         this.projectileGroup = null;
         this.foodGroup = null;
         this.obstacleGroup = null;
         this.chestGroup = null;
-        this.chests = {};       
-        this.itemGroup = null;  
-        this.items = {};        
+        this.chests = {};
+        this.itemGroup = null;
+        this.items = {};
+
+        // Thêm range circle cho player
+        this.rangeCircle = null;
+
+        // Group cho explosions
+        this.explosionGroup = null;
     }
 
     create() {
@@ -41,15 +48,21 @@ export class GameScene extends Phaser.Scene {
         this.obstacleGroup = this.add.group();
         this.chestGroup = this.add.group();
         this.itemGroup = this.add.group();
+        this.explosionGroup = this.add.group();
 
-        // 4. Input Mouse
+        // 4. Tạo Range Circle (Ở layer dưới cùng)
+        this.rangeCircle = this.add.circle(0, 0, 100, 0xFFFFFF, 0);
+        this.rangeCircle.setStrokeStyle(2, 0xFFFFFF, 0.3);
+        this.rangeCircle.setDepth(10); // Dưới mọi thứ
+
+        // 5. Input Mouse
         this.input.on('pointerdown', (pointer) => {
             socket.send({ type: PacketType.ATTACK });
         });
 
         console.log('GameScene Created - Waiting for socket...');
 
-        // 🟢 5. SETUP SOCKET Ở CUỐI CÙNG (Fix lỗi Initialization Order)
+        // 6. SETUP SOCKET Ở CUỐI CÙNG (Fix lỗi Initialization Order)
         socket.setGameScene(this);
     }
 
@@ -63,6 +76,28 @@ export class GameScene extends Phaser.Scene {
                 player.tick(dt);
             }
         });
+
+        // Cập nhật Range Circle theo player hiện tại
+        const myPlayer = this.players[socket.myId];
+        if (myPlayer && myPlayer.container.visible) {
+            const weaponType = myPlayer.weaponType || 'PISTOL';
+            const stats = WEAPON_STATS[weaponType];
+
+            // Cập nhật vị trí và kích thước
+            this.rangeCircle.x = myPlayer.x;
+            this.rangeCircle.y = myPlayer.y;
+            this.rangeCircle.radius = stats.range;
+            this.rangeCircle.setVisible(true);
+
+            // Đổi màu nếu là Sniper và đang di chuyển (không bắn được)
+            if (stats.requireStill && myPlayer.isMoving) {
+                this.rangeCircle.setStrokeStyle(2, 0xFF0000, 0.5); // Đỏ = không bắn được
+            } else {
+                this.rangeCircle.setStrokeStyle(2, 0xFFFFFF, 0.3); // Trắng = bình thường
+            }
+        } else {
+            this.rangeCircle.setVisible(false);
+        }
 
         // Input Logic
         const pointer = this.input.activePointer;
@@ -121,7 +156,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     handleServerUpdate(packet) {
-        // 🟢 LỚP BẢO VỆ TUYỆT ĐỐI (Fix lỗi crash: reading 'size' of undefined)
+        // LỚP BẢO VỆ TUYỆT ĐỐI (Fix lỗi crash: reading 'size' of undefined)
         if (!this.chestGroup || !this.itemGroup || !this.projectileGroup || !this.foodGroup) {
             return;
         }
@@ -159,14 +194,41 @@ export class GameScene extends Phaser.Scene {
         if (packet.projectiles) {
             this.projectileGroup.clear(true, true);
             packet.projectiles.forEach(p => {
+                const radius = p.radius || 6;
                 // Vẽ đạn dựa trên màu server gửi về (nếu có), mặc định vàng
-                const color = p.color || 0xFFFF00; 
-                const bullet = this.add.circle(p.x, p.y, 8, color);
+                let color = 0xFFFF00; // Mặc định vàng
+                if (p.weaponType && WEAPON_STATS[p.weaponType]) {
+                    color = WEAPON_STATS[p.weaponType].color;
+                }
+                const bullet = this.add.circle(p.x, p.y, radius, color);
                 this.projectileGroup.add(bullet);
             });
         }
 
-        // 4. Update Chests
+        //  4. Update Explosions (Hiệu ứng nổ)
+        if (packet.explosions) {
+            this.explosionGroup.clear(true, true);
+            packet.explosions.forEach(e => {
+                // Vẽ vòng tròn nổ với hiệu ứng
+                const circle = this.add.circle(e.x, e.y, e.radius, 0xFF4400, 0.4);
+                circle.setStrokeStyle(3, 0xFF0000, 0.8);
+
+                // Animation phóng to + mờ dần
+                this.tweens.add({
+                    targets: circle,
+                    scaleX: 1.5,
+                    scaleY: 1.5,
+                    alpha: 0,
+                    duration: 200,
+                    ease: 'Power2',
+                    onComplete: () => circle.destroy()
+                });
+
+                this.explosionGroup.add(circle);
+            });
+        }
+
+        // 5. Update Chests
         if (packet.chestsRemoved) {
             packet.chestsRemoved.forEach(id => {
                 if (this.chests[id]) {
@@ -177,7 +239,7 @@ export class GameScene extends Phaser.Scene {
         }
         if (packet.chestsAdded) packet.chestsAdded.forEach(c => this.createChestSprite(c));
 
-        // 5. Update Items
+        // 6. Update Items
         if (packet.itemsRemoved) {
             packet.itemsRemoved.forEach(id => {
                 if (this.items[id]) {
@@ -234,7 +296,8 @@ export class GameScene extends Phaser.Scene {
             case 'WEAPON_ROCKET': color = 0xFF4500; text = "RKT"; break;
             case 'WEAPON_SHOTGUN': color = 0xFFA500; text = "SHT"; break;
             case 'WEAPON_MACHINEGUN': color = 0xADFF2F; text = "MG"; break;
-            case 'WEAPON_LASER': color = 0x00BFFF; text = "LSR"; break;
+            case 'WEAPON_SNIPER': color = 0x00BFFF; text = "SNP"; break; 
+            case 'WEAPON_PISTOL': color = 0xFFFF00; text = "PST"; break; // 
             default: if (i.type.includes('WEAPON')) { color = 0x9933FF; text = "W"; }
         }
 
@@ -258,8 +321,8 @@ export class GameScene extends Phaser.Scene {
         this.foods = {};
         foodsData.forEach(f => this.createFoodSprite(f));
     }
-    
+
     getLeaderboard() {
-       return Object.values(this.players).map(p => ({ name: p.name, score: p.score })).sort((a,b) => b.score - a.score).slice(0, 10);
+        return Object.values(this.players).map(p => ({ name: p.name, score: p.score })).sort((a, b) => b.score - a.score).slice(0, 10);
     }
 }
