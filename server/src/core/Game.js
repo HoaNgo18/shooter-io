@@ -6,6 +6,7 @@ import { Physics } from './Physics.js';
 import { Chest } from '../entities/Chest.js';
 import { Item } from '../entities/Item.js';
 import { User } from '../db/models/User.model.js';
+import { Bot } from '../entities/Bot.js';
 
 export class Game {
   constructor(server) {
@@ -16,6 +17,8 @@ export class Game {
     this.physics = new Physics(this);
     this.tickInterval = null;
     this.lastTick = Date.now();
+    this.minPlayers = 10; // Luôn giữ tối thiểu 5 người chơi (người + bot)
+    this.lastBotSpawn = 0;
 
     // Quản lý thức ăn & Delta
     this.foods = [];
@@ -97,7 +100,7 @@ export class Game {
     return food;
   }
 
-  // 🟢 Hàm tạo item rơi ra (được gọi từ Physics)
+  // Hàm tạo item rơi ra (được gọi từ Physics)
   spawnItem(x, y) {
     // Random loại item
     const keys = Object.values(ITEM_TYPES);
@@ -108,6 +111,38 @@ export class Game {
     this.newItems.push(item); // Báo update
   }
 
+  // Giữ số lượng Bot tối thiểu
+  manageBots() {
+  // Đếm số người chơi THẬT
+  let realPlayerCount = 0;
+  let botCount = 0;
+  
+  this.players.forEach(p => {
+    if (p.isBot) botCount++;
+    else realPlayerCount++;
+  });
+
+  const totalCount = realPlayerCount + botCount;
+  
+  // Logic:
+  // - Nếu có ít người thật (< 3) → giữ 5-7 bot
+  // - Nếu có nhiều người (>= 3) → giữ 2-3 bot
+  const targetBotCount = realPlayerCount < 3 ? 5 : 2;
+  
+  // Chỉ spawn 1 bot mỗi lần
+  if (botCount < targetBotCount) {
+    const botId = `bot_${Date.now()}_${Math.random()}`;
+    const bot = new Bot(botId);
+    this.players.set(botId, bot);
+
+    this.server.broadcast({
+      type: PacketType.PLAYER_JOIN,
+      player: bot.serialize()
+    });
+
+    console.log(`🤖 Spawned Bot: ${bot.name} (Real: ${realPlayerCount}, Bots: ${botCount + 1})`);
+  }
+}
   tick() {
     // 1. Reset Delta
     this.removedFoodIds = [];
@@ -150,9 +185,14 @@ export class Game {
       }
     }
 
-    // 4. Update Players
+    //4. Update Bots
     this.players.forEach(player => {
       if (!player.dead) {
+        // NẾU LÀ BOT THÌ CHO NÓ SUY NGHĨ
+        if (player instanceof Bot) {
+          player.think(this);
+        }
+
         player.update(dt);
       }
     });
@@ -173,7 +213,13 @@ export class Game {
       this.newChests.push(newChest);
     }
 
-    // 8. Send Update
+    // 8. Quản lý Bot
+    if (now - this.lastBotSpawn > 5000) { // 5 giây
+      this.manageBots();
+      this.lastBotSpawn = now;
+    }
+
+    // Send Update
     this.sendStateUpdate();
   }
 
@@ -205,7 +251,12 @@ export class Game {
     const player = this.players.get(clientId);
     if (player) {
       this.players.delete(clientId);
-      console.log(`Player removed: ${player.name}`);
+      // Broadcast để Client xóa Sprite
+      this.server.broadcast({
+        type: PacketType.PLAYER_LEAVE,
+        id: clientId
+      });
+      console.log(`Player/Bots removed: ${player.name}`);
     }
   }
 
@@ -260,19 +311,19 @@ export class Game {
   }
 
   async saveKillerStats(player) {
-  if (!player.userId) return; // Nếu là khách (không đăng nhập) thì bỏ qua
+    if (!player.userId) return; // Nếu là khách (không đăng nhập) thì bỏ qua
 
-  try {
-    const user = await User.findById(player.userId);
-    if (user) {
-      user.totalKills = (user.totalKills || 0) + 1; // Cộng thêm 1 kill
-      await user.save();
-      console.log(`Updated totalKills for ${user.username}: ${user.totalKills}`);
+    try {
+      const user = await User.findById(player.userId);
+      if (user) {
+        user.totalKills = (user.totalKills || 0) + 1; // Cộng thêm 1 kill
+        await user.save();
+        console.log(`Updated totalKills for ${user.username}: ${user.totalKills}`);
+      }
+    } catch (err) {
+      console.error('Error saving killer stats:', err);
     }
-  } catch (err) {
-    console.error('Error saving killer stats:', err);
   }
-}
 
   sendStateUpdate() {
     const state = {

@@ -185,40 +185,40 @@ export class Physics {
 
   // HÀM TẠO EXPLOSION
   createExplosion(projectile) {
-  const stats = WEAPON_STATS[projectile.weaponType];
-  if (!stats || !stats.shrapnelCount) return;
+    const stats = WEAPON_STATS[projectile.weaponType];
+    if (!stats || !stats.shrapnelCount) return;
 
-  console.log(`Rocket exploded! Creating ${stats.shrapnelCount} shrapnel`);
+    console.log(`Rocket exploded! Creating ${stats.shrapnelCount} shrapnel`);
 
-  // Tạo 8 mảnh vụn bắn ra 8 hướng
-  const angleStep = (Math.PI * 2) / stats.shrapnelCount;
-  
-  for (let i = 0; i < stats.shrapnelCount; i++) {
-    const angle = angleStep * i;
-    
-    const shrapnel = new Projectile(
-      projectile.x, projectile.y, angle,
-      400, // Tốc độ
-      stats.shrapnelDamage,
-      projectile.ownerId,
-      projectile.ownerName,
-      'SHRAPNEL',
-      150, // Range
-      3    // Radius
+    // Tạo 8 mảnh vụn bắn ra 8 hướng
+    const angleStep = (Math.PI * 2) / stats.shrapnelCount;
+
+    for (let i = 0; i < stats.shrapnelCount; i++) {
+      const angle = angleStep * i;
+
+      const shrapnel = new Projectile(
+        projectile.x, projectile.y, angle,
+        400, // Tốc độ
+        stats.shrapnelDamage,
+        projectile.ownerId,
+        projectile.ownerName,
+        'SHRAPNEL',
+        150, // Range
+        3    // Radius
+      );
+
+      shrapnel.color = 0xFF6600;
+      this.game.projectiles.push(shrapnel);
+    }
+
+    // Tạo visual effect
+    const explosion = new Explosion(
+      projectile.x, projectile.y,
+      stats.explosionRadius, 0,
+      projectile.ownerId, projectile.ownerName
     );
-    
-    shrapnel.color = 0xFF6600;
-    this.game.projectiles.push(shrapnel);
+    this.game.explosions.push(explosion);
   }
-  
-  // Tạo visual effect
-  const explosion = new Explosion(
-    projectile.x, projectile.y,
-    stats.explosionRadius, 0,
-    projectile.ownerId, projectile.ownerName
-  );
-  this.game.explosions.push(explosion);
-}
 
   resolvePlayerCollision(p1, p2) {
     const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
@@ -238,13 +238,13 @@ export class Physics {
     if (killer) {
       killer.score += 100;
       killer.health = Math.min(killer.health + 20, killer.maxHealth);
+      if (!killer.isBot) {
+        this.game.saveKillerStats(killer);
+      }
+      player.dead = true;
+      player.health = 0;
     }
-
-    player.dead = true;
-    player.health = 0;
-    this.game.savePlayerScore(player);
-    this.game.saveKillerStats(killer);
-
+    
     this.game.server.broadcast({
       type: 'player_died',
       victimId: player.id,
@@ -252,5 +252,27 @@ export class Physics {
       killerName: killerName || 'Unknown',
       score: player.score
     });
+
+    if (player.isBot) {
+      // --- XỬ LÝ BOT ---
+      console.log(`Bot died: ${player.name}`);
+
+      // Bot không cần lưu điểm vào DB
+      
+      // Xóa Bot khỏi game sau 2 giây
+      // (Delay để Client kịp nhận gói tin player_died và vẽ hiệu ứng nổ)
+      setTimeout(() => {
+        // Kiểm tra lại lần nữa xem bot còn đó không (tránh crash)
+        if (this.game.players.has(player.id)) {
+          this.game.removePlayer(player.id);
+          this.game.manageBots();
+        }
+      }, 2000); 
+
+    } else {
+      // --- XỬ LÝ NGƯỜI CHƠI THẬT ---
+      // Lưu điểm vào DB
+      this.game.savePlayerScore(player);
+    }
   }
 }
