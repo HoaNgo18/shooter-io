@@ -7,6 +7,9 @@ client/dist/
 .idea/
 # Chặn file repomix ở BẤT KỲ thư mục nào
 repomix-output.*
+**/server.xml
+**/client.xml
+**/shared.xml
 
 # Chặn file hệ thống Mac ở mọi nơi
 .DS_Store
