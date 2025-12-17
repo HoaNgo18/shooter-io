@@ -4,7 +4,7 @@ import { socket } from '../network/socket';
 
 const API_URL = 'http://localhost:8080/api/auth'; // URL Backend của bạn
 
-const LoginScreen = ({ onJoin }) => {
+const LoginScreen = ({ onLoginSuccess }) => {
   const [tab, setTab] = useState('guest'); // 'guest', 'login', 'register'
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState('');
@@ -39,7 +39,31 @@ const LoginScreen = ({ onJoin }) => {
     setConnecting(true);
     try {
       await socket.connect({ name: username });
-      onJoin();
+      const savedGuest = localStorage.getItem('guest_data');
+      let guestData;
+      if (savedGuest) {
+        // Nếu có, lấy coin và highscore cũ, nhưng update tên mới (nếu người chơi đổi tên)
+        const parsed = JSON.parse(savedGuest);
+        guestData = {
+          ...parsed,
+          username: username,
+          isGuest: true,
+          // Đảm bảo load đủ các trường này (nếu thiếu thì gán = 0)
+          totalKills: parsed.totalKills || 0,
+          totalDeaths: parsed.totalDeaths || 0,
+          coins: parsed.coins || 0,
+          highScore: parsed.highScore || 0
+        };
+      } else {
+        // Nếu chưa có, tạo mới
+        guestData = {
+          username: username,
+          coins: 0,
+          highScore: 0,
+          isGuest: true
+        };
+      }
+      onLoginSuccess({ username: username, coins: 0, highScore: 0, isGuest: true });
     } catch (err) {
       setError('Không thể kết nối Server Game!');
       setConnecting(false);
@@ -73,7 +97,15 @@ const LoginScreen = ({ onJoin }) => {
         name: displayName || data.user.username
       });
 
-      onJoin();
+      onLoginSuccess({
+        username: data.user.username,
+        email: data.user.email,
+        coins: data.user.coins || 0,
+        highScore: data.user.highScore || 0,
+        totalKills: data.user.totalKills || 0,
+        totalDeaths: data.user.totalDeaths || 0,
+        isGuest: false
+      });
 
     } catch (err) {
       setError(err.message);
@@ -105,7 +137,7 @@ const LoginScreen = ({ onJoin }) => {
         token: data.token,
         name: displayName || username
       });
-      onJoin();
+      onLoginSuccess(data.user);
 
     } catch (err) {
       setError(err.message);
@@ -150,7 +182,6 @@ const LoginScreen = ({ onJoin }) => {
           <div>
             <input type="text" placeholder="Tên đăng nhập" style={inputStyle} value={username} onChange={e => setUsername(e.target.value)} onKeyDown={stopPropagation} />
             <input type="password" placeholder="Mật khẩu" style={inputStyle} value={password} onChange={e => setPassword(e.target.value)} onKeyDown={stopPropagation} />
-            {/* 👇 THÊM Ô INPUT NÀY */}
             <div style={{ margin: '15px 0', borderTop: '1px dashed #ccc', paddingTop: '10px' }}>
               <label style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '5px', textAlign: 'left' }}>Tên hiển thị trong game (Tùy chọn):</label>
               <input

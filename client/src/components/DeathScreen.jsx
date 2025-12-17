@@ -2,16 +2,12 @@ import React from 'react';
 import { socket } from '../network/socket';
 import { PacketType } from '@shared/packetTypes';
 
-const DeathScreen = ({ killerName, score, onQuit }) => {
+const DeathScreen = ({ killerName, score, onQuit, onRespawn }) => {
   
   // Kiểm tra xem có phải tự sát không?
   // Lưu ý: Server cần gửi killerName trùng với tên mình nếu tự sát, 
   // hoặc chúng ta so sánh ID nếu App.jsx truyền xuống (ở đây làm đơn giản theo tên)
-  const isSuicide = killerName === socket.gameScene?.players?.[socket.myId]?.name;
-
-  const handleRespawn = () => {
-    socket.send({ type: PacketType.RESPAWN });
-  };
+  const isSuicide = !killerName || killerName === 'Yourself';
 
   return (
     <div style={{
@@ -62,7 +58,7 @@ const DeathScreen = ({ killerName, score, onQuit }) => {
       {/* Nút bấm */}
       <div style={{ display: 'flex', gap: '20px' }}>
         <button 
-          onClick={handleRespawn}
+          onClick={onRespawn}
           style={{
             padding: '15px 40px', fontSize: '18px', fontWeight: 'bold',
             background: 'linear-gradient(to bottom, #4CAF50, #388E3C)',

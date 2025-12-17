@@ -17,10 +17,10 @@ router.post('/register', async (req, res) => {
     }
 
     // Check if user exists
-    const existingUser = await User.findOne({ 
-      $or: [{ username }, { email }] 
+    const existingUser = await User.findOne({
+      $or: [{ username }, { email }]
     });
-    
+
     if (existingUser) {
       return res.status(400).json({ error: 'User already exists' });
     }
@@ -77,8 +77,10 @@ router.post('/login', async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
-        highScore: user.highScore,
-        coins: user.coins
+        highScore: user.highScore || 0,
+        coins: user.coins || 0,
+        totalKills: user.totalKills || 0,     
+        totalDeaths: user.totalDeaths || 0
       }
     });
   } catch (error) {
@@ -97,7 +99,7 @@ router.get('/profile', async (req, res) => {
 
     const decoded = jwt.verify(token, config.JWT_SECRET);
     const user = await User.findById(decoded.id).select('-password');
-    
+
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }

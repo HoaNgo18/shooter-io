@@ -4,6 +4,7 @@ import { PLAYER_RADIUS, MAP_SIZE, FOOD_RADIUS, XP_PER_FOOD, CHEST_RADIUS, ITEM_R
 import { Quadtree } from '../utils/Quadtree.js';
 import { Explosion } from '../entities/Explosion.js';
 import { Projectile } from '../entities/Projectile.js';
+import { PacketType } from '../../../shared/src/packetTypes.js';
 
 export class Physics {
   constructor(game) {
@@ -251,6 +252,7 @@ export class Physics {
     if (killer) {
       killer.score += 100;
       killer.health = Math.min(killer.health + 20, killer.maxHealth);
+      killer.sessionKills = (killer.sessionKills || 0) + 1;
       if (!killer.isBot) {
         //Kiem tra xem co phai vua khong
         const sortedPlayers = Array.from(this.game.players.values()).sort((a, b) => b.score - a.score);
@@ -269,11 +271,13 @@ export class Physics {
     }
 
     this.game.server.broadcast({
-      type: 'player_died',
+      type: PacketType.PLAYER_DIED,
       victimId: player.id,
       killerId: killerId,
       killerName: killerName || 'Unknown',
-      score: player.score
+      score: player.score,
+      coins: player.coins,
+      kills: player.sessionKills
     });
 
     if (player.isBot) {

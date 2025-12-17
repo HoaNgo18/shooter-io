@@ -4,6 +4,7 @@ import cors from 'cors';
 import { connectDB } from './db/mongo.js';
 import authRouter from './api/auth.js';
 import config from './config.js';
+import { User } from './db/models/User.model.js'; 
 
 const app = express();
 
@@ -14,6 +15,20 @@ app.use(express.json());
 // REST API routes
 app.use('/api/auth', authRouter);
 
+// Leaderboard route
+app.get('/api/leaderboard', async (req, res) => {
+  try {
+    const topPlayers = await User.find()
+      .sort({ highScore: -1 })
+      .limit(10)
+      .select('username highScore');
+    
+    res.json(topPlayers);
+  } catch (err) {
+    console.error('Leaderboard error:', err);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
+});
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() });

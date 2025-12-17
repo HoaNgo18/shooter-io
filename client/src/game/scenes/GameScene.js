@@ -173,6 +173,14 @@ export class GameScene extends Phaser.Scene {
                 }
             });
         }
+        if (socket.myId && this.players[socket.myId]) {
+             // Nếu camera chưa follow ai, bắt nó follow mình
+            if (!this.cameras.main._follow) {
+                console.log("Camera now following player:", socket.myId);
+                this.cameras.main.startFollow(this.players[socket.myId].container);
+                this.cameras.main.setZoom(1);
+            }
+        }
 
         // 2. Update Foods
         if (packet.foodsRemoved) {

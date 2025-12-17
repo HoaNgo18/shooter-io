@@ -5,12 +5,13 @@ class NetworkManager {
   constructor() {
     this.ws = null;
     this.gameScene = null;
-    
+
     // Biến này để HUD biết ai là người chơi hiện tại
-    this.myId = null; 
-    
+    this.myId = null;
+
     this.isConnected = false;
     this.listeners = [];
+    this.initData = null;
   }
 
   connect(authOptions) {
@@ -20,13 +21,13 @@ class NetworkManager {
       this.ws.onopen = () => {
         this.isConnected = true;
         console.log('Connected via WebSocket');
-        
+
         // Gửi gói tin JOIN kèm thông tin xác thực
-        this.send({ 
-          type: PacketType.JOIN, 
-          ...authOptions 
+        this.send({
+          type: PacketType.JOIN,
+          ...authOptions
         });
-        
+
         resolve();
       };
 
@@ -36,7 +37,7 @@ class NetworkManager {
       };
 
       this.ws.onmessage = (event) => this.handleMessage(event);
-      
+
       this.ws.onclose = () => {
         this.isConnected = false;
         console.log('🔌 Disconnected');
@@ -56,7 +57,16 @@ class NetworkManager {
   }
 
   setGameScene(scene) {
+    if(!scene) return;
     this.gameScene = scene;
+    if (this.initData) {
+      console.log('Applying buffered INIT data...');
+      this.gameScene.initGame(this.initData);
+    }
+  }
+
+  resetGameScene() {
+    this.gameScene = null;
   }
 
   send(data) {
@@ -75,6 +85,13 @@ class NetworkManager {
   handleMessage(event) {
     const packet = JSON.parse(event.data);
 
+    // Xử lý INIT riêng biệt (quan trọng nhất)
+    if (packet.type === PacketType.INIT) {
+      console.log('Received INIT packet. My ID:', packet.id);
+      this.myId = packet.id;
+      this.initData = packet; // Lưu lại để dùng sau
+    }
+
     // 1. Xử lý Logic Game (Phaser)
     if (this.gameScene) {
       switch (packet.type) {
@@ -87,7 +104,7 @@ class NetworkManager {
         case PacketType.INIT:
           // QUAN TRỌNG: Lưu ID của mình khi server cấp
           this.myId = packet.id;
-          
+
           this.gameScene.initGame(packet);
           this.notifyReact(packet);
           break;

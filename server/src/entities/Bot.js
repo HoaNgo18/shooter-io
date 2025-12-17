@@ -13,6 +13,9 @@ export class Bot extends Player {
     const name = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)] + 
                  Math.floor(Math.random() * 999);
     super(id, name, null);
+
+    this.dead = false; 
+    this.health = this.maxHealth;
     
     this.isBot = true;
     this.target = null;

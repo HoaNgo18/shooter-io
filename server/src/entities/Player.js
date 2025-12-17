@@ -19,12 +19,13 @@ export class Player extends Entity {
     this.score = 0;
     this.weapon = 'PISTOL'; // Mặc định
     this.angle = 0;
-    this.dead = false;
+    this.dead = true; // Bắt đầu ở trạng thái chết để chờ respawn
     this.lastDamageTime = 0;
     this.lastAttack = 0;
     this.radius = PLAYER_RADIUS;
     this.userId = userId; // Lưu trữ ID người dùng từ DB
     this.coins = 0;
+    this.sessionKills = 0;
 
     // Dash logic
     this.dashEndTime = 0;
@@ -236,6 +237,7 @@ export class Player extends Entity {
     const pos = getRandomPosition(MAP_SIZE);
     this.x = pos.x;
     this.y = pos.y;
+    this.dead = false;
     this.health = this.maxHealth;
     this.score = Math.floor(this.score * 0.1);
     this.weapon = 'PISTOL';
@@ -250,6 +252,7 @@ export class Player extends Entity {
     this.radius = PLAYER_RADIUS;
     this.isMoving = false;
     this.lastMoveTime = 0;
+    this.sessionKills = 0;
   }
 
   clampToMap() {
@@ -284,6 +287,7 @@ export class Player extends Entity {
       dead: this.dead,
       weapon: this.weapon,
       radius: this.radius,
+      coins: this.coins,
       hasShield: Date.now() < this.shieldEndTime,
       isSpeedUp: Date.now() < this.speedBuffEndTime,
       isMoving: this.isMoving // Gửi về client để hiển thị trạng thái
