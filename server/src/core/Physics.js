@@ -1,6 +1,6 @@
 
 import { circleCollision, distance } from '../../../shared/src/utils.js';
-import { PLAYER_RADIUS, MAP_SIZE, FOOD_RADIUS, XP_PER_FOOD, CHEST_RADIUS, ITEM_RADIUS, WEAPON_STATS } from '../../../shared/src/constants.js';
+import { PLAYER_RADIUS, MAP_SIZE, FOOD_RADIUS, XP_PER_FOOD, CHEST_RADIUS, ITEM_RADIUS, WEAPON_STATS, CHEST_TYPES } from '../../../shared/src/constants.js';
 import { Quadtree } from '../utils/Quadtree.js';
 import { Explosion } from '../entities/Explosion.js';
 import { Projectile } from '../entities/Projectile.js';
@@ -143,9 +143,22 @@ export class Physics {
 
           this.game.projectiles.splice(i, 1);
           if (chest.dead) {
-            this.game.spawnItem(chest.x, chest.y);
+            const isBigChest = (chest.type === 'BIG');
+            this.game.spawnItem(chest.x, chest.y, chest.type);
             this.game.removedChestIds.push(chest.id);
             this.game.chests.splice(j, 1);
+            if (isBigChest) {
+              this.game.hasBigChest = false;
+              this.game.nextBigChestTime = Date.now() + 120000; // 2 phút (hoặc dùng BIG_CHEST_STATS.interval)
+
+              console.log(`Big Chest destroyed! Next spawn in 2 minutes`);
+
+              // Broadcast thông báo
+              this.game.server.broadcast({
+                type: 'system_message',
+                message: 'Big Chest destroyed! Next one in 2 minutes'
+              });
+            }
           }
           break;
         }
@@ -239,12 +252,22 @@ export class Physics {
       killer.score += 100;
       killer.health = Math.min(killer.health + 20, killer.maxHealth);
       if (!killer.isBot) {
+        //Kiem tra xem co phai vua khong
+        const sortedPlayers = Array.from(this.game.players.values()).sort((a, b) => b.score - a.score);
+        const kingId = sortedPlayers.length > 0 ? sortedPlayers[0].id : null;
+
+        const isKing = (player.id === kingId);
+
+        // Logic cộng coin
+        const coinReward = isKing ? 5 : 1;
+
+        killer.coins += coinReward;
         this.game.saveKillerStats(killer);
       }
       player.dead = true;
       player.health = 0;
     }
-    
+
     this.game.server.broadcast({
       type: 'player_died',
       victimId: player.id,
@@ -258,7 +281,7 @@ export class Physics {
       console.log(`Bot died: ${player.name}`);
 
       // Bot không cần lưu điểm vào DB
-      
+
       // Xóa Bot khỏi game sau 2 giây
       // (Delay để Client kịp nhận gói tin player_died và vẽ hiệu ứng nổ)
       setTimeout(() => {
@@ -267,7 +290,7 @@ export class Physics {
           this.game.removePlayer(player.id);
           this.game.manageBots();
         }
-      }, 2000); 
+      }, 2000);
 
     } else {
       // --- XỬ LÝ NGƯỜI CHƠI THẬT ---

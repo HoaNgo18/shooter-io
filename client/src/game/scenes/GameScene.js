@@ -276,8 +276,32 @@ export class GameScene extends Phaser.Scene {
 
     createChestSprite(c) {
         if (this.chests[c.id]) return;
-        const chest = this.add.rectangle(c.x, c.y, 40, 40, 0xCD853F);
-        chest.setStrokeStyle(2, 0xFFFFFF);
+        // Mặc định là Chest thường
+        let color = 0xCD853F; 
+        let size = 40;
+        let strokeColor = 0xFFFFFF;
+        // Nếu là Big Chest
+        if (c.type === 'BIG') {
+            color = 0xFF0000; // Màu đỏ
+            size = 70;        // To đùng
+            strokeColor = 0xFFD700; // Viền vàng
+        }
+        // Nếu bạn dùng Sprite ảnh:
+        // const chest = this.add.sprite(c.x, c.y, c.type === 'BIG' ? 'chest_gold' : 'chest_wood');
+        // Nếu dùng hình khối cơ bản:
+        const chest = this.add.rectangle(c.x, c.y, size, size, color);
+        chest.setStrokeStyle(3, strokeColor);
+        // Hiệu ứng xoay nhẹ cho Big Chest để gây chú ý
+        if (c.type === 'BIG') {
+             this.tweens.add({
+                targets: chest,
+                angle: 360,
+                duration: 3000,
+                repeat: -1,
+                ease: 'Linear'
+            });
+        }
+
         this.chestGroup.add(chest);
         this.chests[c.id] = chest;
     }
@@ -297,7 +321,10 @@ export class GameScene extends Phaser.Scene {
             case 'WEAPON_SHOTGUN': color = 0xFFA500; text = "SHT"; break;
             case 'WEAPON_MACHINEGUN': color = 0xADFF2F; text = "MG"; break;
             case 'WEAPON_SNIPER': color = 0x00BFFF; text = "SNP"; break; 
-            case 'WEAPON_PISTOL': color = 0xFFFF00; text = "PST"; break; // 
+            case 'WEAPON_PISTOL': color = 0xFFFF00; text = "PST"; break;
+            case 'COIN_SMALL': color = 0xFFD700; text = "$1"; break; 
+            case 'COIN_MEDIUM': color = 0xFFD700; text = "$2"; break; 
+            case 'COIN_LARGE': color = 0xFFD700; text = "$5"; break; 
             default: if (i.type.includes('WEAPON')) { color = 0x9933FF; text = "W"; }
         }
 

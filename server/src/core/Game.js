@@ -1,5 +1,9 @@
 
-import { TICK_RATE, MAP_SIZE, FOOD_COUNT, OBSTACLE_COUNT, OBSTACLE_RADIUS_MIN, OBSTACLE_RADIUS_MAX, CHEST_COUNT, CHEST_RADIUS, ITEM_TYPES } from '../../../shared/src/constants.js';
+import {
+  TICK_RATE, MAP_SIZE, FOOD_COUNT, OBSTACLE_COUNT, OBSTACLE_RADIUS_MIN,
+  OBSTACLE_RADIUS_MAX, CHEST_COUNT, CHEST_RADIUS, ITEM_TYPES, CHEST_TYPES, BIG_CHEST_STATS
+}
+  from '../../../shared/src/constants.js';
 import { PacketType } from '../../../shared/src/packetTypes.js';
 import { Player } from '../entities/Player.js';
 import { Physics } from './Physics.js';
@@ -19,6 +23,9 @@ export class Game {
     this.lastTick = Date.now();
     this.minPlayers = 10; // Luôn giữ tối thiểu 5 người chơi (người + bot)
     this.lastBotSpawn = 0;
+
+    this.nextBigChestTime = null;
+    this.hasBigChest = false;
 
     // Quản lý thức ăn & Delta
     this.foods = [];
@@ -75,13 +82,44 @@ export class Game {
     }
   }
 
-  _spawnRandomChest(id) {
-    const max = MAP_SIZE / 2 - CHEST_RADIUS;
+  _spawnRandomChest(id, type = CHEST_TYPES.NORMAL) {
+    const radius = type === CHEST_TYPES.BIG ? BIG_CHEST_STATS.radius : CHEST_RADIUS;
+    const max = MAP_SIZE / 2 - radius;
+
+    // Nếu là Big Chest, cho nó xuất hiện gần trung tâm hơn
+    const limit = type === CHEST_TYPES.BIG ? MAP_SIZE / 4 : max;
+
     return new Chest(
-      (Math.random() * MAP_SIZE) - max,
-      (Math.random() * MAP_SIZE) - max,
-      id
+      (Math.random() * limit * 2) - limit,
+      (Math.random() * limit * 2) - limit,
+      id,
+      type
     );
+  }
+
+  // Hàm riêng để sinh Chest To và thông báo
+  spawnBigChest() {
+    if (this.hasBigChest) {
+      console.log("Big Chest already exists");
+      return;
+    }
+    const id = `BIG_${Date.now()}`;
+    const chest = this._spawnRandomChest(id, CHEST_TYPES.BIG);
+    this.chests.push(chest);
+    this.newChests.push(chest);
+
+    this.hasBigChest = true; // Đánh dấu đã có Big Chest
+    this.nextBigChestTime = null; // Hủy timer
+
+
+    // Gửi thông báo cho toàn server (Nếu bạn đã làm hệ thống chat/notification)
+    // this.server.broadcast({ 
+    //     type: 'chat', 
+    //     id: 'SYSTEM', 
+    //     message: BIG_CHEST_STATS.message 
+    // });
+
+    console.log("SPAWNED BIG CHEST AT", chest.x, chest.y);
   }
 
   _createFoodObject() {
@@ -100,49 +138,71 @@ export class Game {
     return food;
   }
 
-  // Hàm tạo item rơi ra (được gọi từ Physics)
-  spawnItem(x, y) {
-    // Random loại item
-    const keys = Object.values(ITEM_TYPES);
-    const randomType = keys[Math.floor(Math.random() * keys.length)];
+  // Hàm tạo item rơi ra w
+  spawnItem(x, y, fromChestType = CHEST_TYPES.NORMAL) {
+    let itemType;
 
-    const item = new Item(x, y, randomType);
+    if (fromChestType === CHEST_TYPES.BIG) {
+      // LOOT TABLE CỦA BIG CHEST
+      const rand = Math.random();
+      if (rand < 0.4) {
+        itemType = ITEM_TYPES.WEAPON_SNIPER;
+      } else if (rand < 0.8) {
+        itemType = ITEM_TYPES.WEAPON_ROCKET;
+      } else {
+        itemType = ITEM_TYPES.COIN_LARGE;
+      }
+    } else {
+      // LOOT TABLE CỦA NORMAL CHEST
+      const rand = Math.random();
+      if (rand < 0.3) {
+        itemType = Math.random() < 0.7 ? ITEM_TYPES.COIN_SMALL : ITEM_TYPES.COIN_MEDIUM;
+      } else {
+        const normalItems = [
+          ITEM_TYPES.HEALTH_PACK, ITEM_TYPES.SHIELD, ITEM_TYPES.SPEED,
+          ITEM_TYPES.WEAPON_PISTOL, ITEM_TYPES.WEAPON_SHOTGUN, ITEM_TYPES.WEAPON_MACHINEGUN
+        ];
+        itemType = normalItems[Math.floor(Math.random() * normalItems.length)];
+      }
+    }
+
+    const item = new Item(x, y, itemType);
     this.items.push(item);
-    this.newItems.push(item); // Báo update
+    this.newItems.push(item);
   }
 
   // Giữ số lượng Bot tối thiểu
   manageBots() {
-  // Đếm số người chơi THẬT
-  let realPlayerCount = 0;
-  let botCount = 0;
-  
-  this.players.forEach(p => {
-    if (p.isBot) botCount++;
-    else realPlayerCount++;
-  });
+    // Đếm số người chơi THẬT
+    let realPlayerCount = 0;
+    let botCount = 0;
 
-  const totalCount = realPlayerCount + botCount;
-  
-  // Logic:
-  // - Nếu có ít người thật (< 3) → giữ 5-7 bot
-  // - Nếu có nhiều người (>= 3) → giữ 2-3 bot
-  const targetBotCount = realPlayerCount < 3 ? 5 : 2;
-  
-  // Chỉ spawn 1 bot mỗi lần
-  if (botCount < targetBotCount) {
-    const botId = `bot_${Date.now()}_${Math.random()}`;
-    const bot = new Bot(botId);
-    this.players.set(botId, bot);
-
-    this.server.broadcast({
-      type: PacketType.PLAYER_JOIN,
-      player: bot.serialize()
+    this.players.forEach(p => {
+      if (p.isBot) botCount++;
+      else realPlayerCount++;
     });
 
-    console.log(`🤖 Spawned Bot: ${bot.name} (Real: ${realPlayerCount}, Bots: ${botCount + 1})`);
+    const totalCount = realPlayerCount + botCount;
+
+    // Logic:
+    // - Nếu có ít người thật (< 3) → giữ 5-7 bot
+    // - Nếu có nhiều người (>= 3) → giữ 2-3 bot
+    const targetBotCount = realPlayerCount < 3 ? 5 : 2;
+
+    // Chỉ spawn 1 bot mỗi lần
+    if (botCount < targetBotCount) {
+      const botId = `bot_${Date.now()}_${Math.random()}`;
+      const bot = new Bot(botId);
+      this.players.set(botId, bot);
+
+      this.server.broadcast({
+        type: PacketType.PLAYER_JOIN,
+        player: bot.serialize()
+      });
+
+      console.log(`Spawned Bot: ${bot.name} (Real: ${realPlayerCount}, Bots: ${botCount + 1})`);
+    }
   }
-}
   tick() {
     // 1. Reset Delta
     this.removedFoodIds = [];
@@ -205,10 +265,15 @@ export class Game {
       this.foods.push(this.generateAndTrackFood());
     }
 
-    // 7. Respawn Chests (Nếu bị bắn vỡ thì sinh lại sau frame đó luôn hoặc delay tuỳ ý)
-    // Ở đây làm đơn giản: thiếu là bù luôn
-    while (this.chests.length < CHEST_COUNT) {
-      const newChest = this._spawnRandomChest(Math.random().toString(36).substr(2, 9));
+    // 7. Respawn Chests (Normal chest)
+    const currentNormalChests = this.chests.filter(c => c.type === CHEST_TYPES.NORMAL).length;
+
+    // Chỉ sinh THÊM 1 cái nếu thiếu (Không dùng while để tránh lặp vô tận)
+    if (currentNormalChests < CHEST_COUNT) {
+      const newChest = this._spawnRandomChest(
+        Math.random().toString(36).substr(2, 9),
+        CHEST_TYPES.NORMAL
+      );
       this.chests.push(newChest);
       this.newChests.push(newChest);
     }
@@ -217,6 +282,16 @@ export class Game {
     if (now - this.lastBotSpawn > 5000) { // 5 giây
       this.manageBots();
       this.lastBotSpawn = now;
+    }
+
+    //9. Big Chest
+    if (!this.hasBigChest && this.nextBigChestTime && now > this.nextBigChestTime) {
+      this.spawnBigChest();
+    }
+    // Nếu chưa có lịch spawn và không có Big Chest → Tạo lịch đầu tiên
+    if (!this.hasBigChest && !this.nextBigChestTime) {
+      this.nextBigChestTime = now + BIG_CHEST_STATS.interval;
+      console.log(`Next Big Chest in ${BIG_CHEST_STATS.interval / 1000}s`);
     }
 
     // Send Update
@@ -292,7 +367,7 @@ export class Game {
       const user = await User.findById(player.userId);
       if (user) {
         // Cộng dồn coins (ví dụ: 1 điểm = 1 coin)
-        user.coins += player.score;
+        user.coins += player.coins;
 
         // Cập nhật điểm cao nhất
         if (player.score > user.highScore) {
@@ -303,7 +378,7 @@ export class Game {
         user.totalDeaths += 1;
 
         await user.save();
-        console.log(`Saved score for ${user.username}: Score=${player.score}, HighScore=${user.highScore}`);
+        console.log(`Saved: Score=${player.score}, Earned Coins=${player.coins}`);
       }
     } catch (err) {
       console.error('Error saving score:', err);
@@ -326,6 +401,8 @@ export class Game {
   }
 
   sendStateUpdate() {
+    const bigChest = this.chests.find(c => c.type === CHEST_TYPES.BIG);
+
     const state = {
       type: PacketType.UPDATE,
       t: Date.now(),
@@ -340,7 +417,8 @@ export class Game {
       chestsRemoved: this.removedChestIds,
       // Thêm Delta Items
       itemsAdded: this.newItems,
-      itemsRemoved: this.removedItemIds
+      itemsRemoved: this.removedItemIds,
+      bigChest: bigChest ? { x: bigChest.x, y: bigChest.y } : null // 
     };
 
     this.server.broadcast(state);

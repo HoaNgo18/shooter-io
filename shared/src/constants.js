@@ -25,6 +25,18 @@ export const OBSTACLE_RADIUS_MAX = 80;
 export const CHEST_COUNT = 15;
 export const CHEST_RADIUS = 25;
 export const CHEST_HP = 50;
+export const CHEST_TYPES = {
+  NORMAL: 'NORMAL',
+  BIG: 'BIG' // Chest to (Event)
+};
+
+export const BIG_CHEST_STATS = {
+  radius: 45,        // To gấp đôi chest thường
+  hp: 300,           // Máu trâu hơn nhiều (để người chơi phải bắn lâu mới vỡ)
+  interval: 30000,   // Xuất hiện mỗi 30 giây (30000ms)
+  message: "A LEGENDARY CHEST HAS SPAWNED!" // Thông báo
+};
+
 
 export const ITEM_TYPES = {
   HEALTH_PACK: 'HEALTH_PACK',
@@ -34,12 +46,15 @@ export const ITEM_TYPES = {
   WEAPON_ROCKET: 'WEAPON_ROCKET',
   WEAPON_SHOTGUN: 'WEAPON_SHOTGUN',
   WEAPON_MACHINEGUN: 'WEAPON_MACHINEGUN',
-  WEAPON_SNIPER: 'WEAPON_SNIPER' // Thêm Sniper
+  WEAPON_SNIPER: 'WEAPON_SNIPER', // Thêm Sniper
+  COIN_SMALL: 'COIN_SMALL',   // Rơi từ Chest
+  COIN_MEDIUM: 'COIN_MEDIUM', // Rơi từ Chest hiếm
+  COIN_LARGE: 'COIN_LARGE'    // Rơi từ Chest cực hiếm
 };
 
 export const ITEM_RADIUS = 15;
 
-// 🔫 CẬP NHẬT HỆ THỐNG VŨ KHÍ
+// CẬP NHẬT HỆ THỐNG VŨ KHÍ
 export const WEAPON_STATS = {
   PISTOL: {
     cooldown: 400,        // Bắn mỗi 0.4s

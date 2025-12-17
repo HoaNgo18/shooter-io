@@ -13,6 +13,7 @@ const HUD = () => {
   // State vị trí cho Minimap
   const [myPos, setMyPos] = useState({ x: 0, y: 0 });
   const [kingPos, setKingPos] = useState(null);
+  const [bigChestPos, setBigChestPos] = useState(null);
 
   useEffect(() => {
     const unsubscribe = socket.subscribe((packet) => {
@@ -42,6 +43,11 @@ const HUD = () => {
         if (sorted.length > 0) {
           setKingPos({ x: sorted[0].x, y: sorted[0].y });
         }
+      }
+      if (packet.bigChest) {
+        setBigChestPos({ x: packet.bigChest.x, y: packet.bigChest.y });
+      } else {
+        setBigChestPos(null); // Không có Big Chest (đã bị phá)
       }
     });
 
@@ -131,6 +137,36 @@ const HUD = () => {
             <div style={{ position: 'absolute', top: '-10px', left: '-3px', fontSize: '10px' }}>👑</div>
           </div>
         )}
+        {bigChestPos && (() => {
+          const chestMinimapPos = worldToMinimap(bigChestPos.x, bigChestPos.y);
+          return (
+            <div style={{
+              position: 'absolute',
+              left: chestMinimapPos.left,
+              top: chestMinimapPos.top,
+              width: '10px',
+              height: '10px',
+              background: '#FF0000',
+              borderRadius: '3px',
+              transform: 'translate(-50%, -50%)',
+              border: '2px solid #FFD700',
+              boxShadow: '0 0 8px #FF0000',
+              animation: 'pulse 1s infinite',
+              zIndex: 2
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '-12px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                fontSize: '12px',
+                filter: 'drop-shadow(0 0 2px black)'
+              }}>
+                📦
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
     </div>

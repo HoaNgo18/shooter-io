@@ -24,6 +24,7 @@ export class Player extends Entity {
     this.lastAttack = 0;
     this.radius = PLAYER_RADIUS;
     this.userId = userId; // Lưu trữ ID người dùng từ DB
+    this.coins = 0;
 
     // Dash logic
     this.dashEndTime = 0;
@@ -154,6 +155,16 @@ export class Player extends Entity {
         break;
       case ITEM_TYPES.WEAPON_PISTOL: // 
         this.weapon = 'PISTOL';
+        break;
+      // THÊM LOGIC ĂN COIN
+      case 'COIN_SMALL':
+        this.coins += 1;
+        break;
+      case 'COIN_MEDIUM':
+        this.coins += 2;
+        break;
+      case 'COIN_LARGE':
+        this.coins += 5;
         break;
     }
   }
