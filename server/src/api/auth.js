@@ -9,24 +9,26 @@ const router = express.Router();
 // Register
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { email, gameDisplayName, password } = req.body;
 
     // Validation
-    if (!username || !email || !password) {
-      return res.status(400).json({ error: 'All fields required' });
+    if (!email || !gameDisplayName || !password) {
+      return res.status(400).json({ error: '❌ Vui lòng điền đầy đủ thông tin' });
     }
 
-    // Check if user exists
-    const existingUser = await User.findOne({ 
-      $or: [{ username }, { email }] 
-    });
+    if (password.length < 6) {
+      return res.status(400).json({ error: '❌ Mật khẩu phải có tối thiểu 6 ký tự' });
+    }
+
+    // Check if email exists
+    const existingUser = await User.findOne({ email });
     
     if (existingUser) {
-      return res.status(400).json({ error: 'User already exists' });
+      return res.status(400).json({ error: '❌ Email đã đăng ký' });
     }
 
     // Create user
-    const user = new User({ username, email, password });
+    const user = new User({ email, gameDisplayName, password });
     await user.save();
 
     // Generate token
@@ -38,32 +40,41 @@ router.post('/register', async (req, res) => {
       token,
       user: {
         id: user._id,
-        username: user.username,
         email: user.email,
+        gameDisplayName: user.gameDisplayName,
         highScore: user.highScore
       }
     });
   } catch (error) {
     console.error('Register error:', error);
-    res.status(500).json({ error: 'Server error' });
+    // Parse validation error
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message).join(', ');
+      return res.status(400).json({ error: `❌ ${messages}` });
+    }
+    res.status(500).json({ error: '❌ Lỗi server, vui lòng thử lại' });
   }
 });
 
 // Login
 router.post('/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: '❌ Vui lòng nhập email và mật khẩu' });
+    }
 
     // Find user
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: '❌ Email hoặc mật khẩu sai' });
     }
 
     // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: '❌ Email hoặc mật khẩu sai' });
     }
 
     // Generate token
@@ -75,15 +86,15 @@ router.post('/login', async (req, res) => {
       token,
       user: {
         id: user._id,
-        username: user.username,
         email: user.email,
+        gameDisplayName: user.gameDisplayName,
         highScore: user.highScore,
         coins: user.coins
       }
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: '❌ Lỗi server, vui lòng thử lại' });
   }
 });
 

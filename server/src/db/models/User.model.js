@@ -2,19 +2,19 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema({
-  username: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    minlength: 3,
-    maxlength: 20
-  },
   email: {
     type: String,
     required: true,
     unique: true,
-    lowercase: true
+    lowercase: true,
+    trim: true
+  },
+  gameDisplayName: {
+    type: String,
+    required: true,
+    trim: true,
+    minlength: 1,
+    maxlength: 30
   },
   password: {
     type: String,

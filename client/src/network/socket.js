@@ -13,14 +13,32 @@ class NetworkManager {
     this.listeners = [];
   }
 
-  connect(username) {
+  connect(authOptions) {
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket('ws://localhost:3000');
 
       this.ws.onopen = () => {
         this.isConnected = true;
         console.log('Connected via WebSocket');
-        this.send({ type: PacketType.JOIN, name: username });
+        
+        // Gửi gói tin JOIN kèm thông tin xác thực
+        const joinPacket = { 
+          type: PacketType.JOIN, 
+          ...authOptions 
+        };
+        
+        // Nếu đã đăng nhập, thêm thông tin người chơi từ localStorage
+        if (authOptions.token) {
+          try {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            joinPacket.gameDisplayName = user.gameDisplayName || authOptions.name;
+          } catch (e) {
+            joinPacket.gameDisplayName = authOptions.name;
+          }
+        }
+        
+        this.send(joinPacket);
+        
         resolve();
       };
 
@@ -36,6 +54,17 @@ class NetworkManager {
         console.log('🔌 Disconnected');
       };
     });
+  }
+
+  //ngat ket noi
+  disconnect() {
+    if (this.ws) {
+      this.ws.close(); // Đóng kết nối
+      this.ws = null;
+      this.isConnected = false;
+      this.myId = null;
+      console.log('Manually disconnected');
+    }
   }
 
   setGameScene(scene) {
