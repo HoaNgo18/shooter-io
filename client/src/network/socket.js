@@ -1,4 +1,3 @@
-
 import { PacketType } from '@shared/packetTypes';
 
 class NetworkManager {
@@ -20,7 +19,7 @@ class NetworkManager {
 
       this.ws.onopen = () => {
         this.isConnected = true;
-        console.log('Connected via WebSocket');
+        console.log('✅ Connected via WebSocket');
 
         // Gửi gói tin JOIN kèm thông tin xác thực
         this.send({
@@ -45,19 +44,20 @@ class NetworkManager {
     });
   }
 
-  //ngat ket noi
+  // Ngắt kết nối
   disconnect() {
     if (this.ws) {
       this.ws.close(); // Đóng kết nối
       this.ws = null;
       this.isConnected = false;
       this.myId = null;
+      this.listeners = []; // Reset listeners khi logout
       console.log('Manually disconnected');
     }
   }
 
   setGameScene(scene) {
-    if(!scene) return;
+    if (!scene) return;
     this.gameScene = scene;
     if (this.initData) {
       console.log('Applying buffered INIT data...');
@@ -83,53 +83,58 @@ class NetworkManager {
   }
 
   handleMessage(event) {
-    const packet = JSON.parse(event.data);
+    try {
+      const packet = JSON.parse(event.data);
 
-    // Xử lý INIT riêng biệt (quan trọng nhất)
-    if (packet.type === PacketType.INIT) {
-      console.log('Received INIT packet. My ID:', packet.id);
-      this.myId = packet.id;
-      this.initData = packet; // Lưu lại để dùng sau
-    }
-
-    // 1. Xử lý Logic Game (Phaser)
-    if (this.gameScene) {
-      switch (packet.type) {
-        case PacketType.UPDATE:
-          this.gameScene.handleServerUpdate(packet);
-          // Gửi data sang React HUD
-          this.notifyReact(packet);
-          break;
-
-        case PacketType.INIT:
-          // QUAN TRỌNG: Lưu ID của mình khi server cấp
-          this.myId = packet.id;
-
-          this.gameScene.initGame(packet);
-          this.notifyReact(packet);
-          break;
-
-        case PacketType.PLAYER_JOIN:
-          this.gameScene.addPlayer(packet.player);
-          break;
-
-        case PacketType.PLAYER_LEAVE:
-          this.gameScene.removePlayer(packet.id);
-          break;
+      // 1. Xử lý Logic Global (Luôn chạy dù có GameScene hay không)
+      
+      // Init ID
+      if (packet.type === PacketType.INIT) {
+        console.log('Received INIT packet. My ID:', packet.id);
+        this.myId = packet.id;
+        this.initData = packet;
       }
-    }
 
-    // 2. Xử lý packet từ React (DeathScreen, HUD)
-    if (packet.type === PacketType.PLAYER_DIED) {
+      // Ping/Pong
+      if (packet.type === PacketType.PING) {
+        this.send({ type: PacketType.PONG });
+        return; // Ping pong không cần báo cho React
+      }
+
+      // [QUAN TRỌNG] Bắn tin cho React (App.jsx, HUD) NGAY LẬP TỨC
+      // Việc này đảm bảo USER_DATA_UPDATE luôn đến được App.jsx
       this.notifyReact(packet);
-    }
 
-    if (packet.type === PacketType.PING) {
-      this.send({ type: PacketType.PONG });
+      // 2. Xử lý Logic Game (Phaser) - Chỉ chạy khi đang chơi
+      if (this.gameScene) {
+        switch (packet.type) {
+          case PacketType.UPDATE:
+            this.gameScene.handleServerUpdate(packet);
+            break;
+
+          case PacketType.INIT:
+            // Cập nhật lại ID nếu cần
+            this.myId = packet.id;
+            this.gameScene.initGame(packet);
+            break;
+
+          case PacketType.PLAYER_JOIN:
+            this.gameScene.addPlayer(packet.player);
+            break;
+
+          case PacketType.PLAYER_LEAVE:
+            this.gameScene.removePlayer(packet.id);
+            break;
+        }
+      }
+
+    } catch (e) {
+      console.error('Socket handling error:', e);
     }
   }
 
   notifyReact(data) {
+    // Gửi data cho tất cả các listener đã đăng ký (App.jsx, GameScene...)
     this.listeners.forEach(callback => callback(data));
   }
 }

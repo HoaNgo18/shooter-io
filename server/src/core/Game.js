@@ -367,73 +367,86 @@ export class Game {
   }
 
   async savePlayerScore(player) {
-      if (!player.userId) return; // Khách thì không lưu
+    if (!player.userId) return; // Khách thì không lưu
 
-      try {
-        const user = await User.findById(player.userId);
-        if (user) {
-          // Cộng dồn coins (ví dụ: 1 điểm = 1 coin)
-          user.coins += player.coins;
+    try {
+      const user = await User.findById(player.userId);
+      if (user) {
+        // Cộng dồn coins (ví dụ: 1 điểm = 1 coin)
+        user.coins += player.coins;
 
-          // Cập nhật điểm cao nhất
-          if (player.score > user.highScore) {
-            user.highScore = player.score;
-          }
-
-          // Tăng số lần chết
-          user.totalDeaths += 1;
-
-          await user.save();
-          console.log(`Saved: Score=${player.score}, Earned Coins=${player.coins}`);
+        // Cập nhật điểm cao nhất
+        if (player.score > user.highScore) {
+          user.highScore = player.score;
         }
-      } catch (err) {
-        console.error('Error saving score:', err);
+
+        // Tăng số lần chết
+        user.totalDeaths += 1;
+
+        await user.save();
+        console.log(`Saved: Score=${player.score}, Earned Coins=${player.coins}`);
+        this.server.sendToClient(player.id, {
+          type: 'USER_DATA_UPDATE',
+          coins: user.coins,
+          highScore: user.highScore,
+          totalKills: user.totalKills,
+          totalDeaths: user.totalDeaths,
+          skins: user.skins,
+          equippedSkin: user.equippedSkin
+        });
       }
-    }
-
-  async saveKillerStats(player) {
-      if (!player.userId) return; // Nếu là khách (không đăng nhập) thì bỏ qua
-
-      try {
-        const user = await User.findById(player.userId);
-        if (user) {
-          user.totalKills = (user.totalKills || 0) + 1; // Cộng thêm 1 kill
-          await user.save();
-          console.log(`Updated totalKills for ${user.username}: ${user.totalKills}`);
-        }
-      } catch (err) {
-        console.error('Error saving killer stats:', err);
-      }
-    }
-
-    sendStateUpdate() {
-      const bigChest = this.chests.find(c => c.type === CHEST_TYPES.BIG);
-
-      const state = {
-        type: PacketType.UPDATE,
-        t: Date.now(),
-        // QUAN TRỌNG: Gửi mảng players để HUD vẽ Leaderboard
-        players: Array.from(this.players.values()).map(p => p.serialize()),
-        projectiles: this.projectiles.map(p => p.serialize()),
-        explosions: this.explosions.map(e => e.serialize()),
-        foodsAdded: this.newFoods,
-        foodsRemoved: this.removedFoodIds,
-        // Thêm Delta Chests
-        chestsAdded: this.newChests,
-        chestsRemoved: this.removedChestIds,
-        // Thêm Delta Items
-        itemsAdded: this.newItems,
-        itemsRemoved: this.removedItemIds,
-        bigChest: bigChest ? { x: bigChest.x, y: bigChest.y } : null // 
-      };
-
-      this.server.broadcast(state);
-    }
-
-    getLeaderboard() {
-      return Array.from(this.players.values())
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 10)
-        .map(p => ({ name: p.name, score: p.score }));
+    } catch (err) {
+      console.error('Error saving score:', err);
     }
   }
+
+  async saveKillerStats(player) {
+    if (!player.userId) return; // Nếu là khách (không đăng nhập) thì bỏ qua
+
+    try {
+      const user = await User.findById(player.userId);
+      if (user) {
+        user.totalKills = (user.totalKills || 0) + 1; // Cộng thêm 1 kill
+        await user.save();
+        console.log(`Updated totalKills for ${user.username}: ${user.totalKills}`);
+        this.server.sendToClient(player.id, {
+          type: 'USER_DATA_UPDATE',
+          totalKills: user.totalKills
+        });
+      }
+    } catch (err) {
+      console.error('Error saving killer stats:', err);
+    }
+  }
+
+  sendStateUpdate() {
+    const bigChest = this.chests.find(c => c.type === CHEST_TYPES.BIG);
+
+    const state = {
+      type: PacketType.UPDATE,
+      t: Date.now(),
+      // QUAN TRỌNG: Gửi mảng players để HUD vẽ Leaderboard
+      players: Array.from(this.players.values()).map(p => p.serialize()),
+      projectiles: this.projectiles.map(p => p.serialize()),
+      explosions: this.explosions.map(e => e.serialize()),
+      foodsAdded: this.newFoods,
+      foodsRemoved: this.removedFoodIds,
+      // Thêm Delta Chests
+      chestsAdded: this.newChests,
+      chestsRemoved: this.removedChestIds,
+      // Thêm Delta Items
+      itemsAdded: this.newItems,
+      itemsRemoved: this.removedItemIds,
+      bigChest: bigChest ? { x: bigChest.x, y: bigChest.y } : null // 
+    };
+
+    this.server.broadcast(state);
+  }
+
+  getLeaderboard() {
+    return Array.from(this.players.values())
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10)
+      .map(p => ({ name: p.name, score: p.score }));
+  }
+}

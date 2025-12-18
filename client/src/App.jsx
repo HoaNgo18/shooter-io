@@ -38,10 +38,9 @@ function App() {
       }
     }
 
-    // Đợi một chút để socket ổn định
+    // Đợi socket ổn định
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    // Gửi lệnh hồi sinh để bắt đầu game (vì mặc định đang dead)
     socket.send({ type: PacketType.RESPAWN });
     setGameState('playing');
   };
@@ -65,12 +64,44 @@ function App() {
     socket.send({ type: PacketType.RESPAWN });
   };
 
-  // --- Hợp nhất Logic Game & Socket ---
+  // --- 1. GLOBAL LISTENER: Luôn lắng nghe cập nhật Coin/Stats/Skin ---
+  // (Chạy độc lập với việc đang chơi hay ở Home)
+  useEffect(() => {
+    const handleGlobalMessage = (packet) => {
+      if (packet.type === 'USER_DATA_UPDATE') {
+        console.log("🔄 [App] Received User Update:", packet);
+        
+        setUser(prevUser => {
+          if (!prevUser) return null;
+          return {
+            ...prevUser,
+            coins: packet.coins !== undefined ? packet.coins : prevUser.coins,
+            highScore: packet.highScore !== undefined ? packet.highScore : prevUser.highScore,
+            totalKills: packet.totalKills !== undefined ? packet.totalKills : prevUser.totalKills,
+            totalDeaths: packet.totalDeaths !== undefined ? packet.totalDeaths : prevUser.totalDeaths,
+            skins: packet.skins !== undefined ? packet.skins : prevUser.skins,
+            equippedSkin: packet.equippedSkin !== undefined ? packet.equippedSkin : prevUser.equippedSkin
+          };
+        });
+      }
+    };
+
+    // Đăng ký lắng nghe
+    const unsubscribe = socket.subscribe(handleGlobalMessage);
+    
+    // Hủy đăng ký khi component unmount (tắt app)
+    return () => {
+      unsubscribe();
+    };
+  }, []); // [] nghĩa là chỉ chạy 1 lần khi App bật lên
+
+  // --- 2. GAME LOGIC LISTENER: Chỉ chạy khi gameState = playing ---
   useEffect(() => {
     let game = null;
 
     if (gameState === 'playing') {
-      // 1. Khởi tạo Phaser
+      console.log("🎮 Game Started - Init Phaser");
+      
       const config = {
         type: Phaser.AUTO,
         width: window.innerWidth,
@@ -81,64 +112,45 @@ function App() {
         scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH }
       };
       game = new Phaser.Game(config);
-      // socket.setGameScene(game.scene.scenes[0]);
 
-      // 2. Lắng nghe sự kiện chết từ Server
-      const handleSocketMessage = (packet) => {
-        if (packet.type === PacketType.PLAYER_DIED &&
-          packet.victimId === socket.myId) {
-
-          // Chỉ hiện màn hình chết, không destroy game ngay
+      // Lắng nghe sự kiện chết (Gameplay specific)
+      const handleGameMessage = (packet) => {
+        if (packet.type === PacketType.PLAYER_DIED && packet.victimId === socket.myId) {
+          console.log("💀 Player Died Packet Received");
           setIsDead(true);
           setKillerName(packet.killerName);
           setFinalScore(packet.score);
+
+          // Xử lý riêng cho Guest (vì server không gửi USER_DATA_UPDATE cho guest)
           setUser(prevUser => {
             if (prevUser && prevUser.isGuest) {
-              // 1. Lấy dữ liệu cũ từ LocalStorage (để chắc chắn)
               const savedGuest = localStorage.getItem('guest_data');
               const oldData = savedGuest ? JSON.parse(savedGuest) : prevUser;
-
-              // 2. Cộng dồn chỉ số mới
               const updatedGuest = {
-                ...oldData, // Giữ lại username, skin...
-
-                // Cộng coin
+                ...oldData,
                 coins: (oldData.coins || 0) + (packet.coins || 0),
-
-                // Cập nhật điểm cao nhất
                 highScore: Math.max(oldData.highScore || 0, packet.score),
-
-                // Cộng kill (lấy từ packet.kills server vừa gửi)
                 totalKills: (oldData.totalKills || 0) + (packet.kills || 0),
-
-                // Cộng death (Chết 1 lần thì cộng 1)
                 totalDeaths: (oldData.totalDeaths || 0) + 1
               };
-
-              console.log("Saving Guest Data:", updatedGuest); // Log để kiểm tra
-
-              // 3. Lưu lại
               localStorage.setItem('guest_data', JSON.stringify(updatedGuest));
-
               return updatedGuest;
             }
-            return prevUser; // Nếu là user thật thì Server tự lưu, không làm gì cả
+            return prevUser;
           });
-          // ------------------------------------------
         }
       };
 
-      const unsubscribe = socket.subscribe(handleSocketMessage);
+      const unsubscribe = socket.subscribe(handleGameMessage);
 
       return () => {
-        unsubscribe(); // Hủy lắng nghe socket
-        if (game) {
-          game.destroy(true); // Hủy game Phaser
-        }
+        console.log("🛑 Game Cleanup");
+        unsubscribe();
+        if (game) game.destroy(true);
         socket.resetGameScene();
       };
     }
-  }, [gameState]); // Chỉ chạy lại khi gameState thay đổi
+  }, [gameState]);
 
   return (
     <div className="App">
@@ -156,13 +168,8 @@ function App() {
 
       {gameState === 'playing' && (
         <>
-          {/* Container cho Phaser */}
           <div id="phaser-container" style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }} />
-
-          {/* HUD chỉ hiện khi đang chơi và chưa chết */}
           {!isDead && <HUD />}
-
-          {/* Màn hình chết */}
           {isDead && (
             <DeathScreen
               killerName={killerName}

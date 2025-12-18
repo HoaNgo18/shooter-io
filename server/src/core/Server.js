@@ -22,10 +22,10 @@ export class Server {
 
       this.clients.set(clientId, { ws, id: clientId, player: null });
 
-      ws.on('message', (data) => {
+      ws.on('message', async (data) => {
         try {
           const packet = JSON.parse(data.toString());
-          this.handleMessage(clientId, packet);
+          await this.handleMessage(clientId, packet);
         } catch (err) {
           console.error('Invalid packet:', err);
         }
@@ -42,44 +42,110 @@ export class Server {
     });
   }
 
-  handleMessage(clientId, packet) {
+  async handleMessage(clientId, packet) {
+    // Khai báo client ngay từ đầu để dùng cho tất cả các case
+    const client = this.clients.get(clientId);
+    if (!client) return;
+
     switch (packet.type) {
       case PacketType.JOIN:
         let playerName = packet.name || 'Anonymous';
         let userId = null;
-        // Nếu có token -> Verify
         if (packet.token) {
           try {
             const decoded = jwt.verify(packet.token, config.JWT_SECRET);
             userId = decoded.id;
+            // Gán userId vào đối tượng client để quản lý session
+            client.userId = userId;
 
-            // (Optional) Lấy tên thật từ DB nếu muốn chắc chắn
-            // const user = await User.findById(userId);
-            // if (user) playerName = user.username;
-
+            const user = await User.findById(userId);
+            if (user) {
+              playerName = user.username;
+              this.sendToClient(clientId, {
+                type: 'USER_DATA_UPDATE',
+                coins: user.coins,
+                skins: user.skins,
+                equippedSkin: user.equippedSkin,
+                highScore: user.highScore,
+                totalKills: user.totalKills,
+                totalDeaths: user.totalDeaths
+              });
+            }
             console.log(`User ${userId} logged in via token`);
           } catch (err) {
             console.log('Invalid token, playing as guest');
           }
         }
-        // Gọi hàm addPlayer với userId (để sau này cộng điểm)
         this.game.addPlayer(clientId, playerName, userId);
         break;
+
       case PacketType.INPUT:
         this.game.handleInput(clientId, packet.data);
         break;
+
       case PacketType.ATTACK:
         this.game.handleAttack(clientId);
         break;
+
       case PacketType.PONG:
-        const client = this.clients.get(clientId);
         if (client?.player) {
           client.player.lastPong = Date.now();
         }
         break;
+
       case PacketType.RESPAWN:
-        this.game.respawnPlayer(clientId);
+        // Cập nhật skin khi respawn nếu người chơi đã chọn skin mới
+        const skinIdToUse = packet.skinId || (client.player?.skinId);
+        this.game.respawnPlayer(clientId, skinIdToUse);
         break;
+
+      case PacketType.BUY_SKIN: {
+        // Kiểm tra nếu không có userId (khách) thì không cho mua
+        if (!client.userId) return;
+
+        try {
+          const { skinId } = packet;
+          const user = await User.findById(client.userId);
+          // Bạn có thể lấy giá từ một bảng hằng số, ở đây tạm để 500
+          const PRICE = 500;
+
+          if (user && user.coins >= PRICE && !user.skins.includes(skinId)) {
+            user.coins -= PRICE;
+            user.skins.push(skinId);
+            await user.save();
+
+            // Gửi cập nhật thông qua hàm sendToClient có sẵn trong class
+            this.sendToClient(clientId, {
+              type: 'USER_DATA_UPDATE',
+              coins: user.coins,
+              skins: user.skins
+            });
+          }
+        } catch (err) {
+          console.error("Lỗi mua skin:", err);
+        }
+        break;
+      }
+
+      case PacketType.EQUIP_SKIN: {
+        if (!client.userId) return;
+        try {
+          const { skinId } = packet;
+          const user = await User.findById(client.userId);
+          if (user && user.skins.includes(skinId)) {
+            user.equippedSkin = skinId;
+            await user.save();
+
+            this.sendToClient(clientId, {
+              type: 'USER_DATA_UPDATE',
+              equippedSkin: user.equippedSkin
+            });
+          }
+        } catch (err) {
+          console.error("Lỗi trang bị skin:", err);
+        }
+        break;
+      }
     }
   }
 
