@@ -111,14 +111,6 @@ export class Game {
     this.hasBigChest = true; // Đánh dấu đã có Big Chest
     this.nextBigChestTime = null; // Hủy timer
 
-
-    // Gửi thông báo cho toàn server (Nếu bạn đã làm hệ thống chat/notification)
-    // this.server.broadcast({ 
-    //     type: 'chat', 
-    //     id: 'SYSTEM', 
-    //     message: BIG_CHEST_STATS.message 
-    // });
-
     console.log("SPAWNED BIG CHEST AT", chest.x, chest.y);
   }
 
@@ -192,7 +184,10 @@ export class Game {
     // Chỉ spawn 1 bot mỗi lần
     if (botCount < targetBotCount) {
       const botId = `bot_${Date.now()}_${Math.random()}`;
+      const botSkins = ['default', 'red', 'blue', 'gold', 'dark']; // Các ID skin trong constants
+      const randomSkin = botSkins[Math.floor(Math.random() * botSkins.length)];
       const bot = new Bot(botId);
+      bot.skinId = randomSkin;
       this.players.set(botId, bot);
 
       this.server.broadcast({
@@ -298,8 +293,8 @@ export class Game {
     this.sendStateUpdate();
   }
 
-  addPlayer(clientId, name, userId = null) {
-    const player = new Player(clientId, name, userId);
+  addPlayer(clientId, name, userId = null, skinId = 'default') {
+    const player = new Player(clientId, name, userId, skinId);
     this.players.set(clientId, player);
 
     // Gửi INIT: Full foods + Obstacles
@@ -352,9 +347,12 @@ export class Game {
     }
   }
 
-  respawnPlayer(clientId) {
+  respawnPlayer(clientId, skinId) {
     const player = this.players.get(clientId);
     if (player && player.dead) {
+      if (skinId) {
+        player.skinId = skinId; 
+      }
       player.dead = false;
       player.respawn();
 

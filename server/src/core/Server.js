@@ -4,6 +4,7 @@ import { Game } from './Game.js';
 import jwt from 'jsonwebtoken';
 import config from '../config.js'; // Import config để lấy JWT_SECRET
 import { User } from '../db/models/User.model.js'; // Import Model User
+import { SKINS } from '../../../shared/src/constants.js';
 
 export class Server {
   constructor(port = 3000) {
@@ -51,6 +52,8 @@ export class Server {
       case PacketType.JOIN:
         let playerName = packet.name || 'Anonymous';
         let userId = null;
+
+        let userSkin = packet.skinId || 'default';
         if (packet.token) {
           try {
             const decoded = jwt.verify(packet.token, config.JWT_SECRET);
@@ -61,6 +64,8 @@ export class Server {
             const user = await User.findById(userId);
             if (user) {
               playerName = user.username;
+              userSkin = user.equippedSkin || 'default';
+
               this.sendToClient(clientId, {
                 type: 'USER_DATA_UPDATE',
                 coins: user.coins,
@@ -76,7 +81,7 @@ export class Server {
             console.log('Invalid token, playing as guest');
           }
         }
-        this.game.addPlayer(clientId, playerName, userId);
+        this.game.addPlayer(clientId, playerName, userId, userSkin);
         break;
 
       case PacketType.INPUT:
@@ -100,21 +105,30 @@ export class Server {
         break;
 
       case PacketType.BUY_SKIN: {
-        // Kiểm tra nếu không có userId (khách) thì không cho mua
         if (!client.userId) return;
 
         try {
           const { skinId } = packet;
           const user = await User.findById(client.userId);
-          // Bạn có thể lấy giá từ một bảng hằng số, ở đây tạm để 500
-          const PRICE = 500;
 
-          if (user && user.coins >= PRICE && !user.skins.includes(skinId)) {
-            user.coins -= PRICE;
+          // Tìm thông tin skin để lấy giá
+          const skinInfo = SKINS.find(s => s.id === skinId);
+
+          if (!user || !skinInfo) return;
+
+          // Kiểm tra logic:
+          // 1. Chưa sở hữu skin này
+          // 2. Đủ tiền
+          if (!user.skins.includes(skinId) && user.coins >= skinInfo.price) {
+
+            // Trừ tiền & Thêm skin
+            user.coins -= skinInfo.price;
             user.skins.push(skinId);
-            await user.save();
 
-            // Gửi cập nhật thông qua hàm sendToClient có sẵn trong class
+            await user.save();
+            console.log(`User ${user.username} bought skin ${skinId}`);
+
+            // Gửi cập nhật về Client ngay lập tức
             this.sendToClient(clientId, {
               type: 'USER_DATA_UPDATE',
               coins: user.coins,
@@ -128,18 +142,37 @@ export class Server {
       }
 
       case PacketType.EQUIP_SKIN: {
-        if (!client.userId) return;
+        if (!client.userId) {
+          return;
+        }
         try {
           const { skinId } = packet;
+          console.log(`User ${client.userId} requesting equip: ${skinId}`); // Log debug
+
           const user = await User.findById(client.userId);
+          if (!user) {
+            return;
+          }
+
+          // Kiểm tra xem user có sở hữu skin đó không
           if (user && user.skins.includes(skinId)) {
             user.equippedSkin = skinId;
-            await user.save();
+            await user.save(); // Bây giờ sẽ lưu được vì đã sửa Model
 
+            console.log(`Equipped success: ${skinId}`);
+
+            // Gửi cập nhật về Client
             this.sendToClient(clientId, {
               type: 'USER_DATA_UPDATE',
               equippedSkin: user.equippedSkin
             });
+
+            // Cập nhật ngay vào player trong game (nếu đang chơi)
+            if (client.player) {
+              client.player.skinId = skinId;
+            }
+          } else {
+            console.log("Equip failed: Skin not owned or User not found");
           }
         } catch (err) {
           console.error("Lỗi trang bị skin:", err);

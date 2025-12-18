@@ -14,5 +14,8 @@ export const PacketType = {
   PLAYER_DIED: 'player_died',
   LEADERBOARD: 'leaderboard',
   PING: 'ping',
-  PONG: 'pong'
+  PONG: 'pong',
+  BUY_SKIN: 'buy_skin',
+  EQUIP_SKIN: 'equip_skin',
+  USER_DATA_UPDATE: 'user_data_update'
 };

@@ -67,6 +67,7 @@ class NetworkManager {
 
   resetGameScene() {
     this.gameScene = null;
+    this.initData = null;
   }
 
   send(data) {

@@ -8,7 +8,7 @@ import { getRandomPosition } from '../../../shared/src/utils.js';
 import { Projectile } from './Projectile.js';
 
 export class Player extends Entity {
-  constructor(id, name, userId = null) {
+  constructor(id, name, userId = null, skinId = 'default') {
     const pos = getRandomPosition(MAP_SIZE);
     super(pos.x, pos.y);
 
@@ -26,6 +26,7 @@ export class Player extends Entity {
     this.userId = userId; // Lưu trữ ID người dùng từ DB
     this.coins = 0;
     this.sessionKills = 0;
+    this.skinId = skinId;
 
     // Dash logic
     this.dashEndTime = 0;
@@ -290,7 +291,8 @@ export class Player extends Entity {
       coins: this.coins,
       hasShield: Date.now() < this.shieldEndTime,
       isSpeedUp: Date.now() < this.speedBuffEndTime,
-      isMoving: this.isMoving // Gửi về client để hiển thị trạng thái
+      isMoving: this.isMoving, // Gửi về client để hiển thị trạng thái
+      skinId: this.skinId
     };
   }
 }

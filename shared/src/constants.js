@@ -37,6 +37,14 @@ export const BIG_CHEST_STATS = {
   message: "A LEGENDARY CHEST HAS SPAWNED!" // Thông báo
 };
 
+export const SKINS = [
+  { id: 'default', name: 'Default', price: 0, color: 0x9E9E9E }, 
+  { id: 'red', name: 'Crimson', price: 100, color: 0xFF1744 },   
+  { id: 'blue', name: 'Cobalt', price: 250, color: 0x00E5FF },   
+  { id: 'gold', name: 'Gold', price: 1000, color: 0xFFD700 },   
+  { id: 'dark', name: 'Nightmare', price: 2000, color: 0x212121 } 
+];
+
 
 export const ITEM_TYPES = {
   HEALTH_PACK: 'HEALTH_PACK',

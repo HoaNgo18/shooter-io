@@ -40,7 +40,10 @@ router.post('/register', async (req, res) => {
         id: user._id,
         username: user.username,
         email: user.email,
-        highScore: user.highScore
+        highScore: user.highScore,
+        // --- Cập nhật thêm ---
+        skins: user.skins,
+        equippedSkin: user.equippedSkin
       }
     });
   } catch (error) {
@@ -80,7 +83,9 @@ router.post('/login', async (req, res) => {
         highScore: user.highScore || 0,
         coins: user.coins || 0,
         totalKills: user.totalKills || 0,     
-        totalDeaths: user.totalDeaths || 0
+        totalDeaths: user.totalDeaths || 0,
+        skins: user.skins, 
+        equippedSkin: user.equippedSkin || 'default'
       }
     });
   } catch (error) {
@@ -98,6 +103,7 @@ router.get('/profile', async (req, res) => {
     }
 
     const decoded = jwt.verify(token, config.JWT_SECRET);
+    // select('-password') sẽ tự động lấy tất cả các trường còn lại, bao gồm cả equippedSkin mới thêm
     const user = await User.findById(decoded.id).select('-password');
 
     if (!user) {

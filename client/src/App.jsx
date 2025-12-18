@@ -21,10 +21,12 @@ function App() {
     setGameState('home');
   };
 
-  const handleStartGame = async () => {
+  const handleStartGame = async (selectedSkinId) => {
     setIsDead(false);
     setKillerName('');
     setFinalScore(0);
+
+    const skinToUse = selectedSkinId || user.equippedSkin || 'default';
 
     if (!socket.isConnected) {
       try {
@@ -40,8 +42,10 @@ function App() {
 
     // Đợi socket ổn định
     await new Promise(resolve => setTimeout(resolve, 100));
-
-    socket.send({ type: PacketType.RESPAWN });
+    socket.send({ 
+        type: PacketType.RESPAWN,
+        skinId: skinToUse 
+    });
     setGameState('playing');
   };
 
@@ -68,9 +72,7 @@ function App() {
   // (Chạy độc lập với việc đang chơi hay ở Home)
   useEffect(() => {
     const handleGlobalMessage = (packet) => {
-      if (packet.type === 'USER_DATA_UPDATE') {
-        console.log("🔄 [App] Received User Update:", packet);
-        
+      if (packet.type === 'USER_DATA_UPDATE') {   
         setUser(prevUser => {
           if (!prevUser) return null;
           return {
@@ -161,7 +163,7 @@ function App() {
       {gameState === 'home' && user && (
         <HomeScreen
           user={user}
-          onPlayClick={handleStartGame}
+          onPlayClick={(skinId) => handleStartGame(skinId)}
           onLogout={handleLogout}
         />
       )}

@@ -41,6 +41,10 @@ const userSchema = new mongoose.Schema({
     type: [String],
     default: ['default']
   },
+  equippedSkin: {
+    type: String,
+    default: 'default'
+  },
   createdAt: {
     type: Date,
     default: Date.now
