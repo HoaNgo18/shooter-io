@@ -45,6 +45,8 @@ export const SKINS = [
   { id: 'dark', name: 'Nightmare', price: 2000, color: 0x212121 } 
 ];
 
+export const NEBULA_COUNT = 15; // Thay vì BUSH_COUNT
+export const NEBULA_RADIUS = 70; // Tinh vân thường to hơn bụi cây
 
 export const ITEM_TYPES = {
   HEALTH_PACK: 'HEALTH_PACK',

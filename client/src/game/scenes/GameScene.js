@@ -17,6 +17,7 @@ export class GameScene extends Phaser.Scene {
         this.chests = {};
         this.itemGroup = null;
         this.items = {};
+        this.nebulas = [];
 
         // Thêm range circle cho player
         this.rangeCircle = null;
@@ -121,7 +122,16 @@ export class GameScene extends Phaser.Scene {
     // --- SOCKET HANDLERS ---
 
     initGame(data) {
-        if (data.players) data.players.forEach(p => this.addPlayer(p));
+        if (data.players) {
+            data.players.forEach(p => {
+                const player = this.players[p.id];
+                if (player) {
+                    if (player.updateServerData) player.updateServerData(p);
+                } else {
+                    this.addPlayer(p);
+                }
+            });
+        }
 
         if (data.foods) {
             this.foodGroup.clear(true, true);
@@ -135,6 +145,15 @@ export class GameScene extends Phaser.Scene {
                 rock.setStrokeStyle(3, 0x555555);
                 this.obstacleGroup.add(rock);
             });
+        }
+
+        if (data.nebulas) {
+            // Xóa cũ nếu có (đề phòng)
+            this.nebulas.forEach(n => n.destroy());
+            this.nebulas = [];
+
+            // Tạo mới
+            data.nebulas.forEach(b => this.createNebula(b));
         }
 
         if (data.chests) {
@@ -174,7 +193,7 @@ export class GameScene extends Phaser.Scene {
             });
         }
         if (socket.myId && this.players[socket.myId]) {
-             // Nếu camera chưa follow ai, bắt nó follow mình
+            // Nếu camera chưa follow ai, bắt nó follow mình
             if (!this.cameras.main._follow) {
                 console.log("Camera now following player:", socket.myId);
                 this.cameras.main.startFollow(this.players[socket.myId].container);
@@ -285,7 +304,7 @@ export class GameScene extends Phaser.Scene {
     createChestSprite(c) {
         if (this.chests[c.id]) return;
         // Mặc định là Chest thường
-        let color = 0xCD853F; 
+        let color = 0xCD853F;
         let size = 40;
         let strokeColor = 0xFFFFFF;
         // Nếu là Big Chest
@@ -301,7 +320,7 @@ export class GameScene extends Phaser.Scene {
         chest.setStrokeStyle(3, strokeColor);
         // Hiệu ứng xoay nhẹ cho Big Chest để gây chú ý
         if (c.type === 'BIG') {
-             this.tweens.add({
+            this.tweens.add({
                 targets: chest,
                 angle: 360,
                 duration: 3000,
@@ -312,6 +331,40 @@ export class GameScene extends Phaser.Scene {
 
         this.chestGroup.add(chest);
         this.chests[c.id] = chest;
+    }
+
+    // Trong hàm createNebula(data)
+    createNebula(data) {
+        if (!this.textures.exists('nebula')) {
+            const graphics = this.add.graphics();
+            graphics.fillStyle(0x9C27B0, 0.5);
+            graphics.fillCircle(0, 0, data.radius);
+            const container = this.add.container(data.x, data.y, [graphics]);
+            container.setDepth(15);
+            this.nebulas.push(container);
+            return;
+        }
+        const nebula = this.add.image(data.x, data.y, 'nebula');
+
+        // Scale ảnh cho khớp với radius logic
+        // Giả sử ảnh gốc 100x100, muốn radius 70 (đường kính 140) -> scale 1.4
+        const scale = (data.radius * 2.5) / 100; // *2.5 để hình ảnh phủ rộng hơn hitbox một chút cho đẹp
+        nebula.setScale(scale);
+
+        // Màu sắc & Hiệu ứng
+        nebula.setTint(0x9C27B0); // Nhuộm màu Tím (Purple)
+        nebula.setAlpha(0.6);      // Trong suốt để nhìn xuyên qua được một chút
+        nebula.setDepth(15);       // Layer đè lên người chơi (Player depth=10)
+
+        // Hiệu ứng xoay nhẹ cho sinh động (Optional)
+        this.tweens.add({
+            targets: nebula,
+            angle: 360,
+            duration: 20000 + Math.random() * 10000, // Xoay rất chậm
+            repeat: -1
+        });
+
+        this.nebulas.push(nebula); // Đổi tên mảng bushes -> nebulas
     }
 
     createItemSprite(i) {
@@ -328,11 +381,11 @@ export class GameScene extends Phaser.Scene {
             case 'WEAPON_ROCKET': color = 0xFF4500; text = "RKT"; break;
             case 'WEAPON_SHOTGUN': color = 0xFFA500; text = "SHT"; break;
             case 'WEAPON_MACHINEGUN': color = 0xADFF2F; text = "MG"; break;
-            case 'WEAPON_SNIPER': color = 0x00BFFF; text = "SNP"; break; 
+            case 'WEAPON_SNIPER': color = 0x00BFFF; text = "SNP"; break;
             case 'WEAPON_PISTOL': color = 0xFFFF00; text = "PST"; break;
-            case 'COIN_SMALL': color = 0xFFD700; text = "$1"; break; 
-            case 'COIN_MEDIUM': color = 0xFFD700; text = "$2"; break; 
-            case 'COIN_LARGE': color = 0xFFD700; text = "$5"; break; 
+            case 'COIN_SMALL': color = 0xFFD700; text = "$1"; break;
+            case 'COIN_MEDIUM': color = 0xFFD700; text = "$2"; break;
+            case 'COIN_LARGE': color = 0xFFD700; text = "$5"; break;
             default: if (i.type.includes('WEAPON')) { color = 0x9933FF; text = "W"; }
         }
 

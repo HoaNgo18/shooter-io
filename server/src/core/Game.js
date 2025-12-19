@@ -115,6 +115,7 @@ export class Game {
       // Lấy dữ liệu từ World Manager
       foods: this.world.foods,
       obstacles: this.world.obstacles,
+      nebulas: this.world.nebulas,
       chests: this.world.chests,
       items: this.world.items
     });
@@ -133,6 +134,25 @@ export class Game {
       this.players.delete(clientId);
       this.server.broadcast({ type: PacketType.PLAYER_LEAVE, id: clientId });
       console.log(`Player/Bots removed: ${player.name}`);
+    }
+  }
+
+  respawnPlayer(clientId, skinId) {
+    const player = this.players.get(clientId);
+    if (player) {
+      player.respawn(skinId);
+      // Send INIT to reload world data
+      this.server.sendToClient(clientId, {
+        type: PacketType.INIT,
+        id: clientId,
+        player: player.serialize(),
+        players: Array.from(this.players.values()).map(p => p.serialize()),
+        foods: this.world.foods,
+        obstacles: this.world.obstacles,
+        nebulas: this.world.nebulas,
+        chests: this.world.chests,
+        items: this.world.items
+      });
     }
   }
 

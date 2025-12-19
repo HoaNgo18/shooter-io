@@ -92,6 +92,14 @@ export class Server {
         this.game.handleAttack(clientId);
         break;
 
+      case PacketType.BUY_SKIN:
+        await this.handleBuySkin(clientId, packet.skinId);
+        break;
+
+      case PacketType.EQUIP_SKIN:
+        await this.handleEquipSkin(clientId, packet.skinId);
+        break;
+
       case PacketType.PONG:
         if (client?.player) {
           client.player.lastPong = Date.now();
@@ -195,6 +203,43 @@ export class Server {
       if (id !== excludeId && client.ws.readyState === 1) {
         client.ws.send(message);
       }
+    });
+  }
+
+  async handleBuySkin(clientId, skinId) {
+    const client = this.clients.get(clientId);
+    if (!client || !client.userId) return;
+
+    const user = await User.findById(client.userId);
+    if (!user) return;
+
+    const skin = SKINS.find(s => s.id === skinId);
+    if (!skin || user.coins < skin.price || user.skins.includes(skinId)) return;
+
+    user.coins -= skin.price;
+    user.skins.push(skinId);
+    await user.save();
+
+    this.sendToClient(clientId, {
+      type: 'USER_DATA_UPDATE',
+      coins: user.coins,
+      skins: user.skins
+    });
+  }
+
+  async handleEquipSkin(clientId, skinId) {
+    const client = this.clients.get(clientId);
+    if (!client || !client.userId) return;
+
+    const user = await User.findById(client.userId);
+    if (!user || !user.skins.includes(skinId)) return;
+
+    user.equippedSkin = skinId;
+    await user.save();
+
+    this.sendToClient(clientId, {
+      type: 'USER_DATA_UPDATE',
+      equippedSkin: user.equippedSkin
     });
   }
 

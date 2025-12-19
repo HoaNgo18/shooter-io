@@ -5,10 +5,13 @@ import { SKINS } from '@shared/constants';
 export class ClientPlayer {
     constructor(scene, playerData) {
         this.scene = scene;
-        if (socket.myId === playerData.id) { // Chỉ in ra log của chính mình
+        // Xác định xem đây có phải là chính mình không để xử lý hiển thị khác biệt
+        this.isMe = (socket.myId === playerData.id);
+
+        if (this.isMe) {
             console.log("MY PLAYER DATA:", playerData);
-            console.log("MY SKIN ID:", playerData.skinId);
         }
+        
         this.id = playerData.id;
         this.name = playerData.name;
         this.score = playerData.score || 0;
@@ -21,26 +24,29 @@ export class ClientPlayer {
         this.targetX = playerData.x;
         this.targetY = playerData.y;
 
-        this.weaponType = playerData.weapon || 'PISTOL';
-        this.isMoving = playerData.isMoving || false;
-
-        // --- 1. Tạo Container ---
+        // --- 1. Tạo Container (Chứa Thân + Súng + Shield) ---
         this.container = scene.add.container(playerData.x, playerData.y);
-        const skinId = playerData.skinId || 'default';
-        const skinInfo = SKINS.find(s => s.id === skinId);
+        
+        // Skin
+        this.skinId = playerData.skinId || 'default';
+        const skinInfo = SKINS.find(s => s.id === this.skinId);
         const color = skinInfo ? skinInfo.color : 0xFFFFFF;
-        // -----------------------
-
-        // Vẽ thân (Circle) - Dùng biến color đã lấy được
-        const circle = scene.add.circle(0, 0, 20, color);
+        
+        // Vẽ thân (Circle)
+        this.circle = scene.add.circle(0, 0, 20, color);
 
         // Vẽ súng (Rectangle)
         const weapon = scene.add.rectangle(15, 0, 20, 8, 0xFFFFFF);
 
-        this.container.add([weapon, circle]);
-        this.container.setDepth(1); // Lớp dưới
+        // Shield (Thêm vào container để tự đi theo)
+        this.shieldCircle = scene.add.circle(0, 0, 25, 0x00FFFF, 0);
+        this.shieldCircle.setStrokeStyle(3, 0x00FFFF, 0.6);
+        this.shieldCircle.setVisible(false); // Ẩn mặc định
 
-        // --- 2. Tạo Tên & Thanh Máu ---
+        this.container.add([weapon, this.circle, this.shieldCircle]);
+        this.container.setDepth(10); // Layer Player (cao hơn đất)
+
+        // --- 2. Tạo Tên & Thanh Máu (Nằm ngoài container để không xoay theo người) ---
 
         // Tên 
         this.text = scene.add.text(playerData.x, playerData.y - 40, this.name, {
@@ -51,67 +57,50 @@ export class ClientPlayer {
             strokeThickness: 3,
             align: 'center'
         }).setOrigin(0.5);
-        this.text.setDepth(2);
+        this.text.setDepth(100); // UI luôn ở trên cùng
 
-        // Thanh máu 
-        // Nền đen
+        // Thanh máu nền đen
         this.healthBarBg = scene.add.rectangle(playerData.x, playerData.y - 25, 40, 6, 0x000000);
-        this.healthBarBg.setDepth(2);
+        this.healthBarBg.setDepth(100);
 
-        // Shield bar
-        this.shieldCircle = scene.add.circle(0, 0, 25, 0x00FFFF, 0);
-        this.shieldCircle.setStrokeStyle(3, 0x00FFFF, 0.6);
-        this.container.add(this.shieldCircle); // Add vào container để tự động follow
-        this.shieldCircle.setVisible(false); // Ẩn mặc định
-
-        // Thanh máu xanh (Máu thực tế)
+        // Thanh máu xanh
         this.healthBar = scene.add.rectangle(playerData.x, playerData.y - 25, 40, 4, 0x00FF00);
-        this.healthBar.setDepth(2);
+        this.healthBar.setDepth(100);
     }
 
-    // Hàm 1: Nhận dữ liệu từ Server (Chỉ lưu đích đến & State)
+    // Hàm 1: Nhận dữ liệu từ Server
     updateServerData(data) {
-        // 1. Xử lý Chết/Sống
+        // 1. Xử lý Chết
         if (data.dead) {
-            this.container.setVisible(false);
-            this.text.setVisible(false);
-            this.healthBar.setVisible(false);   // Ẩn máu
-            this.healthBarBg.setVisible(false); // Ẩn nền máu
+            this.setVisibleState(false);
             return;
         }
-
-        // Nếu đang sống thì hiện lên
-        this.container.setVisible(true);
-        this.text.setVisible(true);
-        this.healthBar.setVisible(true);
-        this.healthBarBg.setVisible(true);
 
         // 2. Cập nhật Đích đến (Target)
         this.targetX = data.x;
         this.targetY = data.y;
 
-        // Cập nhật góc quay
+        // Cập nhật góc quay (chỉ xoay container, không xoay tên/máu)
         this.container.rotation = data.angle;
 
-        // 3. Cập nhật dữ liệu game (Score)
+        // 3. Cập nhật dữ liệu game
         this.score = data.score;
-
-        // Cập nhật weapon type & movement state
         this.weaponType = data.weapon || 'PISTOL';
         this.isMoving = data.isMoving || false;
 
+        // Update skin if changed
+        if (data.skinId && data.skinId !== this.skinId) {
+            this.skinId = data.skinId;
+            const skinInfo = SKINS.find(s => s.id === this.skinId);
+            const newColor = skinInfo ? skinInfo.color : 0xFFFFFF;
+            this.circle.fillColor = newColor;
+        }
+
         // Cập nhật Thanh Máu
         if (data.maxHealth) {
-            // Tính phần trăm máu (Max là 40px chiều rộng)
             const percent = Math.max(0, data.health / data.maxHealth);
             this.healthBar.width = 40 * percent;
-
-            // Đổi màu: Máu thấp (<30%) thì đỏ, còn lại xanh
-            if (percent < 0.3) {
-                this.healthBar.fillColor = 0xFF0000;
-            } else {
-                this.healthBar.fillColor = 0x00FF00;
-            }
+            this.healthBar.fillColor = percent < 0.3 ? 0xFF0000 : 0x00FF00;
         }
 
         // 4. Xử lý Lớn lên (Scale)
@@ -121,19 +110,52 @@ export class ClientPlayer {
             this.container.setScale(scale);
         }
 
-        // Hiệu ứng Shield
-        // Cập nhật shield visual
+        // 5. Hiệu ứng Shield
         if (data.hasShield) {
             this.shieldCircle.setVisible(true);
-            this.shieldCircle.radius = (data.radius || 20) + 8; // Lớn hơn player 1 chút
+            this.shieldCircle.radius = (data.radius || 20) + 8;
         } else {
             this.shieldCircle.setVisible(false);
         }
+
+        // 6. --- XỬ LÝ TÀNG HÌNH (NEBULA/BUSH) ---
+        const isHidden = data.hi; // Lấy cờ từ server
+
+        if (isHidden) {
+            if (this.isMe) {
+                // Nếu là mình: Hiện mờ mờ (Alpha 0.5)
+                this.setAlphaState(0.5);
+                this.setVisibleState(true); 
+            } else {
+                // Nếu là địch: Ẩn hoàn toàn (Cả người, tên, máu)
+                this.setVisibleState(false);
+            }
+        } else {
+            // Không núp: Hiện rõ ràng
+            this.setVisibleState(true);
+            this.setAlphaState(1);
+        }
+    }
+
+    // Helper: Ẩn/Hiện toàn bộ thành phần
+    setVisibleState(isVisible) {
+        this.container.setVisible(isVisible);
+        this.text.setVisible(isVisible);
+        this.healthBar.setVisible(isVisible);
+        this.healthBarBg.setVisible(isVisible);
+    }
+
+    // Helper: Chỉnh độ mờ toàn bộ thành phần
+    setAlphaState(alpha) {
+        this.container.setAlpha(alpha);
+        this.text.setAlpha(alpha);
+        this.healthBar.setAlpha(alpha);
+        this.healthBarBg.setAlpha(alpha);
     }
 
     // HÀM 2: Chạy mỗi frame để di chuyển mượt (Lerp)
     tick(dt) {
-        // Nếu nhân vật đang ẩn (chết) thì không cần tính toán di chuyển
+        // Nếu nhân vật đang ẩn hoàn toàn (visible = false) thì không cần render vị trí
         if (!this.container.visible) return;
 
         const t = 0.2; // Hệ số làm mượt
@@ -149,11 +171,10 @@ export class ClientPlayer {
         // --- ĐỒNG BỘ UI THEO NGƯỜI ---
         const currentScale = this.container.scaleX;
 
-        // 1. Tên
+        // Cập nhật vị trí Tên & Máu theo Container
         this.text.x = this.container.x;
         this.text.y = this.container.y - (40 * currentScale);
 
-        // 2. Thanh máu chạy theo người
         this.healthBarBg.x = this.container.x;
         this.healthBarBg.y = this.container.y - (25 * currentScale);
 
@@ -164,9 +185,8 @@ export class ClientPlayer {
     destroy() {
         this.container.destroy();
         this.text.destroy();
-        // Xóa thanh máu khi player thoát/chết hẳn
         this.healthBar.destroy();
         this.healthBarBg.destroy();
-        this.shieldCircle.destroy();
+        // shieldCircle nằm trong container nên tự hủy theo container
     }
 }

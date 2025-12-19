@@ -1,5 +1,5 @@
 import { circleCollision, distance } from '../../../shared/src/utils.js';
-import { PLAYER_RADIUS, MAP_SIZE, FOOD_RADIUS, XP_PER_FOOD, CHEST_RADIUS, ITEM_RADIUS, WEAPON_STATS, CHEST_TYPES } from '../../../shared/src/constants.js';
+import { PLAYER_RADIUS, MAP_SIZE, FOOD_RADIUS, XP_PER_FOOD, CHEST_RADIUS, ITEM_RADIUS, WEAPON_STATS, CHEST_TYPES, NEBULA_RADIUS } from '../../../shared/src/constants.js';
 import { Quadtree } from '../utils/Quadtree.js';
 import { Explosion } from '../entities/Explosion.js';
 import { Projectile } from '../entities/Projectile.js';
@@ -75,7 +75,7 @@ export class Physics {
     });
 
     // Player vs Food (Truy cập qua game.world)
-    const foods = this.game.world.foods; 
+    const foods = this.game.world.foods;
     this.game.players.forEach(player => {
       if (player.dead) return;
       for (let i = foods.length - 1; i >= 0; i--) {
@@ -86,7 +86,7 @@ export class Physics {
         if (dist < (player.radius || PLAYER_RADIUS) + FOOD_RADIUS) {
           player.score += XP_PER_FOOD;
           player.checkLevelUp();
-          
+
           // SỬA: Gọi removeFood từ WorldManager
           this.game.world.removeFood(food.id);
         }
@@ -143,10 +143,10 @@ export class Physics {
           this.game.projectiles.splice(i, 1);
           if (chest.dead) {
             const isBigChest = (chest.type === 'BIG');
-            
+
             // SỬA: spawnItem từ WorldManager
             this.game.world.spawnItem(chest.x, chest.y, chest.type);
-            
+
             // SỬA: Push vào delta của WorldManager
             this.game.world.delta.chestsRemoved.push(chest.id);
             chests.splice(j, 1);
@@ -154,7 +154,7 @@ export class Physics {
             if (isBigChest) {
               // SỬA: Cập nhật trạng thái Big Chest trong WorldManager
               this.game.world.hasBigChest = false;
-              this.game.world.nextBigChestTime = Date.now() + 120000; 
+              this.game.world.nextBigChestTime = Date.now() + 120000;
 
               console.log(`Big Chest destroyed! Next spawn in 2 minutes`);
               this.game.server.broadcast({
@@ -176,7 +176,7 @@ export class Physics {
         const item = items[i];
         if (circleCollision(player.x, player.y, player.radius, item.x, item.y, ITEM_RADIUS)) {
           player.applyItem(item.type);
-          
+
           // SỬA: Push vào delta của WorldManager
           this.game.world.delta.itemsRemoved.push(item.id);
           items.splice(i, 1);
@@ -187,7 +187,7 @@ export class Physics {
     // Player vs Chests (Collision) 
     this.game.players.forEach(player => {
       if (player.dead) return;
-      this.game.world.chests.forEach(chest => { 
+      this.game.world.chests.forEach(chest => {
         const dx = player.x - chest.x;
         const dy = player.y - chest.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -199,6 +199,31 @@ export class Physics {
           player.y += Math.sin(angle) * pushOut;
         }
       });
+    });
+
+    // Player vs Nebulas (Collision)
+    const nebulas = this.game.world.nebulas;
+
+    this.game.players.forEach(player => {
+      if (player.dead) return;
+
+      let insideNebula = false;
+
+      // Duyệt qua tất cả tinh vân để xem player có đứng trong cái nào không
+      for (const nebula of nebulas) {
+        // Tính khoảng cách
+        const dx = player.x - nebula.x;
+        const dy = player.y - nebula.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        // Logic: Nếu khoảng cách < bán kính tinh vân (người chơi lọt thỏm vào trong)
+        // Ta dùng nebula.radius - 10 để người chơi phải đi sâu vào mới tàng hình
+        if (dist < nebula.radius - 10) {
+          insideNebula = true;
+          break; // Chỉ cần chạm 1 tinh vân là đủ
+        }
+      }
+      player.isHidden = insideNebula;
     });
   }
 
@@ -275,8 +300,8 @@ export class Physics {
       setTimeout(() => {
         if (this.game.players.has(player.id)) {
           this.game.removePlayer(player.id);
-          
-          this.game.bots.manageBots(); 
+
+          this.game.bots.manageBots();
         }
       }, 2000);
     } else {

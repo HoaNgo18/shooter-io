@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Phaser from 'phaser';
 import { GameScene } from './game/scenes/GameScene';
-import LoginScreen from './components/LoginScreen';
 import HUD from './components/HUD';
 import DeathScreen from './components/DeathScreen';
 import HomeScreen from './components/HomeScreen';
@@ -9,17 +8,11 @@ import { socket } from './network/socket';
 import { PacketType } from '@shared/packetTypes';
 
 function App() {
-  const [gameState, setGameState] = useState('login');
+  const [gameState, setGameState] = useState('home');
   const [user, setUser] = useState(null);
-
   const [isDead, setIsDead] = useState(false);
   const [killerName, setKillerName] = useState('');
   const [finalScore, setFinalScore] = useState(0);
-
-  const handleLoginSuccess = (userData) => {
-    setUser(userData);
-    setGameState('home');
-  };
 
   const handleStartGame = async (selectedSkinId) => {
     setIsDead(false);
@@ -35,26 +28,31 @@ function App() {
           name: user.username
         });
       } catch (err) {
-        alert('Không thể kết nối server!');
+        alert('Cannot connect to game server!');
         return;
       }
     }
 
-    // Đợi socket ổn định
+    // Wait for socket to stabilize
     await new Promise(resolve => setTimeout(resolve, 100));
     socket.send({ 
         type: PacketType.RESPAWN,
         skinId: skinToUse 
     });
+    // Directly start game, assuming HomeScreen handles login
+    // Set game state to playing
     setGameState('playing');
+  };
+
+  const handleLoginSuccess = (userData) => {
+    setUser(userData);
   };
 
   const handleLogout = () => {
     socket.disconnect();
     localStorage.removeItem('game_token');
-    localStorage.removeItem('game_user_info');
+    localStorage.removeItem('game_username');
     setUser(null);
-    setGameState('login');
   };
 
   const handleQuitToMenu = () => {
@@ -156,15 +154,12 @@ function App() {
 
   return (
     <div className="App">
-      {gameState === 'login' && (
-        <LoginScreen onLoginSuccess={handleLoginSuccess} />
-      )}
-
-      {gameState === 'home' && user && (
+      {gameState === 'home' && (
         <HomeScreen
           user={user}
           onPlayClick={(skinId) => handleStartGame(skinId)}
           onLogout={handleLogout}
+          onLoginSuccess={handleLoginSuccess}
         />
       )}
 

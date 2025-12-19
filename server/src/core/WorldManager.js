@@ -1,6 +1,6 @@
 import { 
   MAP_SIZE, FOOD_COUNT, OBSTACLE_COUNT, OBSTACLE_RADIUS_MIN, OBSTACLE_RADIUS_MAX,
-  CHEST_COUNT, CHEST_RADIUS, CHEST_TYPES, BIG_CHEST_STATS, ITEM_TYPES 
+  CHEST_COUNT, CHEST_RADIUS, CHEST_TYPES, BIG_CHEST_STATS, ITEM_TYPES, NEBULA_COUNT, NEBULA_RADIUS
 } from '../../../shared/src/constants.js';
 import { Chest } from '../entities/Chest.js';
 import { Item } from '../entities/Item.js';
@@ -11,6 +11,7 @@ export class WorldManager {
     this.obstacles = [];
     this.chests = [];
     this.items = [];
+    this.nebulas = [];
 
     // Delta tracking (Change Logs)
     this.delta = {
@@ -30,6 +31,7 @@ export class WorldManager {
     this.initObstacles();
     this.initFood();
     this.initChests();
+    this.initNebulas();
   }
 
   resetDelta() {
@@ -57,6 +59,18 @@ export class WorldManager {
         x: (Math.random() * MAP_SIZE) - max,
         y: (Math.random() * MAP_SIZE) - max,
         radius: radius
+      });
+    }
+  }
+
+  initNebulas() {
+    for (let i = 0; i < NEBULA_COUNT; i++) {
+      const max = MAP_SIZE / 2 - NEBULA_RADIUS;
+      this.nebulas.push({
+        id: `nebula_${i}`,
+        x: (Math.random() * MAP_SIZE) - max,
+        y: (Math.random() * MAP_SIZE) - max,
+        radius: NEBULA_RADIUS
       });
     }
   }

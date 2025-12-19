@@ -27,6 +27,7 @@ export class Player extends Entity {
     this.coins = 0;
     this.sessionKills = 0;
     this.skinId = skinId;
+    this.isHidden = false;
 
     // Dash logic
     this.dashEndTime = 0;
@@ -292,7 +293,26 @@ export class Player extends Entity {
       hasShield: Date.now() < this.shieldEndTime,
       isSpeedUp: Date.now() < this.speedBuffEndTime,
       isMoving: this.isMoving, // Gửi về client để hiển thị trạng thái
-      skinId: this.skinId
+      skinId: this.skinId,
+      hi: this.isHidden
     };
+  }
+
+  respawn(skinId = null) {
+    const pos = getRandomPosition(MAP_SIZE);
+    this.x = pos.x;
+    this.y = pos.y;
+    this.health = PLAYER_MAX_HEALTH;
+    this.maxHealth = PLAYER_MAX_HEALTH;
+    this.dead = false;
+    this.angle = 0;
+    this.lastDamageTime = 0;
+    this.isHidden = false;
+    if (skinId) this.skinId = skinId;
+    // Reset buffs
+    this.shieldEndTime = 0;
+    this.speedBuffEndTime = 0;
+    this.dashEndTime = 0;
+    this.dashCooldownTime = 0;
   }
 }
