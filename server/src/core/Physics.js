@@ -1,4 +1,3 @@
-
 import { circleCollision, distance } from '../../../shared/src/utils.js';
 import { PLAYER_RADIUS, MAP_SIZE, FOOD_RADIUS, XP_PER_FOOD, CHEST_RADIUS, ITEM_RADIUS, WEAPON_STATS, CHEST_TYPES } from '../../../shared/src/constants.js';
 import { Quadtree } from '../utils/Quadtree.js';
@@ -38,11 +37,9 @@ export class Physics {
         if (circleCollision(player.x, player.y, PLAYER_RADIUS, proj.x, proj.y, proj.radius)) {
           console.log(`HIT! ${proj.weaponType} hit ${player.name}. Damage: ${proj.damage}`);
 
-          // Nếu là Rocket thì tạo explosion TRƯỚC khi xóa đạn
           if (proj.weaponType === 'ROCKET') {
             this.createExplosion(proj);
           } else {
-            // Các vũ khí khác thì damage trực tiếp
             player.takeDamage(proj.damage, proj.ownerId);
           }
 
@@ -77,27 +74,30 @@ export class Physics {
       }
     });
 
-    // Player vs Food
+    // Player vs Food (Truy cập qua game.world)
+    const foods = this.game.world.foods; 
     this.game.players.forEach(player => {
       if (player.dead) return;
-      for (let i = this.game.foods.length - 1; i >= 0; i--) {
-        const food = this.game.foods[i];
+      for (let i = foods.length - 1; i >= 0; i--) {
+        const food = foods[i];
         const dx = player.x - food.x;
         const dy = player.y - food.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < (player.radius || PLAYER_RADIUS) + FOOD_RADIUS) {
           player.score += XP_PER_FOOD;
           player.checkLevelUp();
-          this.game.removedFoodIds.push(food.id);
-          this.game.foods.splice(i, 1);
+          
+          // SỬA: Gọi removeFood từ WorldManager
+          this.game.world.removeFood(food.id);
         }
       }
     });
 
-    // Player vs Obstacles
+    // Player vs Obstacles (Truy cập qua game.world)
+    const obstacles = this.game.world.obstacles;
     this.game.players.forEach(player => {
       if (player.dead) return;
-      this.game.obstacles.forEach(obs => {
+      obstacles.forEach(obs => {
         const dx = player.x - obs.x;
         const dy = player.y - obs.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -114,12 +114,11 @@ export class Physics {
     // Projectile vs Obstacles
     for (let i = this.game.projectiles.length - 1; i >= 0; i--) {
       const proj = this.game.projectiles[i];
-      for (const obs of this.game.obstacles) {
+      for (const obs of obstacles) { // Dùng biến obstacles đã lấy ở trên
         const dx = proj.x - obs.x;
         const dy = proj.y - obs.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < proj.radius + obs.radius) {
-          // Rocket nổ khi đâm vào obstacle
           if (proj.weaponType === 'ROCKET') {
             this.createExplosion(proj);
           }
@@ -128,16 +127,15 @@ export class Physics {
         }
       }
     }
-
     // Projectile vs Chests
+    const chests = this.game.world.chests;
     for (let i = this.game.projectiles.length - 1; i >= 0; i--) {
       const proj = this.game.projectiles[i];
-      for (let j = this.game.chests.length - 1; j >= 0; j--) {
-        const chest = this.game.chests[j];
+      for (let j = chests.length - 1; j >= 0; j--) {
+        const chest = chests[j];
         if (circleCollision(proj.x, proj.y, proj.radius, chest.x, chest.y, chest.radius)) {
           chest.takeDamage(proj.damage);
 
-          // Rocket nổ khi đánh trúng chest
           if (proj.weaponType === 'ROCKET') {
             this.createExplosion(proj);
           }
@@ -145,16 +143,20 @@ export class Physics {
           this.game.projectiles.splice(i, 1);
           if (chest.dead) {
             const isBigChest = (chest.type === 'BIG');
-            this.game.spawnItem(chest.x, chest.y, chest.type);
-            this.game.removedChestIds.push(chest.id);
-            this.game.chests.splice(j, 1);
+            
+            // SỬA: spawnItem từ WorldManager
+            this.game.world.spawnItem(chest.x, chest.y, chest.type);
+            
+            // SỬA: Push vào delta của WorldManager
+            this.game.world.delta.chestsRemoved.push(chest.id);
+            chests.splice(j, 1);
+
             if (isBigChest) {
-              this.game.hasBigChest = false;
-              this.game.nextBigChestTime = Date.now() + 120000; // 2 phút (hoặc dùng BIG_CHEST_STATS.interval)
+              // SỬA: Cập nhật trạng thái Big Chest trong WorldManager
+              this.game.world.hasBigChest = false;
+              this.game.world.nextBigChestTime = Date.now() + 120000; 
 
               console.log(`Big Chest destroyed! Next spawn in 2 minutes`);
-
-              // Broadcast thông báo
               this.game.server.broadcast({
                 type: 'system_message',
                 message: 'Big Chest destroyed! Next one in 2 minutes'
@@ -166,23 +168,26 @@ export class Physics {
       }
     }
 
-    // Player vs Items
+    // [MODIFIED] Player vs Items (Truy cập qua game.world)
+    const items = this.game.world.items;
     this.game.players.forEach(player => {
       if (player.dead) return;
-      for (let i = this.game.items.length - 1; i >= 0; i--) {
-        const item = this.game.items[i];
+      for (let i = items.length - 1; i >= 0; i--) {
+        const item = items[i];
         if (circleCollision(player.x, player.y, player.radius, item.x, item.y, ITEM_RADIUS)) {
           player.applyItem(item.type);
-          this.game.removedItemIds.push(item.id);
-          this.game.items.splice(i, 1);
+          
+          // SỬA: Push vào delta của WorldManager
+          this.game.world.delta.itemsRemoved.push(item.id);
+          items.splice(i, 1);
         }
       }
     });
 
-    // Player vs Chests (Collision)
+    // Player vs Chests (Collision) 
     this.game.players.forEach(player => {
       if (player.dead) return;
-      this.game.chests.forEach(chest => {
+      this.game.world.chests.forEach(chest => { 
         const dx = player.x - chest.x;
         const dy = player.y - chest.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -197,35 +202,25 @@ export class Physics {
     });
   }
 
-  // HÀM TẠO EXPLOSION
   createExplosion(projectile) {
     const stats = WEAPON_STATS[projectile.weaponType];
     if (!stats || !stats.shrapnelCount) return;
 
-    console.log(`Rocket exploded! Creating ${stats.shrapnelCount} shrapnel`);
-
-    // Tạo 8 mảnh vụn bắn ra 8 hướng
+    // console.log(`Rocket exploded! Creating ${stats.shrapnelCount} shrapnel`);
     const angleStep = (Math.PI * 2) / stats.shrapnelCount;
 
     for (let i = 0; i < stats.shrapnelCount; i++) {
       const angle = angleStep * i;
-
       const shrapnel = new Projectile(
         projectile.x, projectile.y, angle,
-        400, // Tốc độ
-        stats.shrapnelDamage,
-        projectile.ownerId,
-        projectile.ownerName,
-        'SHRAPNEL',
-        150, // Range
-        3    // Radius
+        400, stats.shrapnelDamage,
+        projectile.ownerId, projectile.ownerName,
+        'SHRAPNEL', 150, 3
       );
-
       shrapnel.color = 0xFF6600;
       this.game.projectiles.push(shrapnel);
     }
 
-    // Tạo visual effect
     const explosion = new Explosion(
       projectile.x, projectile.y,
       stats.explosionRadius, 0,
@@ -254,15 +249,10 @@ export class Physics {
       killer.health = Math.min(killer.health + 20, killer.maxHealth);
       killer.sessionKills = (killer.sessionKills || 0) + 1;
       if (!killer.isBot) {
-        //Kiem tra xem co phai vua khong
         const sortedPlayers = Array.from(this.game.players.values()).sort((a, b) => b.score - a.score);
         const kingId = sortedPlayers.length > 0 ? sortedPlayers[0].id : null;
-
         const isKing = (player.id === kingId);
-
-        // Logic cộng coin
         const coinReward = isKing ? 5 : 1;
-
         killer.coins += coinReward;
         this.game.saveKillerStats(killer);
       }
@@ -281,24 +271,16 @@ export class Physics {
     });
 
     if (player.isBot) {
-      // --- XỬ LÝ BOT ---
       console.log(`Bot died: ${player.name}`);
-
-      // Bot không cần lưu điểm vào DB
-
-      // Xóa Bot khỏi game sau 2 giây
-      // (Delay để Client kịp nhận gói tin player_died và vẽ hiệu ứng nổ)
       setTimeout(() => {
-        // Kiểm tra lại lần nữa xem bot còn đó không (tránh crash)
         if (this.game.players.has(player.id)) {
           this.game.removePlayer(player.id);
-          this.game.manageBots();
+          
+          this.game.bots.manageBots(); 
         }
       }, 2000);
-
     } else {
-      // --- XỬ LÝ NGƯỜI CHƠI THẬT ---
-      // Lưu điểm vào DB
+      // Gọi qua delegate trong Game.js
       this.game.savePlayerScore(player);
     }
   }

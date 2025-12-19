@@ -70,7 +70,7 @@ export class Bot extends Player {
 
     // B. Nếu không thấy người → Tìm food
     if (!newTarget && Math.random() < 0.3) { // 30% cơ hội tìm food
-      const nearbyFoods = game.foods.slice(0, 30); // Chỉ xét 30 food gần nhất
+      const nearbyFoods = game.world.foods.slice(0, 30); // Chỉ xét 30 food gần nhất
       
       for (const food of nearbyFoods) {
         const d = distance(this.x, this.y, food.x, food.y);
@@ -138,7 +138,7 @@ export class Bot extends Player {
       if (projectiles) {
         game.projectiles.push(...projectiles);
         this.lastShot = now;
-        console.log(`🤖 Bot ${this.name} shot at distance ${Math.round(dist)}`);
+        console.log(` Bot ${this.name} shot at distance ${Math.round(dist)}`);
       }
     }
   }
