@@ -1,4 +1,4 @@
-import { 
+import {
   MAP_SIZE, FOOD_COUNT, OBSTACLE_COUNT, OBSTACLE_RADIUS_MIN, OBSTACLE_RADIUS_MAX,
   CHEST_COUNT, CHEST_RADIUS, CHEST_TYPES, BIG_CHEST_STATS, ITEM_TYPES, NEBULA_COUNT, NEBULA_RADIUS
 } from '../../../shared/src/constants.js';
@@ -51,14 +51,28 @@ export class WorldManager {
   }
 
   initObstacles() {
+    const meteorSizes = {
+      tiny: { width: 20, height: 20, radius: 10 },
+      small: { width: 30, height: 35, radius: 15 },
+      med: { width: 45, height: 50, radius: 22 },
+      big: { width: 60, height: 70, radius: 30 }
+    };
+
     for (let i = 0; i < OBSTACLE_COUNT; i++) {
-      const radius = Math.floor(Math.random() * (OBSTACLE_RADIUS_MAX - OBSTACLE_RADIUS_MIN + 1)) + OBSTACLE_RADIUS_MIN;
-      const max = MAP_SIZE / 2 - radius;
+      // Random size category
+      const sizes = Object.keys(meteorSizes);
+      const randomSize = sizes[Math.floor(Math.random() * sizes.length)];
+      const sizeData = meteorSizes[randomSize];
+
+      const max = MAP_SIZE / 2 - Math.max(sizeData.width, sizeData.height) / 2;
       this.obstacles.push({
         id: `obs_${i}`,
         x: (Math.random() * MAP_SIZE) - max,
         y: (Math.random() * MAP_SIZE) - max,
-        radius: radius
+        radius: sizeData.radius, // For backward compatibility
+        width: sizeData.width,
+        height: sizeData.height,
+        size: randomSize // Optional, for client scaling
       });
     }
   }
@@ -132,7 +146,7 @@ export class WorldManager {
 
   spawnBigChest() {
     if (this.hasBigChest) return null;
-    
+
     const id = `BIG_${Date.now()}`;
     const chest = this._spawnRandomChest(id, CHEST_TYPES.BIG);
     this.chests.push(chest);
@@ -159,8 +173,8 @@ export class WorldManager {
     let itemType;
     if (fromChestType === CHEST_TYPES.BIG) {
       const rand = Math.random();
-      if (rand < 0.4) itemType = ITEM_TYPES.WEAPON_SNIPER;
-      else if (rand < 0.8) itemType = ITEM_TYPES.WEAPON_ROCKET;
+      if (rand < 0.5) itemType = ITEM_TYPES.WEAPON_RED;        // Thay đổi
+      else if (rand < 0.8) itemType = ITEM_TYPES.WEAPON_GREEN;    // 20% ra xanh
       else itemType = ITEM_TYPES.COIN_LARGE;
     } else {
       const rand = Math.random();
@@ -169,7 +183,8 @@ export class WorldManager {
       } else {
         const normalItems = [
           ITEM_TYPES.HEALTH_PACK, ITEM_TYPES.SHIELD, ITEM_TYPES.SPEED,
-          ITEM_TYPES.WEAPON_PISTOL, ITEM_TYPES.WEAPON_SHOTGUN, ITEM_TYPES.WEAPON_MACHINEGUN
+          ITEM_TYPES.WEAPON_BLUE,   // Thay đổi
+          ITEM_TYPES.WEAPON_GREEN
         ];
         itemType = normalItems[Math.floor(Math.random() * normalItems.length)];
       }

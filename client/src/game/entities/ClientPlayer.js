@@ -1,3 +1,4 @@
+// client/src/game/entities/ClientPlayer.js - SPRITE VERSION
 import Phaser from 'phaser';
 import { socket } from '../../network/socket';
 import { SKINS } from '@shared/constants';
@@ -5,112 +6,141 @@ import { SKINS } from '@shared/constants';
 export class ClientPlayer {
     constructor(scene, playerData) {
         this.scene = scene;
-        // Xác định xem đây có phải là chính mình không để xử lý hiển thị khác biệt
         this.isMe = (socket.myId === playerData.id);
-
-        if (this.isMe) {
-            console.log("MY PLAYER DATA:", playerData);
-        }
         
         this.id = playerData.id;
         this.name = playerData.name;
         this.score = playerData.score || 0;
-
-        // Lưu vị trí hiện tại
         this.x = playerData.x;
         this.y = playerData.y;
-
-        // Biến lưu vị trí đích (Target) để Lerp
         this.targetX = playerData.x;
         this.targetY = playerData.y;
+        this.targetAngle = playerData.angle || 0;
 
-        // --- 1. Tạo Container (Chứa Thân + Súng + Shield) ---
+        // === CREATE CONTAINER ===
         this.container = scene.add.container(playerData.x, playerData.y);
         
         // Skin
         this.skinId = playerData.skinId || 'default';
         const skinInfo = SKINS.find(s => s.id === this.skinId);
         const color = skinInfo ? skinInfo.color : 0xFFFFFF;
+
+        // === SHIP SPRITE ===
+        this.shipSprite = this.createShipSprite(this.skinId);
         
-        // Vẽ thân (Circle)
-        this.circle = scene.add.circle(0, 0, 20, color);
+        // === THRUST FLAME (Hiệu ứng lửa) ===
+        this.thrustFlame = scene.add.graphics();
+        this.updateThrustFlame(false);
 
-        // Vẽ súng (Rectangle)
-        const weapon = scene.add.rectangle(15, 0, 20, 8, 0xFFFFFF);
-
-        // Shield (Thêm vào container để tự đi theo)
-        this.shieldCircle = scene.add.circle(0, 0, 25, 0x00FFFF, 0);
+        // === SHIELD EFFECT ===
+        this.shieldCircle = scene.add.circle(0, 0, 30, 0x00FFFF, 0);
         this.shieldCircle.setStrokeStyle(3, 0x00FFFF, 0.6);
-        this.shieldCircle.setVisible(false); // Ẩn mặc định
+        this.shieldCircle.setVisible(false);
 
-        this.container.add([weapon, this.circle, this.shieldCircle]);
-        this.container.setDepth(10); // Layer Player (cao hơn đất)
+        // Add to container
+        this.container.add([this.thrustFlame, this.shipSprite, this.shieldCircle]);
+        this.container.setDepth(10);
 
-        // --- 2. Tạo Tên & Thanh Máu (Nằm ngoài container để không xoay theo người) ---
-
-        // Tên 
+        // === UI (Tên & Thanh máu) ===
         this.text = scene.add.text(playerData.x, playerData.y - 40, this.name, {
-            fontSize: '14px',
-            fontFamily: 'Arial',
-            color: '#FFFFFF',
-            stroke: '#000000',
-            strokeThickness: 3,
-            align: 'center'
+            fontSize: '14px', fontFamily: 'Arial', color: '#FFFFFF',
+            stroke: '#000000', strokeThickness: 3, align: 'center'
         }).setOrigin(0.5);
-        this.text.setDepth(100); // UI luôn ở trên cùng
+        this.text.setDepth(100);
 
-        // Thanh máu nền đen
         this.healthBarBg = scene.add.rectangle(playerData.x, playerData.y - 25, 40, 6, 0x000000);
         this.healthBarBg.setDepth(100);
 
-        // Thanh máu xanh
         this.healthBar = scene.add.rectangle(playerData.x, playerData.y - 25, 40, 4, 0x00FF00);
         this.healthBar.setDepth(100);
     }
 
-    // Hàm 1: Nhận dữ liệu từ Server
+    createShipSprite(skinId) {
+        const textureKey = this.getShipTextureKey(skinId);
+        const sprite = this.scene.add.sprite(0, 0, textureKey);
+        sprite.setScale(0.5); // Adjust scale as needed
+        return sprite;
+    }
+
+    getShipTextureKey(skinId) {
+        const textureMap = {
+            'default': 'ship_default',
+            'red': 'ship_red',
+            'blue': 'ship_blue',
+            'gold': 'ship_gold',
+            'dark': 'ship_dark'
+        };
+        return textureMap[skinId] || 'ship_default';
+    }
+
+    updateThrustFlame(isBoosting) {
+        this.thrustFlame.clear();
+        
+        if (isBoosting) {
+            // Vẽ lửa phía sau tàu (giả sử mũi lên, đuôi xuống)
+            // Đuôi tàu ở y ≈ +16, x = 0
+            this.thrustFlame.fillStyle(0xFF6600, 0.8);
+            this.thrustFlame.fillTriangle(
+                -4, 16,   // Trái đuôi
+                4, 16,    // Phải đuôi
+                0, 26 + Math.random() * 5  // Đỉnh lửa
+            );
+            
+            // Lửa vàng bên trong
+            this.thrustFlame.fillStyle(0xFFFF00, 0.6);
+            this.thrustFlame.fillTriangle(
+                -2, 16,
+                2, 16,
+                0, 22
+            );
+        }
+    }
+
     updateServerData(data) {
-        // 1. Xử lý Chết
         if (data.dead) {
             this.setVisibleState(false);
             return;
         }
 
-        // 2. Cập nhật Đích đến (Target)
+        // Update targets for lerp
         this.targetX = data.x;
         this.targetY = data.y;
+        this.targetAngle = data.angle;
 
-        // Cập nhật góc quay (chỉ xoay container, không xoay tên/máu)
-        this.container.rotation = data.angle;
-
-        // 3. Cập nhật dữ liệu game
+        // Update game data
         this.score = data.score;
         this.weaponType = data.weapon || 'PISTOL';
         this.isMoving = data.isMoving || false;
+        this.isBoosting = data.isBoosting || false;
 
-        // Update skin if changed
+        // Update thrust flame
+        this.updateThrustFlame(this.isBoosting);
+
+        // Update skin
         if (data.skinId && data.skinId !== this.skinId) {
             this.skinId = data.skinId;
-            const skinInfo = SKINS.find(s => s.id === this.skinId);
-            const newColor = skinInfo ? skinInfo.color : 0xFFFFFF;
-            this.circle.fillColor = newColor;
+            
+            // Recreate ship sprite with new texture
+            this.shipSprite.destroy();
+            this.shipSprite = this.createShipSprite(this.skinId);
+            this.container.addAt(this.shipSprite, 1);
         }
 
-        // Cập nhật Thanh Máu
+        // Health bar
         if (data.maxHealth) {
             const percent = Math.max(0, data.health / data.maxHealth);
             this.healthBar.width = 40 * percent;
             this.healthBar.fillColor = percent < 0.3 ? 0xFF0000 : 0x00FF00;
         }
 
-        // 4. Xử lý Lớn lên (Scale)
+        // Scale
         if (data.radius) {
             const defaultRadius = 20;
             const scale = data.radius / defaultRadius;
             this.container.setScale(scale);
         }
 
-        // 5. Hiệu ứng Shield
+        // Shield
         if (data.hasShield) {
             this.shieldCircle.setVisible(true);
             this.shieldCircle.radius = (data.radius || 20) + 8;
@@ -118,60 +148,43 @@ export class ClientPlayer {
             this.shieldCircle.setVisible(false);
         }
 
-        // 6. --- XỬ LÝ TÀNG HÌNH (NEBULA/BUSH) ---
-        const isHidden = data.hi; // Lấy cờ từ server
-
+        // Hidden in nebula
+        const isHidden = data.hi;
         if (isHidden) {
             if (this.isMe) {
-                // Nếu là mình: Hiện mờ mờ (Alpha 0.5)
                 this.setAlphaState(0.5);
-                this.setVisibleState(true); 
+                this.setVisibleState(true);
             } else {
-                // Nếu là địch: Ẩn hoàn toàn (Cả người, tên, máu)
                 this.setVisibleState(false);
             }
         } else {
-            // Không núp: Hiện rõ ràng
             this.setVisibleState(true);
             this.setAlphaState(1);
         }
     }
 
-    // Helper: Ẩn/Hiện toàn bộ thành phần
-    setVisibleState(isVisible) {
-        this.container.setVisible(isVisible);
-        this.text.setVisible(isVisible);
-        this.healthBar.setVisible(isVisible);
-        this.healthBarBg.setVisible(isVisible);
-    }
-
-    // Helper: Chỉnh độ mờ toàn bộ thành phần
-    setAlphaState(alpha) {
-        this.container.setAlpha(alpha);
-        this.text.setAlpha(alpha);
-        this.healthBar.setAlpha(alpha);
-        this.healthBarBg.setAlpha(alpha);
-    }
-
-    // HÀM 2: Chạy mỗi frame để di chuyển mượt (Lerp)
     tick(dt) {
-        // Nếu nhân vật đang ẩn hoàn toàn (visible = false) thì không cần render vị trí
         if (!this.container.visible) return;
 
-        const t = 0.2; // Hệ số làm mượt
+        const t = 0.2; // Lerp factor
 
-        // Nội suy vị trí Container
+        // Smooth position
         this.container.x = Phaser.Math.Linear(this.container.x, this.targetX, t);
         this.container.y = Phaser.Math.Linear(this.container.y, this.targetY, t);
 
-        // Cập nhật tọa độ public
+        // Smooth rotation (Sprite mũi hướng lên, không cần offset)
+        this.container.rotation = this.targetAngle;
+
         this.x = this.container.x;
         this.y = this.container.y;
 
-        // --- ĐỒNG BỘ UI THEO NGƯỜI ---
-        const currentScale = this.container.scaleX;
+        // Update thrust flame animation
+        if (this.isBoosting) {
+            this.updateThrustFlame(true);
+        }
 
-        // Cập nhật vị trí Tên & Máu theo Container
+        // Sync UI
+        const currentScale = this.container.scaleX;
         this.text.x = this.container.x;
         this.text.y = this.container.y - (40 * currentScale);
 
@@ -182,11 +195,24 @@ export class ClientPlayer {
         this.healthBar.y = this.container.y - (25 * currentScale);
     }
 
+    setVisibleState(isVisible) {
+        this.container.setVisible(isVisible);
+        this.text.setVisible(isVisible);
+        this.healthBar.setVisible(isVisible);
+        this.healthBarBg.setVisible(isVisible);
+    }
+
+    setAlphaState(alpha) {
+        this.container.setAlpha(alpha);
+        this.text.setAlpha(alpha);
+        this.healthBar.setAlpha(alpha);
+        this.healthBarBg.setAlpha(alpha);
+    }
+
     destroy() {
         this.container.destroy();
         this.text.destroy();
         this.healthBar.destroy();
         this.healthBarBg.destroy();
-        // shieldCircle nằm trong container nên tự hủy theo container
     }
 }

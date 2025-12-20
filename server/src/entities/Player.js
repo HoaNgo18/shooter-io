@@ -1,8 +1,10 @@
+// server/src/entities/Player.js - SPACE SHIP VERSION
 import { Entity } from './Entity.js';
 import {
-  PLAYER_SPEED, PLAYER_MAX_HEALTH, MAP_SIZE, PLAYER_RADIUS,
-  REGEN_DELAY, REGEN_RATE, DASH_DURATION, DASH_COOLDOWN, DASH_MULTIPLIER,
-  WEAPON_STATS, ITEM_TYPES
+  PLAYER_MAX_HEALTH, MAP_SIZE, PLAYER_RADIUS,
+  REGEN_DELAY, REGEN_RATE, DASH_DURATION, DASH_COOLDOWN,
+  WEAPON_STATS, ITEM_TYPES,
+  SHIP_MAX_SPEED, SHIP_ACCELERATION, SHIP_DECELERATION, SHIP_ROTATION_SPEED, SHIP_BRAKE_FORCE, DASH_BOOST
 } from '../../../shared/src/constants.js';
 import { getRandomPosition } from '../../../shared/src/utils.js';
 import { Projectile } from './Projectile.js';
@@ -17,31 +19,37 @@ export class Player extends Entity {
     this.health = PLAYER_MAX_HEALTH;
     this.maxHealth = PLAYER_MAX_HEALTH;
     this.score = 0;
-    this.weapon = 'PISTOL'; // Mặc định
+    this.weapon = 'BLUE';
     this.angle = 0;
-    this.dead = true; // Bắt đầu ở trạng thái chết để chờ respawn
+    this.dead = true;
     this.lastDamageTime = 0;
     this.lastAttack = 0;
     this.radius = PLAYER_RADIUS;
-    this.userId = userId; // Lưu trữ ID người dùng từ DB
+    this.userId = userId;
     this.coins = 0;
     this.sessionKills = 0;
     this.skinId = skinId;
     this.isHidden = false;
 
-    // Dash logic
+    // === SPACE SHIP PHYSICS ===
+    this.vx = 0;
+    this.vy = 0;
+    this.maxSpeed = SHIP_MAX_SPEED;
+    this.acceleration = SHIP_ACCELERATION;
+    this.deceleration = SHIP_DECELERATION;
+    this.rotationSpeed = SHIP_ROTATION_SPEED;
+    this.brakeForce = SHIP_BRAKE_FORCE;
+
     this.dashEndTime = 0;
     this.dashCooldownTime = 0;
+    this.dashBoost = DASH_BOOST;
 
-    // Quản lý Buff
-    this.shieldEndTime = 0;    // Thời gian hết khiên
-    this.speedBuffEndTime = 0; // Thời gian hết tốc chạy
-
-    // Tracking movement cho Sniper
+    this.shieldEndTime = 0;
+    this.speedBuffEndTime = 0;
     this.lastMoveTime = 0;
     this.isMoving = false;
+    this.isBoosting = false;
 
-    // Input (Đã bỏ num1, num2, num3)
     this.input = {
       up: false, down: false, left: false, right: false,
       mouseX: 0, mouseY: 0, space: false
@@ -49,175 +57,133 @@ export class Player extends Entity {
   }
 
   setInput(data) {
-    // 1. Cập nhật các phím di chuyển 
-    if (data.movement) {
-      Object.assign(this.input, data.movement);
-    }
-
-    // 2. Cập nhật tọa độ chuột
-    if (data.mouseX !== undefined) {
-      this.input.mouseX = data.mouseX;
-    }
-
-    if (data.mouseY !== undefined) {
-      this.input.mouseY = data.mouseY;
-    }
+    if (data.movement) Object.assign(this.input, data.movement);
+    if (data.mouseX !== undefined) this.input.mouseX = data.mouseX;
+    if (data.mouseY !== undefined) this.input.mouseY = data.mouseY;
   }
 
   update(dt) {
     if (this.dead) return;
 
-    // 1. Xử lý Input Dash
+    // DASH
     if (this.input.space && Date.now() > this.dashCooldownTime) {
+      this.vx += Math.cos(this.angle) * this.dashBoost * dt;
+      this.vy += Math.sin(this.angle) * this.dashBoost * dt;
       this.dashEndTime = Date.now() + DASH_DURATION;
       this.dashCooldownTime = Date.now() + DASH_COOLDOWN;
     }
 
-    // 2. Tính toán tốc độ
-    let currentSpeed = PLAYER_SPEED;
+    // ROTATION
+    let rotationInput = 0;
+    if (this.input.left) rotationInput -= 1;
+    if (this.input.right) rotationInput += 1;
+    this.angle += rotationInput * this.rotationSpeed * dt;
+    while (this.angle > Math.PI) this.angle -= 2 * Math.PI;
+    while (this.angle < -Math.PI) this.angle += 2 * Math.PI;
 
-    // Giảm tốc do kích thước (Càng to càng chậm)
-    const sizeFactor = this.radius / PLAYER_RADIUS;
-    currentSpeed = currentSpeed / Math.sqrt(sizeFactor);
-
-    // Buff Dash
-    if (Date.now() < this.dashEndTime) {
-      currentSpeed *= DASH_MULTIPLIER;
+    // THRUST
+    this.isBoosting = this.input.up;
+    if (this.input.up) {
+      // Offset để angle=0 hướng lên thay vì phải
+      const thrustAngle = this.angle - Math.PI / 2;
+      this.vx += Math.cos(thrustAngle) * this.acceleration * dt;
+      this.vy += Math.sin(thrustAngle) * this.acceleration * dt;
     }
 
-    // Buff Speed (Item)
-    if (Date.now() < this.speedBuffEndTime) {
-      currentSpeed *= 2;
-    }
-
-    // 3. Di chuyển 
-    let dx = 0;
-    let dy = 0;
-    if (this.input.up) dy -= 1;
-    if (this.input.down) dy += 1;
-    if (this.input.left) dx -= 1;
-    if (this.input.right) dx += 1;
-
-    if (dx !== 0 || dy !== 0) {
-      const length = Math.sqrt(dx * dx + dy * dy);
-      dx /= length;
-      dy /= length;
-
-      this.x += dx * currentSpeed * dt;
-      this.y += dy * currentSpeed * dt;
-
-      // Đánh dấu đang di chuyển
-      this.isMoving = true;
-      this.lastMoveTime = Date.now();
-    } else {
-      // Đứng yên sau 100ms không nhấn phím
-      if (Date.now() - this.lastMoveTime > 100) {
-        this.isMoving = false;
+    // BRAKE
+    if (this.input.down) {
+      const speed = Math.sqrt(this.vx ** 2 + this.vy ** 2);
+      if (speed > 0) {
+        const brakeRatio = Math.min(this.brakeForce * dt / speed, 1);
+        this.vx *= (1 - brakeRatio);
+        this.vy *= (1 - brakeRatio);
       }
     }
 
-    // 4. Góc quay
-    this.angle = Math.atan2(this.input.mouseY - this.y, this.input.mouseX - this.x);
+    // DECELERATION
+    const speed = Math.sqrt(this.vx ** 2 + this.vy ** 2);
+    if (speed > 0) {
+      const frictionRatio = Math.min(this.deceleration * dt / speed, 1);
+      this.vx *= (1 - frictionRatio);
+      this.vy *= (1 - frictionRatio);
+    }
 
-    // 5. Hồi phục & Giới hạn map
+    // SPEED LIMIT
+    let maxSpeedActual = this.maxSpeed;
+    if (Date.now() < this.speedBuffEndTime) maxSpeedActual *= 1.5;
+
+    const finalSpeed = Math.sqrt(this.vx ** 2 + this.vy ** 2);
+    if (finalSpeed > maxSpeedActual) {
+      const ratio = maxSpeedActual / finalSpeed;
+      this.vx *= ratio;
+      this.vy *= ratio;
+    }
+
+    // MOVE
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+
+    this.isMoving = Math.abs(this.vx) > 10 || Math.abs(this.vy) > 10;
     this.regenerate(dt);
     this.clampToMap();
   }
 
-  checkLevelUp() {
-    const scaleFactor = 1 + (this.score / 500);
-    this.radius = PLAYER_RADIUS * scaleFactor;
-    if (this.radius > PLAYER_RADIUS * 3) {
-      this.radius = PLAYER_RADIUS * 3;
-    }
-  }
-
-  // HÀM QUAN TRỌNG: Xử lý ăn vật phẩm
-  applyItem(type) {
-    switch (type) {
-      case ITEM_TYPES.HEALTH_PACK:
-        this.health = Math.min(this.health + (this.maxHealth * 0.5), this.maxHealth);
-        break;
-      case ITEM_TYPES.SHIELD:
-        this.shieldEndTime = Date.now() + 5000;
-        break;
-      case ITEM_TYPES.SPEED:
-        this.speedBuffEndTime = Date.now() + 5000;
-        break;
-      case ITEM_TYPES.WEAPON_ROCKET:
-        this.weapon = 'ROCKET';
-        break;
-      case ITEM_TYPES.WEAPON_SHOTGUN:
-        this.weapon = 'SHOTGUN';
-        break;
-      case ITEM_TYPES.WEAPON_MACHINEGUN:
-        this.weapon = 'MACHINEGUN';
-        break;
-      case ITEM_TYPES.WEAPON_SNIPER: // 
-        this.weapon = 'SNIPER';
-        break;
-      case ITEM_TYPES.WEAPON_PISTOL: // 
-        this.weapon = 'PISTOL';
-        break;
-      // THÊM LOGIC ĂN COIN
-      case 'COIN_SMALL':
-        this.coins += 1;
-        break;
-      case 'COIN_MEDIUM':
-        this.coins += 2;
-        break;
-      case 'COIN_LARGE':
-        this.coins += 5;
-        break;
-    }
-  }
-
   attack() {
     const now = Date.now();
-    const stats = WEAPON_STATS[this.weapon] || WEAPON_STATS.PISTOL;
+    const stats = WEAPON_STATS[this.weapon] || WEAPON_STATS.BLUE;
 
     if (now - this.lastAttack < stats.cooldown) return null;
-
-    const isBusyMoving = this.isMoving || this.hasMovementInput();
-
-    // KIỂM TRA SNIPER: PHẢI ĐỨNG YÊN
-    if (stats.requireStill && isBusyMoving) {
-      return null; // Không bắn được nếu đang di chuyển
-    }
+    if (stats.requireStill && this.isMoving) return null;
 
     this.lastAttack = now;
 
-    const projectiles = [];
-    const count = stats.count;
-    const spread = stats.spread;
+    // Tính góc bắn (hướng lên = angle - 90°)
+    const finalAngle = (this.angle - Math.PI / 2);
 
-    for (let i = 0; i < count; i++) {
-      let angleOffset = 0;
-      if (count > 1) {
-        angleOffset = -spread / 2 + (spread * i / (count - 1));
-      } else {
-        angleOffset = (Math.random() - 0.5) * spread;
-      }
+    // Spawn đạn phía trước tàu (30 pixel về phía mũi tàu)
+    const spawnDistance = 30;
+    const spawnX = this.x + Math.cos(finalAngle) * spawnDistance;
+    const spawnY = this.y + Math.sin(finalAngle) * spawnDistance;
 
-      const finalAngle = this.angle + angleOffset;
+    // Kế thừa vận tốc của tàu vào đạn
+    const projectileSpeed = stats.speed + Math.sqrt(this.vx ** 2 + this.vy ** 2);
 
-      // Tạo projectile với đầy đủ thông tin
-      const p = new Projectile(
-        this.x, this.y,
-        finalAngle,
-        stats.speed,
-        stats.damage,
-        this.id,
-        this.name,
-        this.weapon,      // Weapon type
-        stats.range,      // Range
-        stats.radius      // Radius
-      );
+    const p = new Projectile(
+      spawnX, spawnY, finalAngle,
+      projectileSpeed, stats.damage, this.id, this.name,
+      this.weapon, stats.range, 8
+    );
 
-      p.color = stats.color;
-      projectiles.push(p);
+    return [p];
+  }
+
+  // Giữ nguyên các method còn lại...
+  checkLevelUp() {
+    const scaleFactor = 1 + (this.score / 1000);
+    this.radius = PLAYER_RADIUS * scaleFactor;
+    if (this.radius > PLAYER_RADIUS * 1.5) this.radius = PLAYER_RADIUS * 1.5;
+  }
+
+  applyItem(type) {
+    switch (type) {
+      case ITEM_TYPES.HEALTH_PACK:
+        this.health = Math.min(this.health + this.maxHealth * 0.5, this.maxHealth);
+        break;
+      case ITEM_TYPES.SHIELD: this.shieldEndTime = Date.now() + 5000; break;
+      case ITEM_TYPES.SPEED: this.speedBuffEndTime = Date.now() + 5000; break;
+      case ITEM_TYPES.WEAPON_RED:
+        this.weapon = 'RED';
+        break;
+      case ITEM_TYPES.WEAPON_GREEN:
+        this.weapon = 'GREEN';
+        break;
+      case ITEM_TYPES.WEAPON_BLUE:
+        this.weapon = 'BLUE';
+        break;
+      case 'COIN_SMALL': this.coins += 1; break;
+      case 'COIN_MEDIUM': this.coins += 2; break;
+      case 'COIN_LARGE': this.coins += 5; break;
     }
-    return projectiles;
   }
 
   takeDamage(amount, attackerId) {
@@ -227,34 +193,25 @@ export class Player extends Entity {
     if (this.health < 0) this.health = 0;
   }
 
-  isDead() {
-    return this.health <= 0;
-  }
+  isDead() { return this.health <= 0; }
+  hasMovementInput() { return this.input.up || this.input.down || this.input.left || this.input.right; }
 
-  hasMovementInput() {
-    return this.input.up || this.input.down || this.input.left || this.input.right;
-  }
-
-  respawn() {
+  respawn(skinId = null) {
     const pos = getRandomPosition(MAP_SIZE);
     this.x = pos.x;
     this.y = pos.y;
+    this.vx = 0;
+    this.vy = 0;
+    this.health = PLAYER_MAX_HEALTH;
     this.dead = false;
-    this.health = this.maxHealth;
-    this.score = Math.floor(this.score * 0.1);
-    this.weapon = 'PISTOL';
+    this.angle = 0;
+    if (skinId) this.skinId = skinId;
     this.shieldEndTime = 0;
     this.speedBuffEndTime = 0;
-    this.angle = 0;
-    this.input = { up: false, down: false, left: false, right: false, mouseX: 0, mouseY: 0, space: false };
-    this.dashEndTime = 0;
-    this.dashCooldownTime = 0;
-    this.lastAttack = 0;
-    this.lastDamageTime = 0;
+    this.weapon = 'BLUE';
+    this.score = 0;
     this.radius = PLAYER_RADIUS;
-    this.isMoving = false;
-    this.lastMoveTime = 0;
-    this.sessionKills = 0;
+    this.isBoosting = false;
   }
 
   clampToMap() {
@@ -264,55 +221,25 @@ export class Player extends Entity {
   }
 
   regenerate(dt) {
-    if (this.health >= this.maxHealth) {
-      this.health = this.maxHealth;
-      return;
-    }
+    if (this.health >= this.maxHealth) return;
     if (Date.now() - this.lastDamageTime > REGEN_DELAY) {
       this.health += REGEN_RATE * dt;
-      if (this.health > this.maxHealth) {
-        this.health = this.maxHealth;
-      }
+      if (this.health > this.maxHealth) this.health = this.maxHealth;
     }
   }
 
   serialize() {
     return {
-      id: this.id,
-      name: this.name,
-      x: Math.round(this.x),
-      y: Math.round(this.y),
-      angle: this.angle,
-      health: this.health,
-      maxHealth: this.maxHealth,
-      score: this.score,
-      dead: this.dead,
-      weapon: this.weapon,
-      radius: this.radius,
-      coins: this.coins,
+      id: this.id, name: this.name,
+      x: Math.round(this.x), y: Math.round(this.y),
+      vx: Math.round(this.vx), vy: Math.round(this.vy),
+      angle: this.angle, health: this.health, maxHealth: this.maxHealth,
+      score: this.score, dead: this.dead, weapon: this.weapon,
+      radius: this.radius, coins: this.coins,
       hasShield: Date.now() < this.shieldEndTime,
       isSpeedUp: Date.now() < this.speedBuffEndTime,
-      isMoving: this.isMoving, // Gửi về client để hiển thị trạng thái
-      skinId: this.skinId,
-      hi: this.isHidden
+      isMoving: this.isMoving, isBoosting: this.isBoosting,
+      skinId: this.skinId, hi: this.isHidden
     };
-  }
-
-  respawn(skinId = null) {
-    const pos = getRandomPosition(MAP_SIZE);
-    this.x = pos.x;
-    this.y = pos.y;
-    this.health = PLAYER_MAX_HEALTH;
-    this.maxHealth = PLAYER_MAX_HEALTH;
-    this.dead = false;
-    this.angle = 0;
-    this.lastDamageTime = 0;
-    this.isHidden = false;
-    if (skinId) this.skinId = skinId;
-    // Reset buffs
-    this.shieldEndTime = 0;
-    this.speedBuffEndTime = 0;
-    this.dashEndTime = 0;
-    this.dashCooldownTime = 0;
   }
 }

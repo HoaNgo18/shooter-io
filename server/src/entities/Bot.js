@@ -1,11 +1,10 @@
-// server/src/entities/Bot.js
+// server/src/entities/Bot.js - SPACE SHIP AI
 import { Player } from './Player.js';
 import { distance } from '../../../shared/src/utils.js';
-import { MAP_SIZE, PLAYER_RADIUS } from '../../../shared/src/constants.js';
 
 const BOT_NAMES = [
-  "ProGamer", "NoobMaster", "Guest_99", "Hunter", 
-  "KillerVN", "Dragon", "Shadow", "Ninja", "Warrior", "Phantom"
+  "Stardust", "Nebula", "Comet", "Photon", 
+  "Quantum", "Pulsar", "Nova", "Meteor", "Vortex", "Eclipse"
 ];
 
 export class Bot extends Player {
@@ -14,29 +13,29 @@ export class Bot extends Player {
                  Math.floor(Math.random() * 999);
     super(id, name, null);
 
-    this.dead = false; 
+    this.dead = false;
     this.health = this.maxHealth;
-    
     this.isBot = true;
     this.target = null;
-    this.changeDirTime = 0;
+    
+    // AI params
+    this.accuracy = 0.3 + Math.random() * 0.4;
+    this.aggression = Math.random();
     this.lastShot = 0;
     
-    // Thêm skill level (0-1)
-    this.accuracy = 0.3 + Math.random() * 0.4; // 30-70% cơ hội bắn
-    this.aggression = Math.random(); // 0 = nhút, 1 = hung hăng
+    // Space ship AI specific
+    this.desiredAngle = 0;
+    this.stateChangeTime = 0;
+    this.currentState = 'WANDER'; // WANDER, CHASE, ATTACK, EVADE
   }
 
   think(game) {
     if (this.dead) return;
 
-    // 1. Tìm mục tiêu
     this.findTarget(game);
-
-    // 2. Di chuyển & Bắn
+    
     if (this.target) {
-      this.moveToTarget();
-      this.shootAtTarget(game);
+      this.engageTarget(game);
     } else {
       this.wander();
     }
@@ -46,14 +45,10 @@ export class Bot extends Player {
     let closestDist = Infinity;
     let newTarget = null;
 
-    // CHỈ TÌM NGƯỜI CHƠI THẬT (không tìm Bot khác)
     game.players.forEach(other => {
-      // Bỏ qua chính mình & Bot khác
       if (other.id === this.id || other.isBot || other.dead) return;
 
       const d = distance(this.x, this.y, other.x, other.y);
-      
-      // Tầm nhìn phụ thuộc aggression: Bot hung hăng nhìn xa hơn
       const visionRange = 400 + (this.aggression * 200);
       
       if (d < visionRange && d < closestDist) {
@@ -62,75 +57,62 @@ export class Bot extends Player {
           x: other.x,
           y: other.y,
           id: other.id,
-          isPlayer: true,
           distance: d
         };
       }
     });
 
-    // B. Nếu không thấy người → Tìm food
-    if (!newTarget && Math.random() < 0.3) { // 30% cơ hội tìm food
-      const nearbyFoods = game.world.foods.slice(0, 30); // Chỉ xét 30 food gần nhất
-      
-      for (const food of nearbyFoods) {
-        const d = distance(this.x, this.y, food.x, food.y);
-        if (d < 250 && d < closestDist) {
-          closestDist = d;
-          newTarget = {
-            x: food.x,
-            y: food.y,
-            isPlayer: false,
-            distance: d
-          };
-        }
-      }
-    }
-
     this.target = newTarget;
   }
 
-  moveToTarget() {
+  engageTarget(game) {
     if (!this.target) return;
 
-    // Tính góc đến target
     const dx = this.target.x - this.x;
     const dy = this.target.y - this.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    // Nếu quá gần người chơi → Lùi lại (khoảng cách an toàn 200px)
-    const isTooClose = this.target.isPlayer && dist < 200;
+    const dist = this.target.distance;
     
-    // Tính hướng di chuyển đúng cho WASD
-    if (isTooClose) {
-      // Lùi lại
-      this.input.up = (dy > 10);
-      this.input.down = (dy < -10);
-      this.input.left = (dx > 10);
-      this.input.right = (dx < -10);
+    // Calculate desired angle to face target
+    this.desiredAngle = Math.atan2(dy, dx);
+
+    // Current angle difference
+    let angleDiff = this.desiredAngle - this.angle;
+    while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+    while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+    // === ROTATION CONTROL ===
+    const angleThreshold = 0.1; // 5 degrees tolerance
+    if (Math.abs(angleDiff) > angleThreshold) {
+      this.input.left = angleDiff < 0;
+      this.input.right = angleDiff > 0;
     } else {
-      // Tiến lên
-      this.input.up = (dy < -10);
-      this.input.down = (dy > 10);
-      this.input.left = (dx < -10);
-      this.input.right = (dx > 10);
+      this.input.left = false;
+      this.input.right = false;
     }
 
-    // Hướng chuột về target (để bắn)
-    this.input.mouseX = this.target.x;
-    this.input.mouseY = this.target.y;
-  }
+    // === MOVEMENT CONTROL ===
+    const optimalDist = 300; // Khoảng cách lý tưởng
 
-  shootAtTarget(game) {
-    if (!this.target || !this.target.isPlayer) return;
+    if (dist > optimalDist + 50) {
+      // Too far -> thrust forward
+      this.input.up = true;
+      this.input.down = false;
+    } else if (dist < optimalDist - 50) {
+      // Too close -> brake or rotate away
+      this.input.up = false;
+      this.input.down = true;
+    } else {
+      // Good distance -> maintain
+      this.input.up = false;
+      this.input.down = false;
+    }
 
+    // === SHOOTING ===
     const now = Date.now();
-    const dist = this.target.distance;
-
-    // Chỉ bắn khi:
-    // 1. Trong tầm (400px)
-    // 2. Đã cooldown (1s)
-    // 3. Random dựa trên accuracy
-    if (dist < 400 && 
+    const isAimingWell = Math.abs(angleDiff) < 0.3; // ~17 degrees
+    
+    if (isAimingWell && 
+        dist < 400 && 
         now - this.lastShot > 1000 && 
         Math.random() < this.accuracy) {
       
@@ -138,7 +120,6 @@ export class Bot extends Player {
       if (projectiles) {
         game.projectiles.push(...projectiles);
         this.lastShot = now;
-        console.log(` Bot ${this.name} shot at distance ${Math.round(dist)}`);
       }
     }
   }
@@ -146,26 +127,27 @@ export class Bot extends Player {
   wander() {
     const now = Date.now();
     
-    // Đổi hướng mỗi 2-4 giây
-    if (now > this.changeDirTime) {
-      // Random hướng mới
-      const randomAngle = Math.random() * Math.PI * 2;
-      const moveDistance = 300;
-      
-      this.input.mouseX = this.x + Math.cos(randomAngle) * moveDistance;
-      this.input.mouseY = this.y + Math.sin(randomAngle) * moveDistance;
-      
-      // Tính WASD từ góc
-      const dx = this.input.mouseX - this.x;
-      const dy = this.input.mouseY - this.y;
-      
-      this.input.up = (dy < -10);
-      this.input.down = (dy > 10);
-      this.input.left = (dx < -10);
-      this.input.right = (dx > 10);
-      
-      // Next change: 2-4 giây
-      this.changeDirTime = now + 2000 + Math.random() * 2000;
+    // Change direction every 2-4 seconds
+    if (now > this.stateChangeTime) {
+      this.desiredAngle = Math.random() * Math.PI * 2 - Math.PI;
+      this.stateChangeTime = now + 2000 + Math.random() * 2000;
     }
+
+    // Rotate towards desired angle
+    let angleDiff = this.desiredAngle - this.angle;
+    while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+    while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+    if (Math.abs(angleDiff) > 0.1) {
+      this.input.left = angleDiff < 0;
+      this.input.right = angleDiff > 0;
+    } else {
+      this.input.left = false;
+      this.input.right = false;
+    }
+
+    // Thrust 50% of the time
+    this.input.up = Math.random() < 0.5;
+    this.input.down = false;
   }
 }

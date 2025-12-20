@@ -1,4 +1,4 @@
-import { circleCollision, distance } from '../../../shared/src/utils.js';
+import { circleCollision, rectangleCollision, circleRectangleCollision, distance } from '../../../shared/src/utils.js';
 import { PLAYER_RADIUS, MAP_SIZE, FOOD_RADIUS, XP_PER_FOOD, CHEST_RADIUS, ITEM_RADIUS, WEAPON_STATS, CHEST_TYPES, NEBULA_RADIUS } from '../../../shared/src/constants.js';
 import { Quadtree } from '../utils/Quadtree.js';
 import { Explosion } from '../entities/Explosion.js';
@@ -37,11 +37,7 @@ export class Physics {
         if (circleCollision(player.x, player.y, PLAYER_RADIUS, proj.x, proj.y, proj.radius)) {
           console.log(`HIT! ${proj.weaponType} hit ${player.name}. Damage: ${proj.damage}`);
 
-          if (proj.weaponType === 'ROCKET') {
-            this.createExplosion(proj);
-          } else {
-            player.takeDamage(proj.damage, proj.ownerId);
-          }
+          player.takeDamage(proj.damage, proj.ownerId);
 
           proj.hit = true;
           hitSomeone = true;
@@ -98,15 +94,20 @@ export class Physics {
     this.game.players.forEach(player => {
       if (player.dead) return;
       obstacles.forEach(obs => {
-        const dx = player.x - obs.x;
-        const dy = player.y - obs.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const minDist = (player.radius || PLAYER_RADIUS) + obs.radius;
-        if (dist < minDist) {
-          const angle = Math.atan2(dy, dx);
-          const pushOut = minDist - dist;
-          player.x += Math.cos(angle) * pushOut;
-          player.y += Math.sin(angle) * pushOut;
+        if (circleRectangleCollision(player.x, player.y, player.radius || PLAYER_RADIUS, 
+                                     obs.x - obs.width/2, obs.y - obs.height/2, obs.width, obs.height)) {
+          // Push out: find closest point and push along the vector
+          const px = Math.max(obs.x - obs.width/2, Math.min(player.x, obs.x + obs.width/2));
+          const py = Math.max(obs.y - obs.height/2, Math.min(player.y, obs.y + obs.height/2));
+          const dx = player.x - px;
+          const dy = player.y - py;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const minDist = player.radius || PLAYER_RADIUS;
+          if (dist < minDist && dist > 0) {
+            const pushOut = minDist - dist;
+            player.x += (dx / dist) * pushOut;
+            player.y += (dy / dist) * pushOut;
+          }
         }
       });
     });
@@ -115,13 +116,7 @@ export class Physics {
     for (let i = this.game.projectiles.length - 1; i >= 0; i--) {
       const proj = this.game.projectiles[i];
       for (const obs of obstacles) { // Dùng biến obstacles đã lấy ở trên
-        const dx = proj.x - obs.x;
-        const dy = proj.y - obs.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < proj.radius + obs.radius) {
-          if (proj.weaponType === 'ROCKET') {
-            this.createExplosion(proj);
-          }
+        if (circleRectangleCollision(proj.x, proj.y, proj.radius, obs.x - obs.width/2, obs.y - obs.height/2, obs.width, obs.height)) {
           this.game.projectiles.splice(i, 1);
           break;
         }
@@ -135,10 +130,6 @@ export class Physics {
         const chest = chests[j];
         if (circleCollision(proj.x, proj.y, proj.radius, chest.x, chest.y, chest.radius)) {
           chest.takeDamage(proj.damage);
-
-          if (proj.weaponType === 'ROCKET') {
-            this.createExplosion(proj);
-          }
 
           this.game.projectiles.splice(i, 1);
           if (chest.dead) {
@@ -227,32 +218,6 @@ export class Physics {
     });
   }
 
-  createExplosion(projectile) {
-    const stats = WEAPON_STATS[projectile.weaponType];
-    if (!stats || !stats.shrapnelCount) return;
-
-    // console.log(`Rocket exploded! Creating ${stats.shrapnelCount} shrapnel`);
-    const angleStep = (Math.PI * 2) / stats.shrapnelCount;
-
-    for (let i = 0; i < stats.shrapnelCount; i++) {
-      const angle = angleStep * i;
-      const shrapnel = new Projectile(
-        projectile.x, projectile.y, angle,
-        400, stats.shrapnelDamage,
-        projectile.ownerId, projectile.ownerName,
-        'SHRAPNEL', 150, 3
-      );
-      shrapnel.color = 0xFF6600;
-      this.game.projectiles.push(shrapnel);
-    }
-
-    const explosion = new Explosion(
-      projectile.x, projectile.y,
-      stats.explosionRadius, 0,
-      projectile.ownerId, projectile.ownerName
-    );
-    this.game.explosions.push(explosion);
-  }
 
   resolvePlayerCollision(p1, p2) {
     const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { socket } from '../../network/socket';
 import { PacketType } from '@shared/packetTypes';
 import { ClientPlayer } from '../entities/ClientPlayer';
-import { WEAPON_STATS } from '@shared/constants';
+import { WEAPON_STATS, MAP_SIZE } from '@shared/constants';
 
 export class GameScene extends Phaser.Scene {
     constructor() {
@@ -26,9 +26,73 @@ export class GameScene extends Phaser.Scene {
         this.explosionGroup = null;
     }
 
+    preload() {
+        // Load ship sprites
+        this.load.image('ship_default', '/Ships/playerShip1_blue.png');
+        this.load.image('ship_red', '/Ships/playerShip1_red.png');
+        this.load.image('ship_blue', '/Ships/playerShip1_blue.png');
+        this.load.image('ship_gold', '/Ships/playerShip2_orange.png');
+        this.load.image('ship_dark', '/Ships/ufoYellow.png');
+
+        // Load meteor sprites for obstacles
+        const meteorFiles = [
+            'meteorBrown_big1.png', 'meteorBrown_big2.png', 'meteorBrown_big3.png', 'meteorBrown_big4.png',
+            'meteorBrown_med1.png', 'meteorBrown_med3.png', 'meteorBrown_small1.png', 'meteorBrown_small2.png',
+            'meteorBrown_tiny1.png', 'meteorBrown_tiny2.png',
+            'meteorGrey_big1.png', 'meteorGrey_big2.png', 'meteorGrey_big3.png', 'meteorGrey_big4.png',
+            'meteorGrey_med1.png', 'meteorGrey_med2.png', 'meteorGrey_small1.png', 'meteorGrey_small2.png',
+            'meteorGrey_tiny1.png', 'meteorGrey_tiny2.png', 'spaceMeteors_001.png', 'spaceMeteors_002.png',
+            'spaceMeteors_003.png', 'spaceMeteors_004.png'
+        ];
+        meteorFiles.forEach(file => this.load.image(file.replace('.png', ''), '/Meteors/' + file));
+
+        //Load background 
+        this.load.image('background', '/Backgrounds/blue.png');
+
+        //Load laser sprites
+        //Normal
+        this.load.image('laserBlue01', '/Lasers/laserBlue01.png');
+        this.load.image('laserGreen01', '/Lasers/laserGreen11.png');
+        this.load.image('laserRed01', '/Lasers/laserRed01.png');
+        //Updated versions
+        this.load.image('laserBlue01', '/Lasers/laserBlue01.png');
+        this.load.image('laserGreen01', '/Lasers/laserGreen11.png');
+        this.load.image('laserRed01', '/Lasers/laserRed01.png');
+
+        //Load stars
+        this.load.image('star1', '/Effects/star1.png');
+        this.load.image('star2', '/Effects/star2.png');
+
+        //Load chests sprites
+        this.load.image('chest1', '/Chests/spaceBuilding_001.png');
+        this.load.image('chest2', '/Chests/spaceBuilding_018.png');
+        this.load.image('chest3', '/Chests/spaceBuilding_025.png');
+
+        //Load nebula sprite
+        this.load.image('nebula1', '/Nebulas/fart00.png');
+        this.load.image('nebula2', '/Nebulas/fart01.png');
+        this.load.image('nebula3', '/Nebulas/fart02.png');
+        this.load.image('nebula4', '/Nebulas/fart03.png');
+        this.load.image('nebula5', '/Nebulas/fart04.png');
+
+    }
+
     create() {
-        // 1. Background
-        this.add.grid(0, 0, 5000, 5000, 100, 100, 0x1a1a1a, 1, 0x2a2a2a, 1);
+        // // Tạo tiled background với darkPurple
+        // const bgSize = 256; // Giả sử ảnh gốc 256x256
+        // const tilesNeeded = Math.ceil(MAP_SIZE / bgSize) + 2; // +2 để đảm bảo phủ kín
+
+        // for (let x = -tilesNeeded / 2; x < tilesNeeded / 2; x++) {
+        //     for (let y = -tilesNeeded / 2; y < tilesNeeded / 2; y++) {
+        //         const bg = this.add.image(x * bgSize, y * bgSize, 'background');
+        //         bg.setOrigin(0.5, 0.5);
+        //         bg.setDepth(-100); // Đẩy xuống layer dưới cùng
+        //     }
+        // }
+
+        //  Tạo background repeating
+        const bg = this.add.tileSprite(0, 0, MAP_SIZE, MAP_SIZE, 'background');
+        bg.setDepth(-100);
 
         // 2. Input Keyboard
         this.keys = this.input.keyboard.addKeys({
@@ -81,9 +145,8 @@ export class GameScene extends Phaser.Scene {
         // Cập nhật Range Circle theo player hiện tại
         const myPlayer = this.players[socket.myId];
         if (myPlayer && myPlayer.container.visible) {
-            const weaponType = myPlayer.weaponType || 'PISTOL';
-            const stats = WEAPON_STATS[weaponType];
-
+            const weaponType = myPlayer.weaponType || 'BLUE';
+            const stats = WEAPON_STATS[weaponType] || WEAPON_STATS.BLUE;
             // Cập nhật vị trí và kích thước
             this.rangeCircle.x = myPlayer.x;
             this.rangeCircle.y = myPlayer.y;
@@ -141,9 +204,50 @@ export class GameScene extends Phaser.Scene {
 
         if (data.obstacles) {
             data.obstacles.forEach(obs => {
-                const rock = this.add.circle(obs.x, obs.y, obs.radius, 0x888888);
-                rock.setStrokeStyle(3, 0x555555);
-                this.obstacleGroup.add(rock);
+                // 1. Danh sách đầy đủ các loại thiên thạch
+                const meteorKeys = [
+                    'meteorBrown_big1', 'meteorBrown_big2', 'meteorBrown_big3', 'meteorBrown_big4',
+                    'meteorBrown_med1', 'meteorBrown_med3', 'meteorBrown_small1', 'meteorBrown_small2',
+                    'meteorBrown_tiny1', 'meteorBrown_tiny2',
+                    'meteorGrey_big1', 'meteorGrey_big2', 'meteorGrey_big3', 'meteorGrey_big4',
+                    'meteorGrey_med1', 'meteorGrey_med2', 'meteorGrey_small1', 'meteorGrey_small2',
+                    'meteorGrey_tiny1', 'meteorGrey_tiny2',
+                    'spaceMeteors_001', 'spaceMeteors_002', 'spaceMeteors_003', 'spaceMeteors_004'
+                ];
+
+                // 2. Logic chọn ảnh thông minh hơn:
+                // Nếu thiên thạch từ server là loại TO (width > 100), ưu tiên dùng ảnh "big" hoặc "spaceMeteors" để không bị vỡ hình
+                let validKeys = meteorKeys;
+                if (obs.width > 100) {
+                    validKeys = meteorKeys.filter(k => k.includes('big') || k.includes('spaceMeteors'));
+                }
+
+                const randomKey = validKeys[Math.floor(Math.random() * validKeys.length)];
+                const meteor = this.add.sprite(obs.x, obs.y, randomKey);
+
+                // 3. Scale kích thước
+                // obs.width là đường kính vật lý. Ta scale ảnh để khớp với nó.
+                // Giả sử ảnh gốc trung bình khoảng 80-100px. Chia cho 90 là hệ số tương đối ổn.
+                const scale = obs.width / 90;
+                meteor.setScale(scale);
+
+                // 4. Xoay ngẫu nhiên (Rotation)
+                // Set góc xoay ban đầu ngẫu nhiên
+                meteor.setRotation(Phaser.Math.RND.rotation());
+
+                // 5. Animation: Tự xoay tại chỗ
+                // Thiên thạch to xoay chậm, nhỏ xoay nhanh
+                const duration = Phaser.Math.RND.between(10000, 30000) * (scale > 1.5 ? 2 : 1);
+
+                this.tweens.add({
+                    targets: meteor,
+                    angle: Math.random() > 0.5 ? 360 : -360, // Random chiều xoay trái/phải
+                    duration: duration,
+                    repeat: -1,
+                    ease: 'Linear'
+                });
+
+                this.obstacleGroup.add(meteor);
             });
         }
 
@@ -217,18 +321,20 @@ export class GameScene extends Phaser.Scene {
             packet.foods.forEach(f => this.createFoodSprite(f));
         }
 
-        // 3. Update Projectiles
+        // 3. Update Projectiles (với laser sprites)
         if (packet.projectiles) {
             this.projectileGroup.clear(true, true);
             packet.projectiles.forEach(p => {
-                const radius = p.radius || 6;
-                // Vẽ đạn dựa trên màu server gửi về (nếu có), mặc định vàng
-                let color = 0xFFFF00; // Mặc định vàng
-                if (p.weaponType && WEAPON_STATS[p.weaponType]) {
-                    color = WEAPON_STATS[p.weaponType].color;
-                }
-                const bullet = this.add.circle(p.x, p.y, radius, color);
-                this.projectileGroup.add(bullet);
+                const stats = WEAPON_STATS[p.weaponType] || WEAPON_STATS.BLUE; // Fallback về BLUE
+                const laserSprite = stats.laserSprite || 'laserBlue01';
+
+                // Tạo laser sprite
+                const laser = this.add.sprite(p.x, p.y, laserSprite);
+                laser.setRotation(p.angle + Math.PI / 2);
+                laser.setScale(1.0); // Tăng size lên để dễ nhìn
+                laser.setDepth(5);
+
+                this.projectileGroup.add(laser);
             });
         }
 
@@ -292,79 +398,125 @@ export class GameScene extends Phaser.Scene {
 
     createFoodSprite(f) {
         if (this.foods[f.id]) return;
-        let color = 0xFFFFFF;
-        if (f.type === 0) color = 0xFF4444;
-        if (f.type === 1) color = 0x44FF44;
-        if (f.type === 2) color = 0x4444FF;
-        const food = this.add.circle(f.x, f.y, 5, color);
+        // 1. Random chọn 1 trong 3 loại sao
+        const texture = Phaser.Math.RND.pick(['star1', 'star2']);
+        // 2. Tạo Sprite thay vì Circle
+        const food = this.add.sprite(f.x, f.y, texture);
+        // 3. Chỉnh kích thước
+        // Food hitbox server là 5, nhưng ảnh sao cần to hơn chút để nhìn cho rõ
+        // Set khoảng 24x24 pixel là đẹp
+        food.setDisplaySize(24, 24);
+        // 4. Thêm hiệu ứng xoay tròn (Tween)
+        this.tweens.add({
+            targets: food,
+            alpha: 0.5,                  // Mờ dần xuống 50%
+            scaleX: food.scaleX * 0.8,   // Co lại còn 80% kích thước gốc
+            scaleY: food.scaleY * 0.8,
+            duration: Phaser.Math.RND.between(500, 1000), // Mỗi ngôi sao nhấp nháy tốc độ khác nhau
+            yoyo: true,                  // Đảo ngược lại (Sáng -> Mờ -> Sáng)
+            repeat: -1,                  // Lặp vô hạn
+            ease: 'Sine.easeInOut'       // Hiệu ứng mượt mà
+        });
+        // 5. Thêm vào Group và Map quản lý
         this.foodGroup.add(food);
         this.foods[f.id] = food;
     }
 
     createChestSprite(c) {
         if (this.chests[c.id]) return;
-        // Mặc định là Chest thường
-        let color = 0xCD853F;
-        let size = 40;
-        let strokeColor = 0xFFFFFF;
-        // Nếu là Big Chest
-        if (c.type === 'BIG') {
-            color = 0xFF0000; // Màu đỏ
-            size = 70;        // To đùng
-            strokeColor = 0xFFD700; // Viền vàng
-        }
-        // Nếu bạn dùng Sprite ảnh:
-        // const chest = this.add.sprite(c.x, c.y, c.type === 'BIG' ? 'chest_gold' : 'chest_wood');
-        // Nếu dùng hình khối cơ bản:
-        const chest = this.add.rectangle(c.x, c.y, size, size, color);
-        chest.setStrokeStyle(3, strokeColor);
-        // Hiệu ứng xoay nhẹ cho Big Chest để gây chú ý
-        if (c.type === 'BIG') {
+
+        // 1. Random chọn 1 trong 3 loại sprite để đa dạng
+        const texture = Phaser.Math.RND.pick(['chest1', 'chest2', 'chest3']);
+
+        const chest = this.add.sprite(c.x, c.y, texture);
+
+        // 2. Cấu hình kích thước và màu sắc dựa trên loại hòm
+        const isBig = c.type === 'BIG';
+
+        // Set size: Hòm to (70px), Hòm nhỏ (40px)
+        chest.setDisplaySize(isBig ? 70 : 40, isBig ? 70 : 40);
+
+        if (isBig) {
+            // Hòm to: Nhuộm màu đỏ rực để cảnh báo/thu hút
+            chest.setTint(0xFF4444);
+
+            // Hiệu ứng: Xoay tròn + Phóng to thu nhỏ nhẹ (Pulsing)
             this.tweens.add({
                 targets: chest,
                 angle: 360,
-                duration: 3000,
+                duration: 4000,
                 repeat: -1,
                 ease: 'Linear'
             });
+            this.tweens.add({
+                targets: chest,
+                scaleX: chest.scaleX * 1.1,
+                scaleY: chest.scaleY * 1.1,
+                duration: 800,
+                yoyo: true,
+                repeat: -1
+            });
+        } else {
+            // Hòm thường: Giữ màu gốc hoặc tint nhẹ vàng
+            chest.setTint(0xFFFFFF);
         }
 
         this.chestGroup.add(chest);
         this.chests[c.id] = chest;
     }
 
-    // Trong hàm createNebula(data)
     createNebula(data) {
-        if (!this.textures.exists('nebula')) {
-            const graphics = this.add.graphics();
-            graphics.fillStyle(0x9C27B0, 0.5);
-            graphics.fillCircle(0, 0, data.radius);
-            const container = this.add.container(data.x, data.y, [graphics]);
-            container.setDepth(15);
-            this.nebulas.push(container);
-            return;
+        // Tạo Container để chứa "cụm" mây
+        const container = this.add.container(data.x, data.y);
+
+        // --- TẠO HIỆU ỨNG CỤM (CLUSTER) ---
+        // Thay vì vẽ 1 sprite, ta vẽ 3 sprite xếp chồng lệch nhau để tạo độ dày
+        const cloudCount = 3;
+
+        for (let i = 0; i < cloudCount; i++) {
+            // Random sprite
+            const tex = Phaser.Math.RND.pick(['nebula1', 'nebula2', 'nebula3', 'nebula4', 'nebula5']);
+
+            // Tạo độ lệch ngẫu nhiên (offset) xung quanh tâm để tạo cảm giác đám mây to
+            // Offset trong khoảng -30% đến +30% bán kính
+            const offsetX = Phaser.Math.RND.between(-data.radius * 0.3, data.radius * 0.3);
+            const offsetY = Phaser.Math.RND.between(-data.radius * 0.3, data.radius * 0.3);
+
+            const cloud = this.add.image(offsetX, offsetY, tex);
+
+            // Scale to hơn logic cũ một chút
+            // Logic cũ: * 2.5 -> Logic mới: * 3.5 để bao trùm rộng hơn
+            // Giả sử ảnh gốc khoảng 256px
+            const baseScale = (data.radius * 3.5) / 256;
+
+            // Mỗi mây con có kích thước random nhẹ
+            cloud.setScale(baseScale * Phaser.Math.RND.realInRange(0.8, 1.2));
+
+            // Xoay ngẫu nhiên góc ảnh để không bị lặp lại pattern
+            cloud.setRotation(Phaser.Math.RND.rotation());
+
+            // Màu sắc: Nhuộm tím đặc trưng
+            cloud.setTint(0x9C27B0);
+
+            // Alpha thấp để các lớp mây hòa trộn vào nhau
+            cloud.setAlpha(0.4);
+
+            container.add(cloud);
         }
-        const nebula = this.add.image(data.x, data.y, 'nebula');
 
-        // Scale ảnh cho khớp với radius logic
-        // Giả sử ảnh gốc 100x100, muốn radius 70 (đường kính 140) -> scale 1.4
-        const scale = (data.radius * 2.5) / 100; // *2.5 để hình ảnh phủ rộng hơn hitbox một chút cho đẹp
-        nebula.setScale(scale);
+        // Set depth cao để che khuất người chơi (tạo cảm giác ẩn nấp)
+        container.setDepth(15);
 
-        // Màu sắc & Hiệu ứng
-        nebula.setTint(0x9C27B0); // Nhuộm màu Tím (Purple)
-        nebula.setAlpha(0.6);      // Trong suốt để nhìn xuyên qua được một chút
-        nebula.setDepth(15);       // Layer đè lên người chơi (Player depth=10)
-
-        // Hiệu ứng xoay nhẹ cho sinh động (Optional)
+        // Hiệu ứng: Cả cụm mây xoay chậm lờ đờ
         this.tweens.add({
-            targets: nebula,
+            targets: container,
             angle: 360,
-            duration: 20000 + Math.random() * 10000, // Xoay rất chậm
-            repeat: -1
+            duration: 50000 + Math.random() * 20000, // 50-70 giây/vòng
+            repeat: -1,
+            ease: 'Linear'
         });
 
-        this.nebulas.push(nebula); // Đổi tên mảng bushes -> nebulas
+        this.nebulas.push(container);
     }
 
     createItemSprite(i) {
@@ -378,11 +530,9 @@ export class GameScene extends Phaser.Scene {
             case 'HEALTH_PACK': color = 0xFF0000; text = "HP"; break;
             case 'SHIELD': color = 0x00FFFF; text = "SHD"; break;
             case 'SPEED': color = 0xFFFF00; text = "SPD"; break;
-            case 'WEAPON_ROCKET': color = 0xFF4500; text = "RKT"; break;
-            case 'WEAPON_SHOTGUN': color = 0xFFA500; text = "SHT"; break;
-            case 'WEAPON_MACHINEGUN': color = 0xADFF2F; text = "MG"; break;
-            case 'WEAPON_SNIPER': color = 0x00BFFF; text = "SNP"; break;
-            case 'WEAPON_PISTOL': color = 0xFFFF00; text = "PST"; break;
+            case 'WEAPON_RED': color = 0xFF0000; text = "RED"; break;      // Thay đổi
+            case 'WEAPON_GREEN': color = 0x00FF00; text = "GRN"; break;    // Thay đổi
+            case 'WEAPON_BLUE': color = 0x00E5FF; text = "BLU"; break;
             case 'COIN_SMALL': color = 0xFFD700; text = "$1"; break;
             case 'COIN_MEDIUM': color = 0xFFD700; text = "$2"; break;
             case 'COIN_LARGE': color = 0xFFD700; text = "$5"; break;
