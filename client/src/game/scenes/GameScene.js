@@ -75,6 +75,12 @@ export class GameScene extends Phaser.Scene {
         this.load.image('nebula4', '/Nebulas/fart03.png');
         this.load.image('nebula5', '/Nebulas/fart04.png');
 
+        //Load live icons
+        this.load.image('playerLife1_blue', '/UI/playerLife1_blue.png');
+        this.load.image('playerLife1_red', '/UI/playerLife1_red.png');
+        this.load.image('playerLife1_green', '/UI/playerLife1_green.png');
+        this.load.image('playerLife1_orange', '/UI/playerLife1_orange.png');
+
     }
 
     create() {

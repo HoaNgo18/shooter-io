@@ -2,7 +2,7 @@ export const MAP_SIZE = 5000;
 
 export const PLAYER_RADIUS = 20;
 export const PLAYER_SPEED = 300;
-export const PLAYER_MAX_HEALTH = 100;
+export const PLAYER_MAX_LIVES = 3;
 
 export const TICK_RATE = 60;
 export const INTERPOLATION_DELAY = 100;

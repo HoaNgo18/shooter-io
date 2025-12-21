@@ -7,7 +7,7 @@ export class ClientPlayer {
     constructor(scene, playerData) {
         this.scene = scene;
         this.isMe = (socket.myId === playerData.id);
-        
+
         this.id = playerData.id;
         this.name = playerData.name;
         this.score = playerData.score || 0;
@@ -19,7 +19,7 @@ export class ClientPlayer {
 
         // === CREATE CONTAINER ===
         this.container = scene.add.container(playerData.x, playerData.y);
-        
+
         // Skin
         this.skinId = playerData.skinId || 'default';
         const skinInfo = SKINS.find(s => s.id === this.skinId);
@@ -27,7 +27,7 @@ export class ClientPlayer {
 
         // === SHIP SPRITE ===
         this.shipSprite = this.createShipSprite(this.skinId);
-        
+
         // === THRUST FLAME (Hiệu ứng lửa) ===
         this.thrustFlame = scene.add.graphics();
         this.updateThrustFlame(false);
@@ -47,12 +47,6 @@ export class ClientPlayer {
             stroke: '#000000', strokeThickness: 3, align: 'center'
         }).setOrigin(0.5);
         this.text.setDepth(100);
-
-        this.healthBarBg = scene.add.rectangle(playerData.x, playerData.y - 25, 40, 6, 0x000000);
-        this.healthBarBg.setDepth(100);
-
-        this.healthBar = scene.add.rectangle(playerData.x, playerData.y - 25, 40, 4, 0x00FF00);
-        this.healthBar.setDepth(100);
     }
 
     createShipSprite(skinId) {
@@ -75,7 +69,7 @@ export class ClientPlayer {
 
     updateThrustFlame(isBoosting) {
         this.thrustFlame.clear();
-        
+
         if (isBoosting) {
             // Vẽ lửa phía sau tàu (giả sử mũi lên, đuôi xuống)
             // Đuôi tàu ở y ≈ +16, x = 0
@@ -85,7 +79,7 @@ export class ClientPlayer {
                 4, 16,    // Phải đuôi
                 0, 26 + Math.random() * 5  // Đỉnh lửa
             );
-            
+
             // Lửa vàng bên trong
             this.thrustFlame.fillStyle(0xFFFF00, 0.6);
             this.thrustFlame.fillTriangle(
@@ -119,18 +113,11 @@ export class ClientPlayer {
         // Update skin
         if (data.skinId && data.skinId !== this.skinId) {
             this.skinId = data.skinId;
-            
+
             // Recreate ship sprite with new texture
             this.shipSprite.destroy();
             this.shipSprite = this.createShipSprite(this.skinId);
             this.container.addAt(this.shipSprite, 1);
-        }
-
-        // Health bar
-        if (data.maxHealth) {
-            const percent = Math.max(0, data.health / data.maxHealth);
-            this.healthBar.width = 40 * percent;
-            this.healthBar.fillColor = percent < 0.3 ? 0xFF0000 : 0x00FF00;
         }
 
         // Scale
@@ -187,32 +174,20 @@ export class ClientPlayer {
         const currentScale = this.container.scaleX;
         this.text.x = this.container.x;
         this.text.y = this.container.y - (40 * currentScale);
-
-        this.healthBarBg.x = this.container.x;
-        this.healthBarBg.y = this.container.y - (25 * currentScale);
-
-        this.healthBar.x = this.container.x;
-        this.healthBar.y = this.container.y - (25 * currentScale);
     }
 
     setVisibleState(isVisible) {
         this.container.setVisible(isVisible);
         this.text.setVisible(isVisible);
-        this.healthBar.setVisible(isVisible);
-        this.healthBarBg.setVisible(isVisible);
     }
 
     setAlphaState(alpha) {
         this.container.setAlpha(alpha);
         this.text.setAlpha(alpha);
-        this.healthBar.setAlpha(alpha);
-        this.healthBarBg.setAlpha(alpha);
     }
 
     destroy() {
         this.container.destroy();
         this.text.destroy();
-        this.healthBar.destroy();
-        this.healthBarBg.destroy();
     }
 }

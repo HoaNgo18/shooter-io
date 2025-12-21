@@ -1,7 +1,7 @@
 // server/src/entities/Player.js - SPACE SHIP VERSION
 import { Entity } from './Entity.js';
 import {
-  PLAYER_MAX_HEALTH, MAP_SIZE, PLAYER_RADIUS,
+  PLAYER_MAX_LIVES, MAP_SIZE, PLAYER_RADIUS,
   REGEN_DELAY, REGEN_RATE, DASH_DURATION, DASH_COOLDOWN,
   WEAPON_STATS, ITEM_TYPES,
   SHIP_MAX_SPEED, SHIP_ACCELERATION, SHIP_DECELERATION, SHIP_ROTATION_SPEED, SHIP_BRAKE_FORCE, DASH_BOOST
@@ -16,8 +16,8 @@ export class Player extends Entity {
 
     this.id = id;
     this.name = name;
-    this.health = PLAYER_MAX_HEALTH;
-    this.maxHealth = PLAYER_MAX_HEALTH;
+    this.lives = PLAYER_MAX_LIVES;
+    this.maxLives = PLAYER_MAX_LIVES;
     this.score = 0;
     this.weapon = 'BLUE';
     this.angle = 0;
@@ -124,7 +124,6 @@ export class Player extends Entity {
     this.y += this.vy * dt;
 
     this.isMoving = Math.abs(this.vx) > 10 || Math.abs(this.vy) > 10;
-    this.regenerate(dt);
     this.clampToMap();
   }
 
@@ -167,7 +166,7 @@ export class Player extends Entity {
   applyItem(type) {
     switch (type) {
       case ITEM_TYPES.HEALTH_PACK:
-        this.health = Math.min(this.health + this.maxHealth * 0.5, this.maxHealth);
+        this.lives = Math.min(this.lives + 1, this.maxLives);
         break;
       case ITEM_TYPES.SHIELD: this.shieldEndTime = Date.now() + 5000; break;
       case ITEM_TYPES.SPEED: this.speedBuffEndTime = Date.now() + 5000; break;
@@ -188,12 +187,15 @@ export class Player extends Entity {
 
   takeDamage(amount, attackerId) {
     if (Date.now() < this.shieldEndTime) return;
-    this.health -= amount;
+
+    // Mỗi lần dính đạn mất 1 mạng
+    this.lives -= 1;
     this.lastDamageTime = Date.now();
-    if (this.health < 0) this.health = 0;
+
+    if (this.lives < 0) this.lives = 0;
   }
 
-  isDead() { return this.health <= 0; }
+  isDead() { return this.lives <= 0; }
   hasMovementInput() { return this.input.up || this.input.down || this.input.left || this.input.right; }
 
   respawn(skinId = null) {
@@ -202,7 +204,7 @@ export class Player extends Entity {
     this.y = pos.y;
     this.vx = 0;
     this.vy = 0;
-    this.health = PLAYER_MAX_HEALTH;
+    this.lives = this.maxLives;
     this.dead = false;
     this.angle = 0;
     if (skinId) this.skinId = skinId;
@@ -220,20 +222,13 @@ export class Player extends Entity {
     this.y = Math.max(-max, Math.min(max, this.y));
   }
 
-  regenerate(dt) {
-    if (this.health >= this.maxHealth) return;
-    if (Date.now() - this.lastDamageTime > REGEN_DELAY) {
-      this.health += REGEN_RATE * dt;
-      if (this.health > this.maxHealth) this.health = this.maxHealth;
-    }
-  }
-
   serialize() {
     return {
       id: this.id, name: this.name,
       x: Math.round(this.x), y: Math.round(this.y),
       vx: Math.round(this.vx), vy: Math.round(this.vy),
-      angle: this.angle, health: this.health, maxHealth: this.maxHealth,
+      angle: this.angle, lives: this.lives,          // Thay health
+      maxLives: this.maxLives,
       score: this.score, dead: this.dead, weapon: this.weapon,
       radius: this.radius, coins: this.coins,
       hasShield: Date.now() < this.shieldEndTime,

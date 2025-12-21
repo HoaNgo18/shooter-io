@@ -236,7 +236,7 @@ export class Physics {
     const killer = this.game.players.get(killerId);
     if (killer) {
       killer.score += 100;
-      killer.health = Math.min(killer.health + 20, killer.maxHealth);
+      killer.lives = Math.min(killer.lives + 1, killer.maxLives);
       killer.sessionKills = (killer.sessionKills || 0) + 1;
       if (!killer.isBot) {
         const sortedPlayers = Array.from(this.game.players.values()).sort((a, b) => b.score - a.score);
@@ -247,7 +247,7 @@ export class Physics {
         this.game.saveKillerStats(killer);
       }
       player.dead = true;
-      player.health = 0;
+      player.lives = 0;
     }
 
     this.game.server.broadcast({

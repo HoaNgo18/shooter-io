@@ -185,7 +185,7 @@ const HomeScreen = ({ user, onPlayClick, onLogout, onLoginSuccess }) => {
         container: {
             width: '100vw', height: '100vh',
             background: 'linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%)',
-            // backgroundImage: 'url(https://example.com/game-bg.jpg)', // Add a game background image if available
+            backgroundImage: 'url(/Backgrounds/galaxy_2.jpg)', // Add a game background image if available
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             display: 'flex', flexDirection: 'column',
