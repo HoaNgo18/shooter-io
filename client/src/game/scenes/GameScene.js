@@ -28,11 +28,22 @@ export class GameScene extends Phaser.Scene {
 
     preload() {
         // Load ship sprites
-        this.load.image('ship_default', '/Ships/playerShip1_blue.png');
-        this.load.image('ship_red', '/Ships/playerShip1_red.png');
-        this.load.image('ship_blue', '/Ships/playerShip1_blue.png');
-        this.load.image('ship_gold', '/Ships/playerShip2_orange.png');
-        this.load.image('ship_dark', '/Ships/ufoYellow.png');
+        this.load.image('ship_default', '/Ships/playerShip1_red.png');
+        this.load.image('ship_1', '/Ships/playerShip2_red.png');
+        this.load.image('ship_2', '/Ships/playerShip3_red.png');
+        this.load.image('ship_3', '/Ships/ufoRed.png');
+        this.load.image('ship_4', '/Ships/spaceShips_001.png');
+        this.load.image('ship_5', '/Ships/spaceShips_002.png');
+        this.load.image('ship_6', '/Ships/spaceShips_004.png');
+        this.load.image('ship_7', '/Ships/spaceShips_007.png');
+        this.load.image('ship_8', '/Ships/spaceShips_008.png');
+        this.load.image('ship_9', '/Ships/spaceShips_009.png');
+        
+        //Load enemy ship sprites for bots
+        this.load.image('bot_black', '/Enemies/enemyBlack1.png');
+        this.load.image('bot_blue', '/Enemies/enemyBlue2.png');
+        this.load.image('bot_green', '/Enemies/enemyGreen3.png');
+        this.load.image('bot_red', '/Enemies/enemyRed4.png');
 
         // Load meteor sprites for obstacles
         const meteorFiles = [
@@ -210,44 +221,24 @@ export class GameScene extends Phaser.Scene {
 
         if (data.obstacles) {
             data.obstacles.forEach(obs => {
-                // 1. Danh sách đầy đủ các loại thiên thạch
-                const meteorKeys = [
-                    'meteorBrown_big1', 'meteorBrown_big2', 'meteorBrown_big3', 'meteorBrown_big4',
-                    'meteorBrown_med1', 'meteorBrown_med3', 'meteorBrown_small1', 'meteorBrown_small2',
-                    'meteorBrown_tiny1', 'meteorBrown_tiny2',
-                    'meteorGrey_big1', 'meteorGrey_big2', 'meteorGrey_big3', 'meteorGrey_big4',
-                    'meteorGrey_med1', 'meteorGrey_med2', 'meteorGrey_small1', 'meteorGrey_small2',
-                    'meteorGrey_tiny1', 'meteorGrey_tiny2',
-                    'spaceMeteors_001', 'spaceMeteors_002', 'spaceMeteors_003', 'spaceMeteors_004'
-                ];
+                // Lấy sprite key trực tiếp từ server (đã được random sẵn)
+                const spriteKey = obs.sprite || 'meteorBrown_med1'; // Fallback nếu thiếu
 
-                // 2. Logic chọn ảnh thông minh hơn:
-                // Nếu thiên thạch từ server là loại TO (width > 100), ưu tiên dùng ảnh "big" hoặc "spaceMeteors" để không bị vỡ hình
-                let validKeys = meteorKeys;
-                if (obs.width > 100) {
-                    validKeys = meteorKeys.filter(k => k.includes('big') || k.includes('spaceMeteors'));
-                }
+                const meteor = this.add.sprite(obs.x, obs.y, spriteKey);
 
-                const randomKey = validKeys[Math.floor(Math.random() * validKeys.length)];
-                const meteor = this.add.sprite(obs.x, obs.y, randomKey);
-
-                // 3. Scale kích thước
-                // obs.width là đường kính vật lý. Ta scale ảnh để khớp với nó.
-                // Giả sử ảnh gốc trung bình khoảng 80-100px. Chia cho 90 là hệ số tương đối ổn.
+                // Scale kích thước dựa trên width từ server
                 const scale = obs.width / 90;
                 meteor.setScale(scale);
 
-                // 4. Xoay ngẫu nhiên (Rotation)
-                // Set góc xoay ban đầu ngẫu nhiên
+                // Xoay ngẫu nhiên (Rotation)
                 meteor.setRotation(Phaser.Math.RND.rotation());
 
-                // 5. Animation: Tự xoay tại chỗ
-                // Thiên thạch to xoay chậm, nhỏ xoay nhanh
-                const duration = Phaser.Math.RND.between(10000, 30000) * (scale > 1.5 ? 2 : 1);
+                // Animation: Tự xoay tại chỗ
+                const duration = Phaser.Math.RND.between(20000, 60000) * (scale > 1.5 ? 3 : 1);
 
                 this.tweens.add({
                     targets: meteor,
-                    angle: Math.random() > 0.5 ? 360 : -360, // Random chiều xoay trái/phải
+                    angle: Math.random() > 0.5 ? 360 : -360,
                     duration: duration,
                     repeat: -1,
                     ease: 'Linear'

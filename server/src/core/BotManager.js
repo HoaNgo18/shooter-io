@@ -14,12 +14,12 @@ export class BotManager {
       this.manageBots();
       this.lastSpawnTime = now;
     }
-    
+
     // Logic suy nghĩ cho bot
     this.game.players.forEach(player => {
-        if (!player.dead && player instanceof Bot) {
-            player.think(this.game);
-        }
+      if (!player.dead && player instanceof Bot) {
+        player.think(this.game);
+      }
     });
   }
 
@@ -36,12 +36,10 @@ export class BotManager {
 
     if (botCount < targetBotCount) {
       const botId = `bot_${Date.now()}_${Math.random()}`;
-      const botSkins = ['default', 'red', 'blue', 'gold', 'dark'];
-      const randomSkin = botSkins[Math.floor(Math.random() * botSkins.length)];
-      
+
+      // Bot class sẽ tự động chọn skin từ danh sách bot_black/blue/green/red
       const bot = new Bot(botId);
-      bot.skinId = randomSkin;
-      
+
       // Thêm trực tiếp vào map players của Game
       this.game.players.set(botId, bot);
 
@@ -50,7 +48,7 @@ export class BotManager {
         player: bot.serialize()
       });
 
-      console.log(`Spawned Bot: ${bot.name} (Real: ${realPlayerCount}, Bots: ${botCount + 1})`);
+      console.log(`Spawned Bot: ${bot.name} with skin ${bot.skinId} (Real: ${realPlayerCount}, Bots: ${botCount + 1})`);
     }
   }
 }

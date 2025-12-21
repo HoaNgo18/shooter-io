@@ -7,24 +7,27 @@ export const PLAYER_MAX_LIVES = 3;
 export const TICK_RATE = 60;
 export const INTERPOLATION_DELAY = 100;
 
+//Food
 export const FOOD_COUNT = 300;
 export const FOOD_RADIUS = 5;
 export const XP_PER_FOOD = 10;
 
-export const REGEN_DELAY = 3000;
-export const REGEN_RATE = 10;
-
+// CẬP NHẬT HỆ THỐNG DASH
 export const DASH_DURATION = 200;
 export const DASH_COOLDOWN = 3000;
 export const DASH_MULTIPLIER = 3;
 
-export const OBSTACLE_COUNT = 80;
+// CẬP NHẬT HỆ THỐNG THIÊN THẠCH
+export const OBSTACLE_COUNT = 120;
 export const OBSTACLE_RADIUS_MIN = 30;
 export const OBSTACLE_RADIUS_MAX = 120;
 
+// CẬP NHẬT HỆ THỐNG CHEST
 export const CHEST_COUNT = 15;
 export const CHEST_RADIUS = 25;
 export const CHEST_HP = 50;
+
+// CẬP NHẬT HỆ THỐNG TỐC ĐỘ TÀU
 export const SHIP_MAX_SPEED = 400;
 export const SHIP_ACCELERATION = 600;
 export const SHIP_DECELERATION = 300;

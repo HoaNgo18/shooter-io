@@ -2,7 +2,7 @@
 import { Entity } from './Entity.js';
 import {
   PLAYER_MAX_LIVES, MAP_SIZE, PLAYER_RADIUS,
-  REGEN_DELAY, REGEN_RATE, DASH_DURATION, DASH_COOLDOWN,
+  DASH_DURATION, DASH_COOLDOWN,
   WEAPON_STATS, ITEM_TYPES,
   SHIP_MAX_SPEED, SHIP_ACCELERATION, SHIP_DECELERATION, SHIP_ROTATION_SPEED, SHIP_BRAKE_FORCE, DASH_BOOST
 } from '../../../shared/src/constants.js';
@@ -30,6 +30,8 @@ export class Player extends Entity {
     this.sessionKills = 0;
     this.skinId = skinId;
     this.isHidden = false;
+
+    this.spritePointsDown = skinId.startsWith('bot_');
 
     // === SPACE SHIP PHYSICS ===
     this.vx = 0;
@@ -67,8 +69,10 @@ export class Player extends Entity {
 
     // DASH
     if (this.input.space && Date.now() > this.dashCooldownTime) {
-      this.vx += Math.cos(this.angle) * this.dashBoost * dt;
-      this.vy += Math.sin(this.angle) * this.dashBoost * dt;
+      // Bot sprite hướng XUỐNG, player sprite hướng LÊN
+      const dashAngle = this.spritePointsDown ? this.angle : (this.angle - Math.PI / 2);
+      this.vx += Math.cos(dashAngle) * this.dashBoost * dt;
+      this.vy += Math.sin(dashAngle) * this.dashBoost * dt;
       this.dashEndTime = Date.now() + DASH_DURATION;
       this.dashCooldownTime = Date.now() + DASH_COOLDOWN;
     }
@@ -84,8 +88,8 @@ export class Player extends Entity {
     // THRUST
     this.isBoosting = this.input.up;
     if (this.input.up) {
-      // Offset để angle=0 hướng lên thay vì phải
-      const thrustAngle = this.angle - Math.PI / 2;
+      // Bot sprite hướng XUỐNG, player sprite hướng LÊN
+      const thrustAngle = this.spritePointsDown ? this.angle : (this.angle - Math.PI / 2);
       this.vx += Math.cos(thrustAngle) * this.acceleration * dt;
       this.vy += Math.sin(thrustAngle) * this.acceleration * dt;
     }
@@ -136,8 +140,10 @@ export class Player extends Entity {
 
     this.lastAttack = now;
 
-    // Tính góc bắn (hướng lên = angle - 90°)
-    const finalAngle = (this.angle - Math.PI / 2);
+    // Tính góc bắn dựa trên hướng sprite
+    // - Player sprite (hướng LÊN): angle - 90°
+    // - Bot sprite (hướng XUỐNG): angle (không cần offset)
+    const finalAngle = this.spritePointsDown ? this.angle : (this.angle - Math.PI / 2);
 
     // Spawn đạn phía trước tàu (30 pixel về phía mũi tàu)
     const spawnDistance = 30;

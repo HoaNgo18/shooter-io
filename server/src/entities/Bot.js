@@ -7,11 +7,18 @@ const BOT_NAMES = [
   "Quantum", "Pulsar", "Nova", "Meteor", "Vortex", "Eclipse"
 ];
 
+// Danh sách skin bot (từ Enemies folder)
+const BOT_SKINS = ['bot_black', 'bot_blue', 'bot_green', 'bot_red'];
+
 export class Bot extends Player {
   constructor(id) {
     const name = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)] + 
                  Math.floor(Math.random() * 999);
-    super(id, name, null);
+    
+    // Random chọn 1 bot skin
+    const randomSkin = BOT_SKINS[Math.floor(Math.random() * BOT_SKINS.length)];
+    
+    super(id, name, null, randomSkin);
 
     this.dead = false;
     this.health = this.maxHealth;
@@ -27,6 +34,9 @@ export class Bot extends Player {
     this.desiredAngle = 0;
     this.stateChangeTime = 0;
     this.currentState = 'WANDER'; // WANDER, CHASE, ATTACK, EVADE
+
+    // ĐÁU HIỆU QUAN TRỌNG: Bot dùng sprite hướng XUỐNG
+    this.spritePointsDown = true;
   }
 
   think(game) {
@@ -73,6 +83,7 @@ export class Bot extends Player {
     const dist = this.target.distance;
     
     // Calculate desired angle to face target
+    // LƯU Ý: Vì sprite bot hướng XUỐNG, ta KHÔNG trừ Math.PI/2
     this.desiredAngle = Math.atan2(dy, dx);
 
     // Current angle difference

@@ -57,39 +57,60 @@ export class ClientPlayer {
     }
 
     getShipTextureKey(skinId) {
-        const textureMap = {
+        // Bot sprites (từ Enemies folder - mũi tàu hướng XUỐNG)
+        const botTextureMap = {
+            'bot_black': 'bot_black',
+            'bot_blue': 'bot_blue',
+            'bot_green': 'bot_green',
+            'bot_red': 'bot_red'
+        };
+
+        // Player sprites (từ Ships folder - mũi tàu hướng LÊN)
+        const playerTextureMap = {
             'default': 'ship_default',
             'red': 'ship_red',
             'blue': 'ship_blue',
             'gold': 'ship_gold',
             'dark': 'ship_dark'
         };
-        return textureMap[skinId] || 'ship_default';
+
+        // Kiểm tra xem có phải bot skin không
+        if (botTextureMap[skinId]) {
+            return botTextureMap[skinId];
+        }
+
+        // Nếu không phải bot, trả về player sprite
+        return playerTextureMap[skinId] || 'ship_default';
     }
 
     updateThrustFlame(isBoosting) {
         this.thrustFlame.clear();
 
         if (isBoosting) {
-            // Vẽ lửa phía sau tàu (giả sử mũi lên, đuôi xuống)
-            // Đuôi tàu ở y ≈ +16, x = 0
+            // Kiểm tra xem là Bot hay Player
+            const isBot = this.skinId.startsWith('bot_');
+
+            // Nếu là Bot (ảnh hướng xuống), lửa phải vẽ ở tọa độ Âm (phía trên tâm)
+            // Nếu là Player (ảnh hướng lên), lửa vẽ ở tọa độ Dương (phía dưới tâm)
+            const direction = isBot ? -1 : 1;
+
+            // Vẽ lửa cam (lớp ngoài)
             this.thrustFlame.fillStyle(0xFF6600, 0.8);
             this.thrustFlame.fillTriangle(
-                -4, 16,   // Trái đuôi
-                4, 16,    // Phải đuôi
-                0, 26 + Math.random() * 5  // Đỉnh lửa
+                -4, 16 * direction,   // Trái đuôi
+                4, 16 * direction,    // Phải đuôi
+                0, (26 + Math.random() * 5) * direction  // Đỉnh ngọn lửa
             );
 
-            // Lửa vàng bên trong
+            // Vẽ lửa vàng (lớp trong)
             this.thrustFlame.fillStyle(0xFFFF00, 0.6);
             this.thrustFlame.fillTriangle(
-                -2, 16,
-                2, 16,
-                0, 22
+                -2, 16 * direction,
+                2, 16 * direction,
+                0, 22 * direction
             );
         }
     }
-
     updateServerData(data) {
         if (data.dead) {
             this.setVisibleState(false);
@@ -159,8 +180,12 @@ export class ClientPlayer {
         this.container.x = Phaser.Math.Linear(this.container.x, this.targetX, t);
         this.container.y = Phaser.Math.Linear(this.container.y, this.targetY, t);
 
-        // Smooth rotation (Sprite mũi hướng lên, không cần offset)
-        this.container.rotation = this.targetAngle;
+        // Smooth rotation
+        // Kiểm tra nếu là bot (sprite hướng XUỐNG) thì KHÔNG cần offset
+        // Nếu là player (sprite hướng LÊN) thì cần offset +90°
+        const isBot = this.skinId.startsWith('bot_');
+        const rotationOffset = isBot ? (-Math.PI / 2) : 0; // Bot cần +90° để sprite khớp
+        this.container.rotation = this.targetAngle + rotationOffset;
 
         this.x = this.container.x;
         this.y = this.container.y;

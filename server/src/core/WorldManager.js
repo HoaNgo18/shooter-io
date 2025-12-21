@@ -51,29 +51,86 @@ export class WorldManager {
   }
 
   initObstacles() {
+    // Tăng kích thước ĐÁNG KỂ cho tất cả thiên thạch
     const meteorSizes = {
-      tiny: { width: 20, height: 20, radius: 10 },
-      small: { width: 30, height: 35, radius: 15 },
-      med: { width: 45, height: 50, radius: 22 },
-      big: { width: 60, height: 70, radius: 30 }
+      tiny: { width: 50, height: 50, radius: 25 },    // Tăng 2.5x
+      small: { width: 80, height: 90, radius: 40 },   // Tăng ~2.7x
+      med: { width: 90, height: 120, radius: 60 },   // Tăng ~2.6x
+      big: { width: 120, height: 150, radius: 90 }    // Tăng 3x
     };
 
-    for (let i = 0; i < OBSTACLE_COUNT; i++) {
-      // Random size category
-      const sizes = Object.keys(meteorSizes);
-      const randomSize = sizes[Math.floor(Math.random() * sizes.length)];
+    // Danh sách sprite theo kích thước
+    const meteorSprites = {
+      tiny: ['meteorBrown_tiny1', 'meteorBrown_tiny2', 'meteorGrey_tiny1', 'meteorGrey_tiny2'],
+      small: ['meteorBrown_small1', 'meteorBrown_small2', 'meteorGrey_small1', 'meteorGrey_small2'],
+      med: ['meteorBrown_med1', 'meteorBrown_med3', 'meteorGrey_med1', 'meteorGrey_med2'],
+      big: ['meteorBrown_big1', 'meteorBrown_big2', 'meteorBrown_big3', 'meteorBrown_big4',
+        'meteorGrey_big1', 'meteorGrey_big2', 'meteorGrey_big3', 'meteorGrey_big4',
+        'spaceMeteors_001', 'spaceMeteors_002', 'spaceMeteors_003', 'spaceMeteors_004']
+    };
+
+    const spawnedObstacles = [];
+    let i = 0;
+
+    while (i < OBSTACLE_COUNT) {
+      // Random size category với tỷ lệ: 20% big, 30% med, 30% small, 20% tiny
+      const rand = Math.random();
+      let randomSize;
+      if (rand < 0.3) randomSize = 'big';
+      else if (rand < 0.7) randomSize = 'med';
+      else if (rand < 0.9) randomSize = 'small';
+      else randomSize = 'tiny';
+
       const sizeData = meteorSizes[randomSize];
 
-      const max = MAP_SIZE / 2 - Math.max(sizeData.width, sizeData.height) / 2;
-      this.obstacles.push({
-        id: `obs_${i}`,
-        x: (Math.random() * MAP_SIZE) - max,
-        y: (Math.random() * MAP_SIZE) - max,
-        radius: sizeData.radius, // For backward compatibility
-        width: sizeData.width,
-        height: sizeData.height,
-        size: randomSize // Optional, for client scaling
-      });
+      // === LOGIC MỚI: Nếu là thiên thạch NHỎ (tiny/small), spawn thành CỤM ===
+      if (randomSize === 'tiny' || randomSize === 'small') {
+        const clusterSize = Math.floor(Math.random() * 3) + 2; // 2-4 thiên thạch/cụm
+        const clusterX = (Math.random() * MAP_SIZE * 0.8) - MAP_SIZE * 0.4; // Tránh spawn sát biên
+        const clusterY = (Math.random() * MAP_SIZE * 0.8) - MAP_SIZE * 0.4;
+
+        // Spawn cluster
+        for (let j = 0; j < clusterSize && i < OBSTACLE_COUNT; j++, i++) {
+          // Offset ngẫu nhiên trong bán kính 100-150 pixel
+          const offsetDist = 100 + Math.random() * 50;
+          const offsetAngle = Math.random() * Math.PI * 2;
+
+          const x = clusterX + Math.cos(offsetAngle) * offsetDist;
+          const y = clusterY + Math.sin(offsetAngle) * offsetDist;
+
+          // Chọn sprite ngẫu nhiên từ danh sách phù hợp với size
+          const spriteKey = meteorSprites[randomSize][Math.floor(Math.random() * meteorSprites[randomSize].length)];
+
+          this.obstacles.push({
+            id: `obs_${i}`,
+            x: x,
+            y: y,
+            radius: sizeData.radius,
+            width: sizeData.width,
+            height: sizeData.height,
+            size: randomSize,
+            sprite: spriteKey  // THÊM SPRITE KEY
+          });
+        }
+      } else {
+        // Thiên thạch TO (med/big) spawn đơn lẻ như cũ
+        const max = MAP_SIZE / 2 - Math.max(sizeData.width, sizeData.height) / 2;
+
+        // Chọn sprite ngẫu nhiên từ danh sách phù hợp với size
+        const spriteKey = meteorSprites[randomSize][Math.floor(Math.random() * meteorSprites[randomSize].length)];
+
+        this.obstacles.push({
+          id: `obs_${i}`,
+          x: (Math.random() * MAP_SIZE) - max,
+          y: (Math.random() * MAP_SIZE) - max,
+          radius: sizeData.radius,
+          width: sizeData.width,
+          height: sizeData.height,
+          size: randomSize,
+          sprite: spriteKey  // THÊM SPRITE KEY
+        });
+        i++;
+      }
     }
   }
 
