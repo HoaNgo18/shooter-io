@@ -14,11 +14,11 @@ export class Game {
     this.players = new Map();
     this.projectiles = [];
     this.explosions = [];
-    
+
     // Khởi tạo Managers
     this.world = new WorldManager();
     this.bots = new BotManager(this);
-    
+
     // Physics nhận vào 'this' (game instance), nên trong Physics.js
     // bạn cần đổi 'this.game.foods' thành 'this.game.world.foods'
     this.physics = new Physics(this);
@@ -52,23 +52,19 @@ export class Game {
     this.players.forEach(player => {
       if (!player.dead) player.update(dt);
     });
-    
+
     // 5. Update Bots (AI logic + Spawning)
     this.bots.update(dt);
 
     // 6. Physics Collision
     this.physics.checkCollisions();
 
+    this.world.chests.forEach(chest => chest.update(dt));
+
     // 7. World Management (Spawn Food, Chests, Big Chest)
     this.world.spawnFood();
     this.world.spawnNormalChestIfNeeded();
-    
-    const chestStatus = this.world.checkBigChestSpawn(now);
-    if (chestStatus.scheduled) {
-        console.log(`Next Big Chest in ${chestStatus.time / 1000}s`);
-    } else if (chestStatus.spawned) {
-        console.log("SPAWNED BIG CHEST AT", chestStatus.spawned.x, chestStatus.spawned.y);
-    }
+    this.world.spawnStationIfNeeded();
 
     // 8. Broadcast State
     this.sendStateUpdate();
@@ -94,7 +90,7 @@ export class Game {
   }
 
   updateExplosion() {
-     for (let i = this.explosions.length - 1; i >= 0; i--) {
+    for (let i = this.explosions.length - 1; i >= 0; i--) {
       if (this.explosions[i].shouldRemove()) {
         this.explosions.splice(i, 1);
       }
@@ -137,25 +133,6 @@ export class Game {
     }
   }
 
-  respawnPlayer(clientId, skinId) {
-    const player = this.players.get(clientId);
-    if (player) {
-      player.respawn(skinId);
-      // Send INIT to reload world data
-      this.server.sendToClient(clientId, {
-        type: PacketType.INIT,
-        id: clientId,
-        player: player.serialize(),
-        players: Array.from(this.players.values()).map(p => p.serialize()),
-        foods: this.world.foods,
-        obstacles: this.world.obstacles,
-        nebulas: this.world.nebulas,
-        chests: this.world.chests,
-        items: this.world.items
-      });
-    }
-  }
-
   // --- EVENTS ---
   handleInput(clientId, inputData) {
     const player = this.players.get(clientId);
@@ -172,14 +149,32 @@ export class Game {
 
   respawnPlayer(clientId, skinId) {
     const player = this.players.get(clientId);
-    if (player && player.dead) {
-      if (skinId) player.skinId = skinId;
+    if (player) {
+      // 1. Reset trạng thái player
       player.dead = false;
-      player.respawn();
-      this.server.broadcast({
-        type: PacketType.RESPAWN, // Lưu ý: Check lại PacketType trong file shared
-        player: player.serialize()
+      player.respawn(skinId); // Hàm này đã có trong Player.js, xử lý reset máu, vị trí...
+
+      // 2. QUAN TRỌNG: Gửi lại gói INIT cho chính người chơi đó để load lại Map
+      // (Dữ liệu này cần thiết nếu họ vừa thoát ra menu và vào lại)
+      this.server.sendToClient(clientId, {
+        type: PacketType.INIT,
+        id: clientId,
+        player: player.serialize(),
+        players: Array.from(this.players.values()).map(p => p.serialize()),
+        foods: this.world.foods,       // Gửi danh sách thức ăn hiện tại
+        obstacles: this.world.obstacles, // Gửi danh sách thiên thạch hiện tại
+        nebulas: this.world.nebulas,
+        chests: this.world.chests,
+        items: this.world.items
       });
+
+      // 3. Thông báo cho những người chơi khác biết (để cập nhật skin/vị trí mới ngay lập tức)
+      this.server.broadcast({
+        type: PacketType.RESPAWN,
+        player: player.serialize()
+      }, clientId); // Exclude clientId vì họ đã nhận thông tin qua INIT rồi
+
+      console.log(`Player respawned: ${player.name}`);
     }
   }
 
@@ -194,7 +189,6 @@ export class Game {
 
   // --- NETWORK ---
   sendStateUpdate() {
-    const bigChest = this.world.chests.find(c => c.type === CHEST_TYPES.BIG);
 
     const state = {
       type: PacketType.UPDATE,
@@ -202,16 +196,19 @@ export class Game {
       players: Array.from(this.players.values()).map(p => p.serialize()),
       projectiles: this.projectiles.map(p => p.serialize()),
       explosions: this.explosions.map(e => e.serialize()),
-      
+
       // Lấy Delta từ World Manager
       foodsAdded: this.world.delta.foodsAdded,
       foodsRemoved: this.world.delta.foodsRemoved,
-      chestsAdded: this.world.delta.chestsAdded,
+      chestsAdded: this.world.delta.chestsAdded.map(c => ({
+        ...c,
+        rotation: c.rotation || 0
+      })),
+
       chestsRemoved: this.world.delta.chestsRemoved,
       itemsAdded: this.world.delta.itemsAdded,
       itemsRemoved: this.world.delta.itemsRemoved,
-      
-      bigChest: bigChest ? { x: bigChest.x, y: bigChest.y } : null
+
     };
 
     this.server.broadcast(state);

@@ -96,10 +96,6 @@ export class Server {
         await this.handleBuySkin(clientId, packet.skinId);
         break;
 
-      case PacketType.EQUIP_SKIN:
-        await this.handleEquipSkin(clientId, packet.skinId);
-        break;
-
       case PacketType.PONG:
         if (client?.player) {
           client.player.lastPong = Date.now();
@@ -187,6 +183,12 @@ export class Server {
         }
         break;
       }
+      case PacketType.DASH:
+        const player = this.game.players.get(clientId);
+        if (player && typeof player.performDash === 'function') {
+          player.performDash();
+        }
+        break;
     }
   }
 

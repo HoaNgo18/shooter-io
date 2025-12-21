@@ -38,7 +38,7 @@ export class GameScene extends Phaser.Scene {
         this.load.image('ship_7', '/Ships/spaceShips_007.png');
         this.load.image('ship_8', '/Ships/spaceShips_008.png');
         this.load.image('ship_9', '/Ships/spaceShips_009.png');
-        
+
         //Load enemy ship sprites for bots
         this.load.image('bot_black', '/Enemies/enemyBlack1.png');
         this.load.image('bot_blue', '/Enemies/enemyBlue2.png');
@@ -92,21 +92,15 @@ export class GameScene extends Phaser.Scene {
         this.load.image('playerLife1_green', '/UI/playerLife1_green.png');
         this.load.image('playerLife1_orange', '/UI/playerLife1_orange.png');
 
+        //Load station sprite
+        this.load.image('station1', '/Stations/spaceStation_018.png');
+        this.load.image('station2', '/Stations/spaceStation_019.png');
+        this.load.image('station3', '/Stations/spaceStation_022.png');
+        this.load.image('station4', '/Stations/spaceStation_023.png');
+
     }
 
     create() {
-        // // Tạo tiled background với darkPurple
-        // const bgSize = 256; // Giả sử ảnh gốc 256x256
-        // const tilesNeeded = Math.ceil(MAP_SIZE / bgSize) + 2; // +2 để đảm bảo phủ kín
-
-        // for (let x = -tilesNeeded / 2; x < tilesNeeded / 2; x++) {
-        //     for (let y = -tilesNeeded / 2; y < tilesNeeded / 2; y++) {
-        //         const bg = this.add.image(x * bgSize, y * bgSize, 'background');
-        //         bg.setOrigin(0.5, 0.5);
-        //         bg.setDepth(-100); // Đẩy xuống layer dưới cùng
-        //     }
-        // }
-
         //  Tạo background repeating
         const bg = this.add.tileSprite(0, 0, MAP_SIZE, MAP_SIZE, 'background');
         bg.setDepth(-100);
@@ -140,6 +134,12 @@ export class GameScene extends Phaser.Scene {
         // 5. Input Mouse
         this.input.on('pointerdown', (pointer) => {
             socket.send({ type: PacketType.ATTACK });
+        });
+
+        // Dash khi nhấn Space
+        this.input.keyboard.on('keydown-SPACE', () => {
+            console.log("Space pressed -> Sending DASH packet"); // Log để debug
+            socket.send({ type: PacketType.DASH });
         });
 
         console.log('GameScene Created - Waiting for socket...');
@@ -220,6 +220,7 @@ export class GameScene extends Phaser.Scene {
         }
 
         if (data.obstacles) {
+            this.obstacleGroup.clear(true, true);
             data.obstacles.forEach(obs => {
                 // Lấy sprite key trực tiếp từ server (đã được random sẵn)
                 const spriteKey = obs.sprite || 'meteorBrown_med1'; // Fallback nếu thiếu
@@ -421,45 +422,39 @@ export class GameScene extends Phaser.Scene {
 
     createChestSprite(c) {
         if (this.chests[c.id]) return;
+        let texture;
+        const isStation = (c.type === 'STATION');
+        if (isStation) {
+            texture = Phaser.Math.RND.pick(['station1', 'station2', 'station3', 'station4']);
+        } else {
+            texture = Phaser.Math.RND.pick(['chest1', 'chest2', 'chest3']);
+        }
+        const sprite = this.add.sprite(c.x, c.y, texture);
+        if (isStation) {
+            if (c.width && c.height) {
+                sprite.setDisplaySize(c.width, c.height);
+            } else {
+                sprite.setDisplaySize(86, 24);
+            }
 
-        // 1. Random chọn 1 trong 3 loại sprite để đa dạng
-        const texture = Phaser.Math.RND.pick(['chest1', 'chest2', 'chest3']);
+            sprite.setTint(0xDDDDDD);
 
-        const chest = this.add.sprite(c.x, c.y, texture);
-
-        // 2. Cấu hình kích thước và màu sắc dựa trên loại hòm
-        const isBig = c.type === 'BIG';
-
-        // Set size: Hòm to (70px), Hòm nhỏ (40px)
-        chest.setDisplaySize(isBig ? 70 : 40, isBig ? 70 : 40);
-
-        if (isBig) {
-            // Hòm to: Nhuộm màu đỏ rực để cảnh báo/thu hút
-            chest.setTint(0xFF4444);
-
-            // Hiệu ứng: Xoay tròn + Phóng to thu nhỏ nhẹ (Pulsing)
+            // SỬA: Thay animation scale bằng rotation
             this.tweens.add({
-                targets: chest,
+                targets: sprite,
                 angle: 360,
-                duration: 4000,
+                duration: 15000, // 15 giây/vòng
                 repeat: -1,
                 ease: 'Linear'
             });
-            this.tweens.add({
-                targets: chest,
-                scaleX: chest.scaleX * 1.1,
-                scaleY: chest.scaleY * 1.1,
-                duration: 800,
-                yoyo: true,
-                repeat: -1
-            });
         } else {
-            // Hòm thường: Giữ màu gốc hoặc tint nhẹ vàng
-            chest.setTint(0xFFFFFF);
+            // Chest thường thì hình vuông là đúng
+            sprite.setDisplaySize(40, 40);
+            sprite.setTint(0xFFFFFF);
         }
 
-        this.chestGroup.add(chest);
-        this.chests[c.id] = chest;
+        this.chestGroup.add(sprite);
+        this.chests[c.id] = sprite;
     }
 
     createNebula(data) {

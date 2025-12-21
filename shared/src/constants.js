@@ -13,19 +13,15 @@ export const FOOD_RADIUS = 5;
 export const XP_PER_FOOD = 10;
 
 // CẬP NHẬT HỆ THỐNG DASH
-export const DASH_DURATION = 200;
+export const DASH_DURATION = 150;
 export const DASH_COOLDOWN = 3000;
-export const DASH_MULTIPLIER = 3;
+export const DASH_BOOST = 150;
 
 // CẬP NHẬT HỆ THỐNG THIÊN THẠCH
 export const OBSTACLE_COUNT = 120;
 export const OBSTACLE_RADIUS_MIN = 30;
 export const OBSTACLE_RADIUS_MAX = 120;
 
-// CẬP NHẬT HỆ THỐNG CHEST
-export const CHEST_COUNT = 15;
-export const CHEST_RADIUS = 25;
-export const CHEST_HP = 50;
 
 // CẬP NHẬT HỆ THỐNG TỐC ĐỘ TÀU
 export const SHIP_MAX_SPEED = 400;
@@ -33,20 +29,25 @@ export const SHIP_ACCELERATION = 600;
 export const SHIP_DECELERATION = 300;
 export const SHIP_ROTATION_SPEED = 3.5;
 export const SHIP_BRAKE_FORCE = 800;
-export const DASH_BOOST = 1200;
+
+export const CHEST_COUNT = 15;
+export const CHEST_RADIUS = 25;
+export const CHEST_HP = 3; // Normal Chest: 5 phát bắn là vỡ
+
+// --- THÊM STATION STATS ---
+export const STATION_COUNT = 10;
+export const STATION_STATS = {
+  // Thay radius bằng width/height
+  width: 86,         // Chiều ngang (tương ứng với ảnh spaceStation_018)
+  height: 24,         // Chiều dọc
+  hp: 8,             
+  dropCount: 3
+};
+
 export const CHEST_TYPES = {
   NORMAL: 'NORMAL',
-  BIG: 'BIG' // Chest to (Event)
+  STATION: 'STATION' // Chỉ còn 2 loại này
 };
-
-export const BIG_CHEST_STATS = {
-  radius: 45,        // To gấp đôi chest thường
-  hp: 300,           // Máu trâu hơn nhiều (để người chơi phải bắn lâu mới vỡ)
-  interval: 30000,   // Xuất hiện mỗi 30 giây (30000ms)
-  message: "A LEGENDARY CHEST HAS SPAWNED!" // Thông báo
-};
-
-// shared/src/constants.js
 
 export const SKINS = [
   { id: 'default', name: 'Starter Red', price: 0 },

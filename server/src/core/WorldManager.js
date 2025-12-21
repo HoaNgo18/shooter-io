@@ -1,6 +1,7 @@
 import {
   MAP_SIZE, FOOD_COUNT, OBSTACLE_COUNT, OBSTACLE_RADIUS_MIN, OBSTACLE_RADIUS_MAX,
-  CHEST_COUNT, CHEST_RADIUS, CHEST_TYPES, BIG_CHEST_STATS, ITEM_TYPES, NEBULA_COUNT, NEBULA_RADIUS
+  CHEST_COUNT, CHEST_RADIUS, CHEST_TYPES, ITEM_TYPES, NEBULA_COUNT, NEBULA_RADIUS,
+  STATION_COUNT, STATION_STATS
 } from '../../../shared/src/constants.js';
 import { Chest } from '../entities/Chest.js';
 import { Item } from '../entities/Item.js';
@@ -23,13 +24,10 @@ export class WorldManager {
       itemsRemoved: []
     };
 
-    // Big Chest Logic
-    this.hasBigChest = false;
-    this.nextBigChestTime = null;
-
     // Init
     this.initObstacles();
     this.initFood();
+    this.initStations();
     this.initChests();
     this.initNebulas();
   }
@@ -146,6 +144,22 @@ export class WorldManager {
     }
   }
 
+  initStations() {
+    for (let i = 0; i < STATION_COUNT; i++) {
+      // Station cũng là Chest, nhưng type khác
+      const id = `station_${i}`;
+
+      // Spawn random vị trí (hoặc bạn có thể fix vị trí nếu muốn map đẹp hơn)
+      // Lưu ý: Station to nên tránh spawn quá sát mép map
+      const limit = MAP_SIZE / 2 - 100;
+      const x = (Math.random() * limit * 2) - limit;
+      const y = (Math.random() * limit * 2) - limit;
+
+      const station = new Chest(x, y, id, CHEST_TYPES.STATION);
+      this.chests.push(station);
+    }
+  }
+
   initChests() {
     for (let i = 0; i < CHEST_COUNT; i++) {
       this.chests.push(this._spawnRandomChest(`chest_${i}`));
@@ -180,13 +194,13 @@ export class WorldManager {
   }
 
   _spawnRandomChest(id, type = CHEST_TYPES.NORMAL) {
-    const radius = type === CHEST_TYPES.BIG ? BIG_CHEST_STATS.radius : CHEST_RADIUS;
+    // Chỉ xử lý Chest thường ở đây (vì Station spawn cố định lúc đầu)
+    const radius = 25;
     const max = MAP_SIZE / 2 - radius;
-    const limit = type === CHEST_TYPES.BIG ? MAP_SIZE / 4 : max;
 
     return new Chest(
-      (Math.random() * limit * 2) - limit,
-      (Math.random() * limit * 2) - limit,
+      (Math.random() * max * 2) - max,
+      (Math.random() * max * 2) - max,
       id,
       type
     );
@@ -201,47 +215,49 @@ export class WorldManager {
     }
   }
 
-  spawnBigChest() {
-    if (this.hasBigChest) return null;
+  spawnStationIfNeeded() {
+    // Đếm số lượng station hiện tại
+    const currentStations = this.chests.filter(c => c.type === CHEST_TYPES.STATION).length;
 
-    const id = `BIG_${Date.now()}`;
-    const chest = this._spawnRandomChest(id, CHEST_TYPES.BIG);
-    this.chests.push(chest);
-    this.delta.chestsAdded.push(chest);
-    this.hasBigChest = true;
-    this.nextBigChestTime = null;
-    return chest; // Return để Game log ra console
-  }
+    // Nếu thiếu thì spawn thêm
+    if (currentStations < STATION_COUNT) {
+      // Tạo ID random
+      const id = `station_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
-  checkBigChestSpawn(now) {
-    // Nếu chưa có big chest và chưa lên lịch -> lên lịch
-    if (!this.hasBigChest && !this.nextBigChestTime) {
-      this.nextBigChestTime = now + BIG_CHEST_STATS.interval;
-      return { scheduled: true, time: BIG_CHEST_STATS.interval };
+      // Spawn vị trí random (tránh mép map)
+      const limit = MAP_SIZE / 2 - 200;
+      const x = (Math.random() * limit * 2) - limit;
+      const y = (Math.random() * limit * 2) - limit;
+
+      const newStation = new Chest(x, y, id, CHEST_TYPES.STATION);
+
+      this.chests.push(newStation);
+
+      // QUAN TRỌNG: Báo cho Client biết có Station mới
+      this.delta.chestsAdded.push(newStation);
+
+      console.log("Respawned Station:", id);
     }
-    // Nếu đến giờ -> spawn
-    if (!this.hasBigChest && this.nextBigChestTime && now > this.nextBigChestTime) {
-      return { spawned: this.spawnBigChest() };
-    }
-    return {};
   }
 
   spawnItem(x, y, fromChestType = CHEST_TYPES.NORMAL) {
     let itemType;
-    if (fromChestType === CHEST_TYPES.BIG) {
+
+    // Nếu rớt từ STATION -> Đồ xịn (tương tự logic Big Chest cũ)
+    if (fromChestType === CHEST_TYPES.STATION) {
       const rand = Math.random();
-      if (rand < 0.5) itemType = ITEM_TYPES.WEAPON_RED;        // Thay đổi
-      else if (rand < 0.8) itemType = ITEM_TYPES.WEAPON_GREEN;    // 20% ra xanh
+      if (rand < 0.4) itemType = ITEM_TYPES.WEAPON_RED;
+      else if (rand < 0.7) itemType = ITEM_TYPES.WEAPON_GREEN;
       else itemType = ITEM_TYPES.COIN_LARGE;
     } else {
+      // Normal Chest -> Đồ thường
       const rand = Math.random();
-      if (rand < 0.3) {
+      if (rand < 0.4) {
         itemType = Math.random() < 0.7 ? ITEM_TYPES.COIN_SMALL : ITEM_TYPES.COIN_MEDIUM;
       } else {
         const normalItems = [
           ITEM_TYPES.HEALTH_PACK, ITEM_TYPES.SHIELD, ITEM_TYPES.SPEED,
-          ITEM_TYPES.WEAPON_BLUE,   // Thay đổi
-          ITEM_TYPES.WEAPON_GREEN
+          ITEM_TYPES.WEAPON_BLUE
         ];
         itemType = normalItems[Math.floor(Math.random() * normalItems.length)];
       }

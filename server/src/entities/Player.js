@@ -2,9 +2,11 @@
 import { Entity } from './Entity.js';
 import {
   PLAYER_MAX_LIVES, MAP_SIZE, PLAYER_RADIUS,
-  DASH_DURATION, DASH_COOLDOWN,
+  DASH_DURATION, DASH_COOLDOWN, DASH_BOOST,
   WEAPON_STATS, ITEM_TYPES,
-  SHIP_MAX_SPEED, SHIP_ACCELERATION, SHIP_DECELERATION, SHIP_ROTATION_SPEED, SHIP_BRAKE_FORCE, DASH_BOOST
+  SHIP_MAX_SPEED, SHIP_ACCELERATION,
+  SHIP_DECELERATION, SHIP_ROTATION_SPEED, SHIP_BRAKE_FORCE,
+
 } from '../../../shared/src/constants.js';
 import { getRandomPosition } from '../../../shared/src/utils.js';
 import { Projectile } from './Projectile.js';
@@ -66,16 +68,6 @@ export class Player extends Entity {
 
   update(dt) {
     if (this.dead) return;
-
-    // DASH
-    if (this.input.space && Date.now() > this.dashCooldownTime) {
-      // Bot sprite hướng XUỐNG, player sprite hướng LÊN
-      const dashAngle = this.spritePointsDown ? this.angle : (this.angle - Math.PI / 2);
-      this.vx += Math.cos(dashAngle) * this.dashBoost * dt;
-      this.vy += Math.sin(dashAngle) * this.dashBoost * dt;
-      this.dashEndTime = Date.now() + DASH_DURATION;
-      this.dashCooldownTime = Date.now() + DASH_COOLDOWN;
-    }
 
     // ROTATION
     let rotationInput = 0;
@@ -160,6 +152,42 @@ export class Player extends Entity {
     );
 
     return [p];
+  }
+
+  // server/src/entities/Player.js
+
+  performDash() {
+    // 1. Kiểm tra Cooldown
+    if (Date.now() < this.dashCooldownTime) return;
+
+    // 2. Tính góc Dash (Bot hướng xuống, Player hướng lên)
+    const dashAngle = this.spritePointsDown ? this.angle : (this.angle - Math.PI / 2);
+
+    // 3. --- LOGIC DỊCH CHUYỂN TỨC THỜI (BLINK) ---
+    const BLINK_DISTANCE = DASH_BOOST; // Khoảng cách dịch chuyển (pixel)
+
+    // Tính tọa độ đích đến
+    let targetX = this.x + Math.cos(dashAngle) * BLINK_DISTANCE;
+    let targetY = this.y + Math.sin(dashAngle) * BLINK_DISTANCE;
+
+    // 4. Giới hạn trong bản đồ (Quan trọng: để không dịch chuyển ra ngoài map)
+    // MAP_SIZE đã được import ở đầu file, mặc định là 5000
+    // Trừ đi 50 đơn vị để không bị kẹt sát mép
+    const maxBound = (5000 / 2) - 50; 
+    
+    this.x = Math.max(-maxBound, Math.min(maxBound, targetX));
+    this.y = Math.max(-maxBound, Math.min(maxBound, targetY));
+
+    // 5. (Tùy chọn) Hãm phanh sau khi dịch chuyển
+    // Giảm vận tốc hiện tại đi 50% để người chơi dễ kiểm soát sau khi blink
+    this.vx *= 0.5; 
+    this.vy *= 0.5;
+
+    // 6. Set thời gian hồi chiêu
+    this.dashEndTime = Date.now() + DASH_DURATION;
+    this.dashCooldownTime = Date.now() + DASH_COOLDOWN;
+    
+    console.log(`Player ${this.name} blinked to ${Math.round(this.x)}, ${Math.round(this.y)}`);
   }
 
   // Giữ nguyên các method còn lại...

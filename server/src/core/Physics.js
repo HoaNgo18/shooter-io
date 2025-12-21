@@ -10,6 +10,57 @@ export class Physics {
     this.game = game;
   }
 
+  circleRotatedRectCollision(cx, cy, cr, rectX, rectY, width, height, rotation) {
+    // Xoay tâm circle về hệ tọa độ không xoay
+    const cos = Math.cos(-rotation);
+    const sin = Math.sin(-rotation);
+    const dx = cx - rectX;
+    const dy = cy - rectY;
+
+    const localX = dx * cos - dy * sin;
+    const localY = dx * sin + dy * cos;
+
+    // Tìm điểm gần nhất trên rectangle (local space)
+    const closestX = Math.max(-width / 2, Math.min(localX, width / 2));
+    const closestY = Math.max(-height / 2, Math.min(localY, height / 2));
+
+    const distX = localX - closestX;
+    const distY = localY - closestY;
+    const distance = Math.sqrt(distX * distX + distY * distY);
+
+    return distance < cr;
+  }
+
+  // THÊM HÀM 2: Đẩy player ra khỏi Rotated Rectangle
+  pushOutOfRotatedRect(player, rectX, rectY, width, height, rotation) {
+    const cos = Math.cos(-rotation);
+    const sin = Math.sin(-rotation);
+    const dx = player.x - rectX;
+    const dy = player.y - rectY;
+
+    const localX = dx * cos - dy * sin;
+    const localY = dx * sin + dy * cos;
+
+    const closestX = Math.max(-width / 2, Math.min(localX, width / 2));
+    const closestY = Math.max(-height / 2, Math.min(localY, height / 2));
+
+    const distX = localX - closestX;
+    const distY = localY - closestY;
+    const dist = Math.sqrt(distX * distX + distY * distY);
+
+    if (dist < player.radius && dist > 0) {
+      const pushOut = player.radius - dist;
+      const pushLocalX = (distX / dist) * pushOut;
+      const pushLocalY = (distY / dist) * pushOut;
+
+      // Xoay vector đẩy về world space
+      const cosWorld = Math.cos(rotation);
+      const sinWorld = Math.sin(rotation);
+      player.x += pushLocalX * cosWorld - pushLocalY * sinWorld;
+      player.y += pushLocalX * sinWorld + pushLocalY * cosWorld;
+    }
+  }
+
   checkCollisions() {
     const boundary = { x: 0, y: 0, width: MAP_SIZE, height: MAP_SIZE };
     const qt = new Quadtree(boundary, 4);
@@ -94,19 +145,26 @@ export class Physics {
     this.game.players.forEach(player => {
       if (player.dead) return;
       obstacles.forEach(obs => {
-        if (circleRectangleCollision(player.x, player.y, player.radius || PLAYER_RADIUS, 
-                                     obs.x - obs.width/2, obs.y - obs.height/2, obs.width, obs.height)) {
-          // Push out: find closest point and push along the vector
-          const px = Math.max(obs.x - obs.width/2, Math.min(player.x, obs.x + obs.width/2));
-          const py = Math.max(obs.y - obs.height/2, Math.min(player.y, obs.y + obs.height/2));
-          const dx = player.x - px;
-          const dy = player.y - py;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          const minDist = player.radius || PLAYER_RADIUS;
-          if (dist < minDist && dist > 0) {
-            const pushOut = minDist - dist;
+        // 1. Tính khoảng cách giữa 2 tâm
+        const dx = player.x - obs.x;
+        const dy = player.y - obs.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        // 2. Tổng bán kính (Player + Thiên thạch)
+        const minDist = (player.radius || PLAYER_RADIUS) + obs.radius;
+
+        // 3. Nếu va chạm (Khoảng cách < Tổng bán kính)
+        if (dist < minDist) {
+          // Tính độ lấn vào nhau (Overlap)
+          const pushOut = minDist - dist;
+
+          // Đẩy Player ra xa theo hướng vector nối tâm
+          if (dist > 0) {
             player.x += (dx / dist) * pushOut;
             player.y += (dy / dist) * pushOut;
+          } else {
+            // Trường hợp hiếm: 2 tâm trùng nhau hoàn toàn -> đẩy đại sang phải
+            player.x += pushOut;
           }
         }
       });
@@ -115,46 +173,66 @@ export class Physics {
     // Projectile vs Obstacles
     for (let i = this.game.projectiles.length - 1; i >= 0; i--) {
       const proj = this.game.projectiles[i];
-      for (const obs of obstacles) { // Dùng biến obstacles đã lấy ở trên
-        if (circleRectangleCollision(proj.x, proj.y, proj.radius, obs.x - obs.width/2, obs.y - obs.height/2, obs.width, obs.height)) {
+      // Kiểm tra xem đạn đã nổ chưa để tránh check thừa
+      if (proj.shouldRemove()) continue;
+
+      for (const obs of obstacles) {
+        // Tính khoảng cách
+        const dx = proj.x - obs.x;
+        const dy = proj.y - obs.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        // Nếu va chạm
+        if (dist < proj.radius + obs.radius) {
+          // Xóa đạn ngay lập tức
           this.game.projectiles.splice(i, 1);
-          break;
+
+          // (Tùy chọn) Bạn có thể thêm hiệu ứng nổ nhỏ tại đây nếu muốn
+          // this.physics.createExplosion(...) 
+
+          break; // Đạn đã mất, không check các obs khác nữa
         }
       }
     }
+
     // Projectile vs Chests
     const chests = this.game.world.chests;
     for (let i = this.game.projectiles.length - 1; i >= 0; i--) {
       const proj = this.game.projectiles[i];
+      if (proj.shouldRemove()) continue;
+
       for (let j = chests.length - 1; j >= 0; j--) {
         const chest = chests[j];
-        if (circleCollision(proj.x, proj.y, proj.radius, chest.x, chest.y, chest.radius)) {
+        let isHit = false;
+
+        // KIỂM TRA LOẠI CHEST ĐỂ CHỌN THUẬT TOÁN VA CHẠM
+        if (chest.type === CHEST_TYPES.STATION) {
+          if (chest.type === CHEST_TYPES.STATION) {
+            // SỬA: Dùng rotated rectangle collision
+            isHit = this.circleRotatedRectCollision(
+              proj.x, proj.y, proj.radius,
+              chest.x, chest.y,
+              chest.width, chest.height,
+              chest.rotation  // <-- QUAN TRỌNG
+            );
+          }
+        } else {
+          // Va chạm TRÒN (Chest thường)
+          if (circleCollision(proj.x, proj.y, proj.radius, chest.x, chest.y, chest.radius)) {
+            isHit = true;
+          }
+        }
+
+        if (isHit) {
           chest.takeDamage(proj.damage);
-
           this.game.projectiles.splice(i, 1);
+
           if (chest.dead) {
-            const isBigChest = (chest.type === 'BIG');
-
-            // SỬA: spawnItem từ WorldManager
             this.game.world.spawnItem(chest.x, chest.y, chest.type);
-
-            // SỬA: Push vào delta của WorldManager
             this.game.world.delta.chestsRemoved.push(chest.id);
             chests.splice(j, 1);
-
-            if (isBigChest) {
-              // SỬA: Cập nhật trạng thái Big Chest trong WorldManager
-              this.game.world.hasBigChest = false;
-              this.game.world.nextBigChestTime = Date.now() + 120000;
-
-              console.log(`Big Chest destroyed! Next spawn in 2 minutes`);
-              this.game.server.broadcast({
-                type: 'system_message',
-                message: 'Big Chest destroyed! Next one in 2 minutes'
-              });
-            }
           }
-          break;
+          break; // Đạn nổ rồi thì break loop chests
         }
       }
     }
@@ -178,16 +256,34 @@ export class Physics {
     // Player vs Chests (Collision) 
     this.game.players.forEach(player => {
       if (player.dead) return;
+
       this.game.world.chests.forEach(chest => {
-        const dx = player.x - chest.x;
-        const dy = player.y - chest.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const minDist = player.radius + chest.radius;
-        if (dist < minDist) {
-          const angle = Math.atan2(dy, dx);
-          const pushOut = minDist - dist;
-          player.x += Math.cos(angle) * pushOut;
-          player.y += Math.sin(angle) * pushOut;
+        if (chest.type === CHEST_TYPES.STATION) {
+          if (this.circleRotatedRectCollision(
+            player.x, player.y, player.radius,
+            chest.x, chest.y,
+            chest.width, chest.height,
+            chest.rotation  // <-- QUAN TRỌNG
+          )) {
+            // Đẩy player ra
+            this.pushOutOfRotatedRect(
+              player,
+              chest.x, chest.y,
+              chest.width, chest.height,
+              chest.rotation  // <-- QUAN TRỌNG
+            );
+          }
+        } else {
+          // --- LOGIC ĐẨY RA KHỎI HÌNH TRÒN (NORMAL CHEST) ---
+          const dx = player.x - chest.x;
+          const dy = player.y - chest.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const minDist = player.radius + chest.radius;
+          if (dist < minDist && dist > 0) {
+            const pushOut = minDist - dist;
+            player.x += (dx / dist) * pushOut;
+            player.y += (dy / dist) * pushOut;
+          }
         }
       });
     });

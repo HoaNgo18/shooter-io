@@ -2,6 +2,7 @@ export const PacketType = {
   // Client -> Server
   JOIN: 'join',
   INPUT: 'input',
+  DASH: 'dash',
   ATTACK: 'attack',
   CHAT: 'chat',
   RESPAWN: 'respawn',
