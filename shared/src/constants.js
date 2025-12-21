@@ -46,12 +46,19 @@ export const BIG_CHEST_STATS = {
   message: "A LEGENDARY CHEST HAS SPAWNED!" // Thông báo
 };
 
+// shared/src/constants.js
+
 export const SKINS = [
-  { id: 'default', name: 'Default', price: 0, color: 0x9E9E9E },
-  { id: 'red', name: 'Crimson', price: 100, color: 0xFF1744 },
-  { id: 'blue', name: 'Cobalt', price: 250, color: 0x00E5FF },
-  { id: 'gold', name: 'Gold', price: 1000, color: 0xFFD700 },
-  { id: 'dark', name: 'Nightmare', price: 2000, color: 0x212121 }
+  { id: 'default', name: 'Starter Red', price: 0 },
+  { id: 'ship_1', name: 'Interceptor', price: 100 },
+  { id: 'ship_2', name: 'Bomber', price: 250 },
+  { id: 'ship_3', name: 'UFO Red', price: 500 },
+  { id: 'ship_4', name: 'Scout', price: 1000 },
+  { id: 'ship_5', name: 'Frigate', price: 1500 },
+  { id: 'ship_6', name: 'Destroyer', price: 2000 },
+  { id: 'ship_7', name: 'Speeder', price: 3000 },
+  { id: 'ship_8', name: 'Tanker', price: 4000 },
+  { id: 'ship_9', name: 'Mothership', price: 5000 }
 ];
 
 export const NEBULA_COUNT = 15; // Thay vì BUSH_COUNT

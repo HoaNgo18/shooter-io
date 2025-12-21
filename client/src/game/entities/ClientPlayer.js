@@ -57,7 +57,7 @@ export class ClientPlayer {
     }
 
     getShipTextureKey(skinId) {
-        // Bot sprites (từ Enemies folder - mũi tàu hướng XUỐNG)
+        // Bot sprites
         const botTextureMap = {
             'bot_black': 'bot_black',
             'bot_blue': 'bot_blue',
@@ -65,21 +65,25 @@ export class ClientPlayer {
             'bot_red': 'bot_red'
         };
 
-        // Player sprites (từ Ships folder - mũi tàu hướng LÊN)
+        // Player sprites (Mapping từ Skin ID -> Texture Key đã Preload)
         const playerTextureMap = {
             'default': 'ship_default',
-            'red': 'ship_red',
-            'blue': 'ship_blue',
-            'gold': 'ship_gold',
-            'dark': 'ship_dark'
+            'ship_1': 'ship_1',
+            'ship_2': 'ship_2',
+            'ship_3': 'ship_3',
+            'ship_4': 'ship_4',
+            'ship_5': 'ship_5',
+            'ship_6': 'ship_6',
+            'ship_7': 'ship_7',
+            'ship_8': 'ship_8',
+            'ship_9': 'ship_9'
         };
 
-        // Kiểm tra xem có phải bot skin không
         if (botTextureMap[skinId]) {
             return botTextureMap[skinId];
         }
 
-        // Nếu không phải bot, trả về player sprite
+        // Nếu tìm thấy key tương ứng thì trả về, không thì trả về mặc định
         return playerTextureMap[skinId] || 'ship_default';
     }
 

@@ -2,6 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { socket } from '../network/socket'; // <--- 1. Import Socket trực tiếp
 import { PacketType } from '../../../shared/src/packetTypes';
 
+const SKIN_IMAGES = {
+    'default': '/Ships/playerShip1_red.png',
+    'ship_1': '/Ships/playerShip2_red.png',
+    'ship_2': '/Ships/playerShip3_red.png',
+    'ship_3': '/Ships/ufoRed.png',
+    'ship_4': '/Ships/spaceShips_001.png',
+    'ship_5': '/Ships/spaceShips_002.png',
+    'ship_6': '/Ships/spaceShips_004.png',
+    'ship_7': '/Ships/spaceShips_007.png',
+    'ship_8': '/Ships/spaceShips_008.png',
+    'ship_9': '/Ships/spaceShips_009.png'
+};
+
 const HomeScreen = ({ user, onPlayClick, onLogout, onLoginSuccess }) => {
     const [activeTab, setActiveTab] = useState('home');
     const [skins, setSkins] = useState([]);
@@ -44,11 +57,16 @@ const HomeScreen = ({ user, onPlayClick, onLogout, onLoginSuccess }) => {
 
     const loadSkins = () => {
         setSkins([
-            { id: 'default', name: 'DEFAULT', price: 0, color: '#9E9E9E' },
-            { id: 'red', name: 'CRIMSON', price: 100, color: '#FF1744' },
-            { id: 'blue', name: 'COBALT', price: 100, color: '#00E5FF' },
-            { id: 'gold', name: 'GOLDEN AGE', price: 250, color: '#FFD700' },
-            { id: 'dark', name: 'NIGHTMARE', price: 500, color: '#212121' },
+            { id: 'default', name: 'Starter Red', price: 0 },
+            { id: 'ship_1', name: 'Interceptor', price: 100 },
+            { id: 'ship_2', name: 'Bomber', price: 250 },
+            { id: 'ship_3', name: 'UFO Red', price: 500 },
+            { id: 'ship_4', name: 'Scout', price: 1000 },
+            { id: 'ship_5', name: 'Frigate', price: 1500 },
+            { id: 'ship_6', name: 'Destroyer', price: 2000 },
+            { id: 'ship_7', name: 'Speeder', price: 3000 },
+            { id: 'ship_8', name: 'Tanker', price: 4000 },
+            { id: 'ship_9', name: 'Mothership', price: 5000 }
         ]);
     };
 
@@ -373,10 +391,42 @@ const HomeScreen = ({ user, onPlayClick, onLogout, onLoginSuccess }) => {
                                         {skins.map(s => {
                                             const isOwned = localUser.skins?.includes(s.id) || s.price === 0;
                                             const isEquipped = localUser.equippedSkin === s.id;
+                                            const imgPath = SKIN_IMAGES[s.id] || SKIN_IMAGES['default'];
+                                            console.log(`Skin: ${s.name} | Path: ${imgPath}`);
 
                                             return (
                                                 <div key={s.id} style={styles.skinCard(isEquipped, isOwned)}>
-                                                    <div style={styles.colorDot(s.color)}></div>
+                                                    <div style={{
+                                                        width: '80px',            // Tăng kích thước khung lên chút cho dễ nhìn
+                                                        height: '80px',
+                                                        margin: '0 auto 15px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        background: 'rgba(255, 255, 255, 0.05)', // Thêm nền mờ nhẹ để biết vị trí khung
+                                                        borderRadius: '8px'
+                                                    }}>
+                                                        <img
+                                                            src={imgPath}
+                                                            alt={s.name}
+                                                            style={{
+                                                                maxWidth: '80%',      // Chỉ chiếm tối đa 80% khung
+                                                                maxHeight: '80%',
+                                                                objectFit: 'contain', // Giữ nguyên tỉ lệ ảnh
+
+                                                                // Tạm thời comment dòng filter này lại để test
+                                                                // filter: isOwned ? 'none' : 'grayscale(100%) brightness(50%)',
+
+                                                                // Nếu ảnh gốc ĐÃ HƯỚNG LÊN (như bạn nói), thì KHÔNG CẦN XOAY NỮA
+                                                                // transform: 'rotate(-90deg)' 
+                                                            }}
+                                                            onError={(e) => {
+                                                                console.error("Lỗi load ảnh:", imgPath); // In lỗi ra console thay vì ẩn
+                                                                e.target.style.border = "2px solid red"; // Viền đỏ nếu lỗi
+                                                                e.target.alt = "IMG ERROR";
+                                                            }}
+                                                        />
+                                                    </div>
                                                     <div style={{ fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>{s.name}</div>
 
                                                     {isOwned ? (
