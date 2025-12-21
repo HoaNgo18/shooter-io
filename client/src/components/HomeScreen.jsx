@@ -192,6 +192,13 @@ const HomeScreen = ({ user, onPlayClick, onLogout, onLoginSuccess }) => {
         });
     };
 
+    const handleBuySkin = (skinId) => {
+        socket.send({
+            type: PacketType.BUY_SKIN,
+            skinId: skinId
+        });
+    };
+
     const handleLogout = () => {
         onLogout();
         setShowLogin(true);

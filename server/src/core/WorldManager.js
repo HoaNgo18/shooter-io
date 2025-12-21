@@ -59,7 +59,6 @@ export class WorldManager {
 
     // Danh sách sprite theo kích thước
     const meteorSprites = {
-      tiny: ['meteorBrown_tiny1', 'meteorBrown_tiny2', 'meteorGrey_tiny1', 'meteorGrey_tiny2'],
       small: ['meteorBrown_small1', 'meteorBrown_small2', 'meteorGrey_small1', 'meteorGrey_small2'],
       med: ['meteorBrown_med1', 'meteorBrown_med3', 'meteorGrey_med1', 'meteorGrey_med2'],
       big: ['meteorBrown_big1', 'meteorBrown_big2', 'meteorBrown_big3', 'meteorBrown_big4',
@@ -76,13 +75,12 @@ export class WorldManager {
       let randomSize;
       if (rand < 0.3) randomSize = 'big';
       else if (rand < 0.7) randomSize = 'med';
-      else if (rand < 0.9) randomSize = 'small';
-      else randomSize = 'tiny';
+      else randomSize = 'small';
 
       const sizeData = meteorSizes[randomSize];
 
       // === LOGIC MỚI: Nếu là thiên thạch NHỎ (tiny/small), spawn thành CỤM ===
-      if (randomSize === 'tiny' || randomSize === 'small') {
+      if (randomSize === 'small') {
         const clusterSize = Math.floor(Math.random() * 3) + 2; // 2-4 thiên thạch/cụm
         const clusterX = (Math.random() * MAP_SIZE * 0.8) - MAP_SIZE * 0.4; // Tránh spawn sát biên
         const clusterY = (Math.random() * MAP_SIZE * 0.8) - MAP_SIZE * 0.4;
