@@ -21,7 +21,6 @@ export class Bot extends Player {
     super(id, name, null, randomSkin);
 
     this.dead = false;
-    this.health = this.maxHealth;
     this.isBot = true;
     this.target = null;
     

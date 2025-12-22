@@ -74,17 +74,6 @@ const HUD = () => {
     };
   };
 
-  function getRarityColor(rarity) {
-    const colors = {
-      common: '#FFFFFF',
-      uncommon: '#00FF00',
-      rare: '#0080FF',
-      epic: '#9933FF',
-      legendary: '#FFD700'
-    };
-    return colors[rarity] || '#FFFFFF';
-  }
-
   const myMinimapPos = worldToMinimap(myPos.x, myPos.y);
   const kingMinimapPos = kingPos ? worldToMinimap(kingPos.x, kingPos.y) : null;
 

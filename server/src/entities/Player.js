@@ -1,7 +1,7 @@
 // server/src/entities/Player.js - SPACE SHIP VERSION
 import { Entity } from './Entity.js';
 import {
-  PLAYER_MAX_LIVES, MAP_SIZE, PLAYER_RADIUS,
+  SHIP_MAX_LIVES, MAP_SIZE, SHIP_RADIUS,
   DASH_DURATION, DASH_COOLDOWN, DASH_BOOST,
   WEAPON_STATS, ITEM_TYPES,
   SHIP_MAX_SPEED, SHIP_ACCELERATION,
@@ -18,20 +18,22 @@ export class Player extends Entity {
 
     this.id = id;
     this.name = name;
-    this.lives = PLAYER_MAX_LIVES;
-    this.maxLives = PLAYER_MAX_LIVES;
+    // SỬA: Dùng constant thay vì số 3
+    this.lives = 3; 
+    this.maxLives = SHIP_MAX_LIVES;
     this.score = 0;
     this.weapon = 'BLUE';
     this.angle = 0;
     this.dead = true;
     this.lastDamageTime = 0;
     this.lastAttack = 0;
-    this.radius = PLAYER_RADIUS;
+    this.radius = SHIP_RADIUS;
     this.userId = userId;
     this.coins = 0;
     this.sessionKills = 0;
     this.skinId = skinId;
     this.isHidden = false;
+    this.speedMultiplier = 1;
 
     this.spritePointsDown = skinId.startsWith('bot_');
 
@@ -106,7 +108,10 @@ export class Player extends Entity {
 
     // SPEED LIMIT
     let maxSpeedActual = this.maxSpeed;
-    if (Date.now() < this.speedBuffEndTime) maxSpeedActual *= 1.5;
+    // Sử dụng this.speedMultiplier được set từ Item Config
+    if (Date.now() < this.speedBuffEndTime) {
+      maxSpeedActual *= this.speedMultiplier;
+    }
 
     const finalSpeed = Math.sqrt(this.vx ** 2 + this.vy ** 2);
     if (finalSpeed > maxSpeedActual) {
@@ -154,8 +159,6 @@ export class Player extends Entity {
     return [p];
   }
 
-  // server/src/entities/Player.js
-
   performDash() {
     // 1. Kiểm tra Cooldown
     if (Date.now() < this.dashCooldownTime) return;
@@ -170,16 +173,13 @@ export class Player extends Entity {
     let targetX = this.x + Math.cos(dashAngle) * BLINK_DISTANCE;
     let targetY = this.y + Math.sin(dashAngle) * BLINK_DISTANCE;
 
-    // 4. Giới hạn trong bản đồ (Quan trọng: để không dịch chuyển ra ngoài map)
-    // MAP_SIZE đã được import ở đầu file, mặc định là 5000
-    // Trừ đi 50 đơn vị để không bị kẹt sát mép
-    const maxBound = (5000 / 2) - 50;
+    // 4. Giới hạn trong bản đồ
+    const maxBound = (MAP_SIZE / 2) - 50;
 
     this.x = Math.max(-maxBound, Math.min(maxBound, targetX));
     this.y = Math.max(-maxBound, Math.min(maxBound, targetY));
 
     // 5. (Tùy chọn) Hãm phanh sau khi dịch chuyển
-    // Giảm vận tốc hiện tại đi 50% để người chơi dễ kiểm soát sau khi blink
     this.vx *= 0.5;
     this.vy *= 0.5;
 
@@ -190,11 +190,11 @@ export class Player extends Entity {
     console.log(`Player ${this.name} blinked to ${Math.round(this.x)}, ${Math.round(this.y)}`);
   }
 
-  // Giữ nguyên các method còn lại...
   checkLevelUp() {
     const scaleFactor = 1 + (this.score / 1000);
-    this.radius = PLAYER_RADIUS * scaleFactor;
-    if (this.radius > PLAYER_RADIUS * 1.5) this.radius = PLAYER_RADIUS * 1.5;
+    // SỬA: Thay PLAYER_RADIUS bằng SHIP_RADIUS
+    this.radius = SHIP_RADIUS * scaleFactor;
+    if (this.radius > SHIP_RADIUS * 1.5) this.radius = SHIP_RADIUS * 1.5;
   }
 
   // Cập nhật phương thức applyItem() 
@@ -267,7 +267,7 @@ export class Player extends Entity {
     this.y = pos.y;
     this.vx = 0;
     this.vy = 0;
-    this.lives = this.maxLives;
+    this.lives = 3;
     this.dead = false;
     this.angle = 0;
     if (skinId) this.skinId = skinId;
@@ -275,7 +275,9 @@ export class Player extends Entity {
     this.speedBuffEndTime = 0;
     this.weapon = 'BLUE';
     this.score = 0;
-    this.radius = PLAYER_RADIUS;
+    
+    this.radius = SHIP_RADIUS;
+    
     this.isBoosting = false;
   }
 
@@ -290,7 +292,7 @@ export class Player extends Entity {
       id: this.id, name: this.name,
       x: Math.round(this.x), y: Math.round(this.y),
       vx: Math.round(this.vx), vy: Math.round(this.vy),
-      angle: this.angle, lives: this.lives,          // Thay health
+      angle: this.angle, lives: this.lives,
       maxLives: this.maxLives,
       score: this.score, dead: this.dead, weapon: this.weapon,
       radius: this.radius, coins: this.coins,

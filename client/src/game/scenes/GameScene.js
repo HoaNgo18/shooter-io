@@ -61,11 +61,6 @@ export class GameScene extends Phaser.Scene {
         this.load.image('background', '/Backgrounds/blue.png');
 
         //Load laser sprites
-        //Normal
-        this.load.image('laserBlue01', '/Lasers/laserBlue01.png');
-        this.load.image('laserGreen01', '/Lasers/laserGreen11.png');
-        this.load.image('laserRed01', '/Lasers/laserRed01.png');
-        //Updated versions
         this.load.image('laserBlue01', '/Lasers/laserBlue01.png');
         this.load.image('laserGreen01', '/Lasers/laserGreen11.png');
         this.load.image('laserRed01', '/Lasers/laserRed01.png');
@@ -86,12 +81,6 @@ export class GameScene extends Phaser.Scene {
         this.load.image('nebula4', '/Nebulas/fart03.png');
         this.load.image('nebula5', '/Nebulas/fart04.png');
 
-        //Load live icons
-        this.load.image('playerLife1_blue', '/UI/playerLife1_blue.png');
-        this.load.image('playerLife1_red', '/UI/playerLife1_red.png');
-        this.load.image('playerLife1_green', '/UI/playerLife1_green.png');
-        this.load.image('playerLife1_orange', '/UI/playerLife1_orange.png');
-
         //Load station sprite
         this.load.image('station1', '/Stations/spaceStation_018.png');
         this.load.image('station2', '/Stations/spaceStation_019.png');
@@ -105,9 +94,9 @@ export class GameScene extends Phaser.Scene {
         this.load.image('item_bronze_coin', '/Power-ups/star_bronze.png');
         this.load.image('item_silver_coin', '/Power-ups/star_silver.png');
         this.load.image('item_gold_coin', '/Power-ups/star_gold.png');
-        this.load.image('item_weapon_red', '/Lasers/laserBlue04.png');
+        this.load.image('item_weapon_blue', '/Lasers/laserBlue04.png');
         this.load.image('item_weapon_green', '/Lasers/laserGreen08.png');
-        this.load.image('item_weapon_blue', '/Lasers/laserRed04.png');
+        this.load.image('item_weapon_red', '/Lasers/laserRed04.png');
 
         //Load explosion sprite
 

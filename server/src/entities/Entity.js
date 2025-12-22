@@ -10,11 +10,4 @@ export class Entity {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
   }
-
-  serialize() {
-    return {
-      x: Math.round(this.x),
-      y: Math.round(this.y)
-    };
-  }
 }

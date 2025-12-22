@@ -1,11 +1,6 @@
 // Game Settings
 export const MAP_SIZE = 5000;
 
-// Player Stats
-export const PLAYER_RADIUS = 20;
-export const PLAYER_SPEED = 300;
-export const PLAYER_MAX_LIVES = 3;
-
 // Game Timing
 export const TICK_RATE = 60;
 export const INTERPOLATION_DELAY = 100;
@@ -25,7 +20,9 @@ export const OBSTACLE_COUNT = 120;
 export const OBSTACLE_RADIUS_MIN = 30;
 export const OBSTACLE_RADIUS_MAX = 120;
 
-// CẬP NHẬT HỆ THỐNG TỐC ĐỘ TÀU
+// CẬP NHẬT CHỈ SỐ TÀU
+export const SHIP_RADIUS = 20;      // Đổi từ PLAYER_RADIUS
+export const SHIP_MAX_LIVES = 5;    // Đổi từ PLAYER_MAX_LIVES
 export const SHIP_MAX_SPEED = 400;
 export const SHIP_ACCELERATION = 600;
 export const SHIP_DECELERATION = 300;
@@ -115,7 +112,7 @@ export const ITEM_CONFIG = {
     name: 'Speed Boost',
     description: '+50% Speed 8s',
     sprite: 'item_boost',
-    effect: { type: 'speed', multiplier: 1.5, duration: 8000 },
+    effect: { type: 'speed', multiplier: 2.0, duration: 1000 },
     glowColor: 0xFFD700,      // Vàng
     borderColor: 0xFFFFFF,    // Viền trắng
     dropChance: 0.15

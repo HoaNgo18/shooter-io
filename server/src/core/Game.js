@@ -45,9 +45,6 @@ export class Game {
     // 2. Update Projectiles
     this.updateProjectiles(dt);
 
-    // 3. Update Explosions
-    this.updateExplosion();
-
     // 4. Update Players (Input + Move)
     this.players.forEach(player => {
       if (!player.dead) player.update(dt);
@@ -76,9 +73,6 @@ export class Game {
       proj.update(dt);
 
       if (proj.distanceTraveled >= proj.range) {
-        if (proj.weaponType === 'ROCKET') {
-          this.physics.createExplosion(proj);
-        }
         this.projectiles.splice(i, 1);
         continue;
       }

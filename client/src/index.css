@@ -32,15 +32,3 @@ body {
     /* Bay lên trên rồi mất */
   }
 }
-
-@keyframes itemGlow {
-
-  0%,
-  100% {
-    filter: drop-shadow(0 0 5px currentColor);
-  }
-
-  50% {
-    filter: drop-shadow(0 0 15px currentColor);
-  }
-}
