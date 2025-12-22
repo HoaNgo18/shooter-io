@@ -108,7 +108,7 @@ export const ITEM_CONFIG = {
     effect: { type: 'shield', duration: 5000 },
     glowColor: 0xFFD700,      // Vàng
     borderColor: 0xFFFFFF,    // Viền trắng
-    dropChance: 0.15
+    dropChance: 0.30
   },
 
   [ITEM_TYPES.SPEED_BOOST]: {
@@ -118,7 +118,7 @@ export const ITEM_CONFIG = {
     effect: { type: 'speed', multiplier: 1.5, duration: 8000 },
     glowColor: 0xFFD700,      // Vàng
     borderColor: 0xFFFFFF,    // Viền trắng
-    dropChance: 0.30
+    dropChance: 0.15
   },
 
   [ITEM_TYPES.WEAPON_BLUE]: {

@@ -109,6 +109,10 @@ export class GameScene extends Phaser.Scene {
         this.load.image('item_weapon_green', '/Lasers/laserGreen08.png');
         this.load.image('item_weapon_blue', '/Lasers/laserRed04.png');
 
+        //Load explosion sprite
+
+        //Load shield sprite
+        this.load.image('shield', '/Effects/shield3.png');
     }
 
     create() {

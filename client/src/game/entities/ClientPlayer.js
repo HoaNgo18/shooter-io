@@ -1,4 +1,4 @@
-// client/src/game/entities/ClientPlayer.js - SPRITE VERSION
+
 import Phaser from 'phaser';
 import { socket } from '../../network/socket';
 import { SKINS } from '@shared/constants';
@@ -32,13 +32,14 @@ export class ClientPlayer {
         this.thrustFlame = scene.add.graphics();
         this.updateThrustFlame(false);
 
-        // === SHIELD EFFECT ===
-        this.shieldCircle = scene.add.circle(0, 0, 30, 0x00FFFF, 0);
-        this.shieldCircle.setStrokeStyle(3, 0x00FFFF, 0.6);
-        this.shieldCircle.setVisible(false);
+        // === SHIELD EFFECT (IMAGE VERSION) ===
+        this.shieldSprite = scene.add.sprite(0, 0, 'shield');
+        this.shieldSprite.setScale(0.8); // Giảm scale xuống để vừa với ship
+        this.shieldSprite.setVisible(false);
+        this.shieldSprite.setAlpha(0.8);
 
-        // Add to container
-        this.container.add([this.thrustFlame, this.shipSprite, this.shieldCircle]);
+        // Add to container (thứ tự: flame → ship → shield)
+        this.container.add([this.thrustFlame, this.shipSprite, this.shieldSprite]);
         this.container.setDepth(10);
 
         // === UI (Tên & Thanh máu) ===
@@ -52,12 +53,11 @@ export class ClientPlayer {
     createShipSprite(skinId) {
         const textureKey = this.getShipTextureKey(skinId);
         const sprite = this.scene.add.sprite(0, 0, textureKey);
-        sprite.setScale(0.5); // Adjust scale as needed
+        sprite.setScale(0.5);
         return sprite;
     }
 
     getShipTextureKey(skinId) {
-        // Bot sprites
         const botTextureMap = {
             'bot_black': 'bot_black',
             'bot_blue': 'bot_blue',
@@ -65,7 +65,6 @@ export class ClientPlayer {
             'bot_red': 'bot_red'
         };
 
-        // Player sprites (Mapping từ Skin ID -> Texture Key đã Preload)
         const playerTextureMap = {
             'default': 'ship_default',
             'ship_1': 'ship_1',
@@ -83,7 +82,6 @@ export class ClientPlayer {
             return botTextureMap[skinId];
         }
 
-        // Nếu tìm thấy key tương ứng thì trả về, không thì trả về mặc định
         return playerTextureMap[skinId] || 'ship_default';
     }
 
@@ -91,19 +89,15 @@ export class ClientPlayer {
         this.thrustFlame.clear();
 
         if (isBoosting) {
-            // Kiểm tra xem là Bot hay Player
             const isBot = this.skinId.startsWith('bot_');
-
-            // Nếu là Bot (ảnh hướng xuống), lửa phải vẽ ở tọa độ Âm (phía trên tâm)
-            // Nếu là Player (ảnh hướng lên), lửa vẽ ở tọa độ Dương (phía dưới tâm)
             const direction = isBot ? -1 : 1;
 
             // Vẽ lửa cam (lớp ngoài)
             this.thrustFlame.fillStyle(0xFF6600, 0.8);
             this.thrustFlame.fillTriangle(
-                -4, 16 * direction,   // Trái đuôi
-                4, 16 * direction,    // Phải đuôi
-                0, (26 + Math.random() * 5) * direction  // Đỉnh ngọn lửa
+                -4, 16 * direction,
+                4, 16 * direction,
+                0, (26 + Math.random() * 5) * direction
             );
 
             // Vẽ lửa vàng (lớp trong)
@@ -115,6 +109,7 @@ export class ClientPlayer {
             );
         }
     }
+
     updateServerData(data) {
         if (data.dead) {
             this.setVisibleState(false);
@@ -138,8 +133,6 @@ export class ClientPlayer {
         // Update skin
         if (data.skinId && data.skinId !== this.skinId) {
             this.skinId = data.skinId;
-
-            // Recreate ship sprite with new texture
             this.shipSprite.destroy();
             this.shipSprite = this.createShipSprite(this.skinId);
             this.container.addAt(this.shipSprite, 1);
@@ -152,12 +145,30 @@ export class ClientPlayer {
             this.container.setScale(scale);
         }
 
-        // Shield
+        // === CẬP NHẬT SHIELD SPRITE ===
         if (data.hasShield) {
-            this.shieldCircle.setVisible(true);
-            this.shieldCircle.radius = (data.radius || 20) + 8;
+            this.shieldSprite.setVisible(true);
+            
+            // Điều chỉnh scale shield theo size tàu (giảm xuống để vừa hơn)
+            const shieldScale = (data.radius || 20) / 20 * 0.4; // Chỉ lớn hơn 20% thay vì 80%
+            this.shieldSprite.setScale(shieldScale);
+            
+            console.log('Shield scale:', shieldScale, 'Position:', this.shieldSprite.x, this.shieldSprite.y); // DEBUG
+            
+            // Hiệu ứng nhấp nháy nhẹ
+            if (!this.scene.tweens.isTweening(this.shieldSprite)) {
+                this.scene.tweens.add({
+                    targets: this.shieldSprite,
+                    alpha: { from: 0.8, to: 0.5 },
+                    duration: 800,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+            }
         } else {
-            this.shieldCircle.setVisible(false);
+            this.shieldSprite.setVisible(false);
+            this.scene.tweens.killTweensOf(this.shieldSprite);
         }
 
         // Hidden in nebula
@@ -178,17 +189,15 @@ export class ClientPlayer {
     tick(dt) {
         if (!this.container.visible) return;
 
-        const t = 0.2; // Lerp factor
+        const t = 0.2;
 
         // Smooth position
         this.container.x = Phaser.Math.Linear(this.container.x, this.targetX, t);
         this.container.y = Phaser.Math.Linear(this.container.y, this.targetY, t);
 
         // Smooth rotation
-        // Kiểm tra nếu là bot (sprite hướng XUỐNG) thì KHÔNG cần offset
-        // Nếu là player (sprite hướng LÊN) thì cần offset +90°
         const isBot = this.skinId.startsWith('bot_');
-        const rotationOffset = isBot ? (-Math.PI / 2) : 0; // Bot cần +90° để sprite khớp
+        const rotationOffset = isBot ? (-Math.PI / 2) : 0;
         this.container.rotation = this.targetAngle + rotationOffset;
 
         this.x = this.container.x;
@@ -216,6 +225,7 @@ export class ClientPlayer {
     }
 
     destroy() {
+        this.scene.tweens.killTweensOf(this.shieldSprite); // Cleanup tweens
         this.container.destroy();
         this.text.destroy();
     }
