@@ -241,12 +241,24 @@ export class Physics {
     const items = this.game.world.items;
     this.game.players.forEach(player => {
       if (player.dead) return;
+
       for (let i = items.length - 1; i >= 0; i--) {
         const item = items[i];
+
         if (circleCollision(player.x, player.y, player.radius, item.x, item.y, ITEM_RADIUS)) {
+          // Apply effect
           player.applyItem(item.type);
 
-          // SỬA: Push vào delta của WorldManager
+          // SEND NOTIFICATION TO CLIENT
+          if (!player.isBot) {
+            this.game.server.sendToClient(player.id, {
+              type: 'ITEM_PICKED_UP',
+              playerId: player.id,
+              itemType: item.type
+            });
+          }
+
+          // Remove item
           this.game.world.delta.itemsRemoved.push(item.id);
           items.splice(i, 1);
         }

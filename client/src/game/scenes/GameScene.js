@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { socket } from '../../network/socket';
 import { PacketType } from '@shared/packetTypes';
 import { ClientPlayer } from '../entities/ClientPlayer';
-import { WEAPON_STATS, MAP_SIZE } from '@shared/constants';
+import { WEAPON_STATS, MAP_SIZE, ITEM_CONFIG } from '@shared/constants';
 
 export class GameScene extends Phaser.Scene {
     constructor() {
@@ -97,6 +97,17 @@ export class GameScene extends Phaser.Scene {
         this.load.image('station2', '/Stations/spaceStation_019.png');
         this.load.image('station3', '/Stations/spaceStation_022.png');
         this.load.image('station4', '/Stations/spaceStation_023.png');
+
+        //Load item icons
+        this.load.image('item_health_pack', '/Power-ups/pill_red.png');
+        this.load.image('item_boost', '/Power-ups/bolt_gold.png');
+        this.load.image('item_shield', '/Power-ups/shield_bronze.png');
+        this.load.image('item_bronze_coin', '/Power-ups/star_bronze.png');
+        this.load.image('item_silver_coin', '/Power-ups/star_silver.png');
+        this.load.image('item_gold_coin', '/Power-ups/star_gold.png');
+        this.load.image('item_weapon_red', '/Lasers/laserBlue04.png');
+        this.load.image('item_weapon_green', '/Lasers/laserGreen08.png');
+        this.load.image('item_weapon_blue', '/Lasers/laserRed04.png');
 
     }
 
@@ -511,39 +522,101 @@ export class GameScene extends Phaser.Scene {
         this.nebulas.push(container);
     }
 
-    createItemSprite(i) {
-        if (this.items[i.id]) return;
+    createItemSprite(itemData) {
+        if (this.items[itemData.id]) return;
 
-        let color = 0xFFFFFF;
-        let text = "?";
-        let fontSize = '11px';
-
-        switch (i.type) {
-            case 'HEALTH_PACK': color = 0xFF0000; text = "HP"; break;
-            case 'SHIELD': color = 0x00FFFF; text = "SHD"; break;
-            case 'SPEED': color = 0xFFFF00; text = "SPD"; break;
-            case 'WEAPON_RED': color = 0xFF0000; text = "RED"; break;      // Thay đổi
-            case 'WEAPON_GREEN': color = 0x00FF00; text = "GRN"; break;    // Thay đổi
-            case 'WEAPON_BLUE': color = 0x00E5FF; text = "BLU"; break;
-            case 'COIN_SMALL': color = 0xFFD700; text = "$1"; break;
-            case 'COIN_MEDIUM': color = 0xFFD700; text = "$2"; break;
-            case 'COIN_LARGE': color = 0xFFD700; text = "$5"; break;
-            default: if (i.type.includes('WEAPON')) { color = 0x9933FF; text = "W"; }
+        const config = ITEM_CONFIG[itemData.type];
+        if (!config) {
+            console.error('Unknown item type:', itemData.type);
+            return;
         }
 
-        const container = this.add.container(i.x, i.y);
-        const circle = this.add.circle(0, 0, 15, color);
-        circle.setStrokeStyle(2, 0x000000);
-        const label = this.add.text(0, 0, text, { fontSize, color: '#000000', fontFamily: 'Arial', fontWeight: 'bold' }).setOrigin(0.5);
+        // Create container
+        const container = this.add.container(itemData.x, itemData.y);
 
-        container.add([circle, label]);
+        // === VÒNG GLOW BÊN NGOÀI (màu trắng, có hiệu ứng phóng to thu nhỏ) ===
+        const outerGlowRadius = 25;
+        const outerGlow = this.add.circle(0, 0, outerGlowRadius, 0xFFFFFF, 0.2);
+        outerGlow.setStrokeStyle(2, 0xFFFFFF, 0.4);
+
+        // === VÒNG MÀU BÊN TRONG (màu theo loại item: xanh/vàng/đỏ) ===
+        const innerGlowRadius = 18;
+        const innerGlow = this.add.circle(0, 0, innerGlowRadius, config.glowColor, 0.3);
+        innerGlow.setStrokeStyle(2, config.glowColor, 0.6);
+
+        // === ITEM SPRITE ===
+        const sprite = this.add.sprite(0, 0, config.sprite);
+        sprite.setScale(0.6);
+        sprite.setOrigin(0.5);
+
+        // Add to container (thứ tự: outerGlow → innerGlow → sprite)
+        container.add([outerGlow, innerGlow, sprite]);
+        container.setDepth(12);
+
+        // === ANIMATIONS ===
+
+        // 1. Pulsing OUTER glow (vòng trắng bên ngoài)
         this.tweens.add({
-            targets: container, scaleX: 1.15, scaleY: 1.15,
-            yoyo: true, repeat: -1, duration: 600, ease: 'Sine.easeInOut'
+            targets: outerGlow,
+            scaleX: 1.3,
+            scaleY: 1.3,
+            alpha: 0.1,
+            duration: 1000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
         });
 
+        // 2. Pulsing INNER glow (vòng màu bên trong - nhịp nhanh hơn)
+        this.tweens.add({
+            targets: innerGlow,
+            scaleX: 1.15,
+            scaleY: 1.15,
+            alpha: 0.5,
+            duration: 700,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+
+        // 2. Floating animation
+        this.tweens.add({
+            targets: container,
+            y: container.y - 10,
+            duration: 1500,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+
+        // 3. Rotation (for weapons only)
+        if (itemData.type.includes('WEAPON')) {
+            this.tweens.add({
+                targets: sprite,
+                angle: 360,
+                duration: 3000,
+                repeat: -1,
+                ease: 'Linear'
+            });
+        }
+
+        // 4. Sparkle particles (for coins and special items)
+        const particles = this.add.particles(0, 0, 'star1', {
+            speed: { min: 20, max: 50 },
+            scale: { start: 0.3, end: 0 },
+            alpha: { start: 0.8, end: 0 },
+            lifespan: 800,
+            frequency: 300,
+            tint: config.glowColor // Dùng màu của vòng inner (xanh/vàng/đỏ)
+        });
+        container.add(particles);
+
+        // === PICKUP NOTIFICATION SETUP ===
+        container.setData('itemType', itemData.type);
+        container.setData('itemName', config.name);
+
         this.itemGroup.add(container);
-        this.items[i.id] = container;
+        this.items[itemData.id] = container;
     }
 
     updateFoods(foodsData) {

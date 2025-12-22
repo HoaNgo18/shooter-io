@@ -1,6 +1,46 @@
 body {
   margin: 0;
   padding: 0;
-  overflow: hidden; /* Ẩn thanh cuộn */
+  overflow: hidden;
+  /* Ẩn thanh cuộn */
   background-color: #000;
+}
+
+/* Thêm vào client/src/index.css */
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -70%);
+    /* Bay lên từ dưới */
+  }
+
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+    /* Đến vị trí */
+  }
+
+  85% {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+    /* Giữ nguyên */
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -30%);
+    /* Bay lên trên rồi mất */
+  }
+}
+
+@keyframes itemGlow {
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 5px currentColor);
+  }
+
+  50% {
+    filter: drop-shadow(0 0 15px currentColor);
+  }
 }

@@ -6,7 +6,7 @@ import {
   WEAPON_STATS, ITEM_TYPES,
   SHIP_MAX_SPEED, SHIP_ACCELERATION,
   SHIP_DECELERATION, SHIP_ROTATION_SPEED, SHIP_BRAKE_FORCE,
-
+  ITEM_CONFIG
 } from '../../../shared/src/constants.js';
 import { getRandomPosition } from '../../../shared/src/utils.js';
 import { Projectile } from './Projectile.js';
@@ -173,20 +173,20 @@ export class Player extends Entity {
     // 4. Giới hạn trong bản đồ (Quan trọng: để không dịch chuyển ra ngoài map)
     // MAP_SIZE đã được import ở đầu file, mặc định là 5000
     // Trừ đi 50 đơn vị để không bị kẹt sát mép
-    const maxBound = (5000 / 2) - 50; 
-    
+    const maxBound = (5000 / 2) - 50;
+
     this.x = Math.max(-maxBound, Math.min(maxBound, targetX));
     this.y = Math.max(-maxBound, Math.min(maxBound, targetY));
 
     // 5. (Tùy chọn) Hãm phanh sau khi dịch chuyển
     // Giảm vận tốc hiện tại đi 50% để người chơi dễ kiểm soát sau khi blink
-    this.vx *= 0.5; 
+    this.vx *= 0.5;
     this.vy *= 0.5;
 
     // 6. Set thời gian hồi chiêu
     this.dashEndTime = Date.now() + DASH_DURATION;
     this.dashCooldownTime = Date.now() + DASH_COOLDOWN;
-    
+
     console.log(`Player ${this.name} blinked to ${Math.round(this.x)}, ${Math.round(this.y)}`);
   }
 
@@ -197,25 +197,54 @@ export class Player extends Entity {
     if (this.radius > PLAYER_RADIUS * 1.5) this.radius = PLAYER_RADIUS * 1.5;
   }
 
+  // Cập nhật phương thức applyItem() 
   applyItem(type) {
-    switch (type) {
-      case ITEM_TYPES.HEALTH_PACK:
-        this.lives = Math.min(this.lives + 1, this.maxLives);
+    const config = ITEM_CONFIG[type];
+    if (!config) return;
+
+    const effect = config.effect;
+
+    switch (effect.type) {
+      case 'heal':
+        this.lives = Math.min(this.lives + effect.value, this.maxLives);
+        console.log(`${this.name} healed +${effect.value} life`);
         break;
-      case ITEM_TYPES.SHIELD: this.shieldEndTime = Date.now() + 5000; break;
-      case ITEM_TYPES.SPEED: this.speedBuffEndTime = Date.now() + 5000; break;
-      case ITEM_TYPES.WEAPON_RED:
-        this.weapon = 'RED';
+
+      case 'full_heal':
+        this.lives = this.maxLives;
+        console.log(`${this.name} fully healed!`);
         break;
-      case ITEM_TYPES.WEAPON_GREEN:
-        this.weapon = 'GREEN';
+
+      case 'shield':
+        this.shieldEndTime = Date.now() + effect.duration;
+        console.log(`${this.name} activated shield for ${effect.duration}ms`);
         break;
-      case ITEM_TYPES.WEAPON_BLUE:
-        this.weapon = 'BLUE';
+
+      case 'speed':
+        this.speedBuffEndTime = Date.now() + effect.duration;
+        this.speedMultiplier = effect.multiplier;
+        console.log(`${this.name} speed boost x${effect.multiplier}`);
         break;
-      case 'COIN_SMALL': this.coins += 1; break;
-      case 'COIN_MEDIUM': this.coins += 2; break;
-      case 'COIN_LARGE': this.coins += 5; break;
+
+      case 'dash_reset':
+        this.dashCooldownTime = 0; // Reset cooldown instantly
+        console.log(`${this.name} dash reset!`);
+        break;
+
+      case 'weapon':
+        this.weapon = effect.weaponType;
+        console.log(`${this.name} equipped ${effect.weaponType} weapon`);
+        break;
+
+      case 'coin':
+        this.coins += effect.value;
+        console.log(`${this.name} earned ${effect.value} coins`);
+        break;
+
+      case 'ammo_refill':
+        this.lastAttack = 0; // Reset attack cooldown
+        console.log(`${this.name} ammo refilled!`);
+        break;
     }
   }
 

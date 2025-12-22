@@ -1,9 +1,12 @@
+// Game Settings
 export const MAP_SIZE = 5000;
 
+// Player Stats
 export const PLAYER_RADIUS = 20;
 export const PLAYER_SPEED = 300;
 export const PLAYER_MAX_LIVES = 3;
 
+// Game Timing
 export const TICK_RATE = 60;
 export const INTERPOLATION_DELAY = 100;
 
@@ -22,7 +25,6 @@ export const OBSTACLE_COUNT = 120;
 export const OBSTACLE_RADIUS_MIN = 30;
 export const OBSTACLE_RADIUS_MAX = 120;
 
-
 // CẬP NHẬT HỆ THỐNG TỐC ĐỘ TÀU
 export const SHIP_MAX_SPEED = 400;
 export const SHIP_ACCELERATION = 600;
@@ -30,6 +32,7 @@ export const SHIP_DECELERATION = 300;
 export const SHIP_ROTATION_SPEED = 3.5;
 export const SHIP_BRAKE_FORCE = 800;
 
+// --- CẬP NHẬT HỆ THỐNG RƯƠNG VÀ ITEM ---
 export const CHEST_COUNT = 15;
 export const CHEST_RADIUS = 25;
 export const CHEST_HP = 3; // Normal Chest: 5 phát bắn là vỡ
@@ -40,7 +43,7 @@ export const STATION_STATS = {
   // Thay radius bằng width/height
   width: 86,         // Chiều ngang (tương ứng với ảnh spaceStation_018)
   height: 24,         // Chiều dọc
-  hp: 8,             
+  hp: 8,
   dropCount: 3
 };
 
@@ -66,18 +69,118 @@ export const NEBULA_COUNT = 15; // Thay vì BUSH_COUNT
 export const NEBULA_RADIUS = 70; // Tinh vân thường to hơn bụi cây
 
 export const ITEM_TYPES = {
+  // Health & Defense
   HEALTH_PACK: 'HEALTH_PACK',
   SHIELD: 'SHIELD',
-  SPEED: 'SPEED',
-  WEAPON_BLUE: 'WEAPON_BLUE',     // Thay đổi
-  WEAPON_RED: 'WEAPON_RED',       // Thay đổi
+
+  // Movement
+  SPEED_BOOST: 'SPEED_BOOST',
+
+  // Weapons
+  WEAPON_BLUE: 'WEAPON_BLUE',
+  WEAPON_RED: 'WEAPON_RED',
   WEAPON_GREEN: 'WEAPON_GREEN',
-  COIN_SMALL: 'COIN_SMALL',   // Rơi từ Chest
-  COIN_MEDIUM: 'COIN_MEDIUM', // Rơi từ Chest hiếm
-  COIN_LARGE: 'COIN_LARGE'    // Rơi từ Chest cực hiếm
+
+  // Coins
+  COIN_BRONZE: 'COIN_BRONZE',
+  COIN_SILVER: 'COIN_SILVER',
+  COIN_GOLD: 'COIN_GOLD',
+
 };
 
 export const ITEM_RADIUS = 15;
+
+export const ITEM_CONFIG = {
+  [ITEM_TYPES.HEALTH_PACK]: {
+    name: 'Health Pack',
+    description: '+1 Life',
+    sprite: 'item_health_pack',
+    effect: { type: 'heal', value: 1 },
+    glowColor: 0x00FF00,      // Xanh lá
+    borderColor: 0xFFFFFF,    // Viền trắng
+    dropChance: 0.25
+  },
+
+  [ITEM_TYPES.SHIELD]: {
+    name: 'Energy Shield',
+    description: 'Invulnerability 5s',
+    sprite: 'item_shield',
+    effect: { type: 'shield', duration: 5000 },
+    glowColor: 0xFFD700,      // Vàng
+    borderColor: 0xFFFFFF,    // Viền trắng
+    dropChance: 0.15
+  },
+
+  [ITEM_TYPES.SPEED_BOOST]: {
+    name: 'Speed Boost',
+    description: '+50% Speed 8s',
+    sprite: 'item_boost',
+    effect: { type: 'speed', multiplier: 1.5, duration: 8000 },
+    glowColor: 0xFFD700,      // Vàng
+    borderColor: 0xFFFFFF,    // Viền trắng
+    dropChance: 0.30
+  },
+
+  [ITEM_TYPES.WEAPON_BLUE]: {
+    name: 'Plasma Blaster',
+    description: 'Balanced weapon',
+    sprite: 'item_weapon_blue',
+    effect: { type: 'weapon', weaponType: 'BLUE' },
+    glowColor: 0xFF0000,      // Đỏ
+    borderColor: 0xFFFFFF,    // Viền trắng
+    dropChance: 0.25
+  },
+
+  [ITEM_TYPES.WEAPON_RED]: {
+    name: 'Heavy Cannon',
+    description: 'High damage, slow fire',
+    sprite: 'item_weapon_red',
+    effect: { type: 'weapon', weaponType: 'RED' },
+    glowColor: 0xFF0000,      // Đỏ
+    borderColor: 0xFFFFFF,    // Viền trắng
+    dropChance: 0.15
+  },
+
+  [ITEM_TYPES.WEAPON_GREEN]: {
+    name: 'Rapid Laser',
+    description: 'Fast fire, low damage',
+    sprite: 'item_weapon_green',
+    effect: { type: 'weapon', weaponType: 'GREEN' },
+    glowColor: 0xFF0000,      // Đỏ
+    borderColor: 0xFFFFFF,    // Viền trắng
+    dropChance: 0.20
+  },
+
+  [ITEM_TYPES.COIN_BRONZE]: {
+    name: 'Bronze Coin',
+    description: '+1 Coin',
+    sprite: 'item_bronze_coin',
+    effect: { type: 'coin', value: 1 },
+    glowColor: 0xFFD700,      // Vàng
+    borderColor: 0xFFFFFF,    // Viền trắng
+    dropChance: 0.40
+  },
+
+  [ITEM_TYPES.COIN_SILVER]: {
+    name: 'Silver Coin',
+    description: '+3 Coins',
+    sprite: 'item_silver_coin',
+    effect: { type: 'coin', value: 3 },
+    glowColor: 0xFFD700,      // Vàng
+    borderColor: 0xFFFFFF,    // Viền trắng
+    dropChance: 0.25
+  },
+
+  [ITEM_TYPES.COIN_GOLD]: {
+    name: 'Gold Coin',
+    description: '+5 Coins',
+    sprite: 'item_gold_coin',
+    effect: { type: 'coin', value: 5 },
+    glowColor: 0xFFD700,      // Vàng
+    borderColor: 0xFFFFFF,    // Viền trắng
+    dropChance: 0.10
+  },
+};
 
 // CẬP NHẬT HỆ THỐNG VŨ KHÍ
 export const WEAPON_STATS = {

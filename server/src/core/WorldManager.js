@@ -1,6 +1,7 @@
 import {
   MAP_SIZE, FOOD_COUNT, OBSTACLE_COUNT, OBSTACLE_RADIUS_MIN, OBSTACLE_RADIUS_MAX,
-  CHEST_COUNT, CHEST_RADIUS, CHEST_TYPES, ITEM_TYPES, NEBULA_COUNT, NEBULA_RADIUS,
+  CHEST_COUNT, CHEST_RADIUS, CHEST_TYPES, ITEM_TYPES, ITEM_CONFIG,
+  NEBULA_COUNT, NEBULA_RADIUS,
   STATION_COUNT, STATION_STATS
 } from '../../../shared/src/constants.js';
 import { Chest } from '../entities/Chest.js';
@@ -239,30 +240,103 @@ export class WorldManager {
   }
 
   spawnItem(x, y, fromChestType = CHEST_TYPES.NORMAL) {
-    let itemType;
-
-    // Nếu rớt từ STATION -> Đồ xịn (tương tự logic Big Chest cũ)
     if (fromChestType === CHEST_TYPES.STATION) {
-      const rand = Math.random();
-      if (rand < 0.4) itemType = ITEM_TYPES.WEAPON_RED;
-      else if (rand < 0.7) itemType = ITEM_TYPES.WEAPON_GREEN;
-      else itemType = ITEM_TYPES.COIN_LARGE;
+      // Station drops: 3 items với 3 màu khác nhau (xanh, vàng, đỏ)
+      const greenItem = this.rollGreenItem();   // Xanh
+      const yellowItem = this.rollYellowItem(); // Vàng
+      const redItem = this.rollRedItem();       // Đỏ
+
+      // Spawn 3 items xung quanh vị trí Station (hình tam giác)
+      const angleOffset = (Math.PI * 2) / 3; // 120 degrees
+      const spawnRadius = 50; // Khoảng cách từ tâm Station
+
+      const items = [greenItem, yellowItem, redItem];
+
+      items.forEach((itemType, index) => {
+        const angle = angleOffset * index + Math.random() * 0.3; // Random nhẹ
+        const itemX = x + Math.cos(angle) * spawnRadius;
+        const itemY = y + Math.sin(angle) * spawnRadius;
+
+        const item = new Item(itemX, itemY, itemType);
+        this.items.push(item);
+        this.delta.itemsAdded.push(item);
+      });
+
+      console.log(`Station destroyed! Dropped: ${greenItem}, ${yellowItem}, ${redItem}`);
     } else {
-      // Normal Chest -> Đồ thường
-      const rand = Math.random();
-      if (rand < 0.4) {
-        itemType = Math.random() < 0.7 ? ITEM_TYPES.COIN_SMALL : ITEM_TYPES.COIN_MEDIUM;
-      } else {
-        const normalItems = [
-          ITEM_TYPES.HEALTH_PACK, ITEM_TYPES.SHIELD, ITEM_TYPES.SPEED,
-          ITEM_TYPES.WEAPON_BLUE
-        ];
-        itemType = normalItems[Math.floor(Math.random() * normalItems.length)];
+      // Normal Chest drops: 1 item thường
+      const itemType = this.rollCommonDrop();
+      const item = new Item(x, y, itemType);
+      this.items.push(item);
+      this.delta.itemsAdded.push(item);
+    }
+  }
+
+
+  rollCommonDrop() {
+    const pool = [
+      ITEM_TYPES.COIN_BRONZE,      // Vàng - 40%
+      ITEM_TYPES.COIN_SILVER,      // Vàng - 25%
+      ITEM_TYPES.HEALTH_PACK,      // Xanh - 25%
+      ITEM_TYPES.SPEED_BOOST,      // Vàng - 30%
+      ITEM_TYPES.WEAPON_BLUE       // Đỏ - 25%
+    ];
+
+    return this.weightedRandom(pool);
+  }
+
+  rollGreenItem() {
+    return ITEM_TYPES.HEALTH_PACK;
+  }
+
+  rollYellowItem() {
+    const pool = [
+      ITEM_TYPES.SHIELD,           // 15%
+      ITEM_TYPES.SPEED_BOOST,      // 30%
+      ITEM_TYPES.COIN_BRONZE,      // 40%
+      ITEM_TYPES.COIN_SILVER,      // 25%
+      ITEM_TYPES.COIN_GOLD         // 10%
+    ];
+
+    return this.weightedRandom(pool);
+  }
+
+  rollRedItem() {
+    const pool = [
+      ITEM_TYPES.WEAPON_BLUE,      // 25%
+      ITEM_TYPES.WEAPON_RED,       // 15%
+      ITEM_TYPES.WEAPON_GREEN      // 20%
+    ];
+
+    return this.weightedRandom(pool);
+  }
+
+
+  weightedRandom(itemTypes) {
+    // Calculate total weight
+    const weights = itemTypes.map(type => ITEM_CONFIG[type].dropChance);
+    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+
+    // Random selection
+    let random = Math.random() * totalWeight;
+
+    for (let i = 0; i < itemTypes.length; i++) {
+      random -= weights[i];
+      if (random <= 0) {
+        return itemTypes[i];
       }
     }
 
-    const item = new Item(x, y, itemType);
-    this.items.push(item);
-    this.delta.itemsAdded.push(item);
+    return itemTypes[0]; // Fallback
+  }
+
+  update(dt) {
+    // Check for expired items
+    for (let i = this.items.length - 1; i >= 0; i--) {
+      if (this.items[i].shouldDespawn()) {
+        this.delta.itemsRemoved.push(this.items[i].id);
+        this.items.splice(i, 1);
+      }
+    }
   }
 }

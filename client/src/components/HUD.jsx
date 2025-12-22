@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { socket } from '../network/socket';
-import { MAP_SIZE } from '@shared/constants'; // Import MAP_SIZE từ shared
+import { MAP_SIZE, ITEM_CONFIG } from '@shared/constants'; // Import MAP_SIZE từ shared
 
 const MINIMAP_SIZE = 150; // Kích thước Minimap
 
@@ -14,6 +14,8 @@ const HUD = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [myPos, setMyPos] = useState({ x: 0, y: 0 });
   const [kingPos, setKingPos] = useState(null);
+
+  const [pickupNotif, setPickupNotif] = useState(null);
 
   useEffect(() => {
     const unsubscribe = socket.subscribe((packet) => {
@@ -41,6 +43,19 @@ const HUD = () => {
           setKingPos({ x: sorted[0].x, y: sorted[0].y });
         }
       }
+
+      if (packet.type === 'ITEM_PICKED_UP' && packet.playerId === socket.myId) {
+        const config = ITEM_CONFIG[packet.itemType];
+        if (config) {
+          setPickupNotif({
+            name: config.name,
+            description: config.description
+          });
+
+          // Auto-hide after 1.5 seconds
+          setTimeout(() => setPickupNotif(null), 1500);
+        }
+      }
     });
 
     return () => unsubscribe();
@@ -58,6 +73,17 @@ const HUD = () => {
       top: ratioY * MINIMAP_SIZE
     };
   };
+
+  function getRarityColor(rarity) {
+    const colors = {
+      common: '#FFFFFF',
+      uncommon: '#00FF00',
+      rare: '#0080FF',
+      epic: '#9933FF',
+      legendary: '#FFD700'
+    };
+    return colors[rarity] || '#FFFFFF';
+  }
 
   const myMinimapPos = worldToMinimap(myPos.x, myPos.y);
   const kingMinimapPos = kingPos ? worldToMinimap(kingPos.x, kingPos.y) : null;
@@ -256,8 +282,43 @@ const HUD = () => {
             </div>
           </div>
         )}
-
       </div>
+
+      {pickupNotif && (
+        <div style={{
+          position: 'absolute',
+          top: '30%',                    // Lệch lên trên (30% từ top thay vì 50%)
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          textAlign: 'center',
+          pointerEvents: 'none',
+          zIndex: 1000,
+          animation: 'fadeInOut 1.5s ease'
+        }}>
+          {/* Item Name */}
+          <div style={{
+            fontSize: '28px',
+            fontWeight: 'bold',
+            color: '#FFD700',           // Vàng gold - dễ nhìn
+            textShadow: '0 0 10px rgba(255, 215, 0, 0.8), 2px 2px 4px rgba(0,0,0,0.9)',
+            marginBottom: '8px',
+            letterSpacing: '1px'
+          }}>
+            + {pickupNotif.name}
+          </div>
+
+          {/* Description */}
+          <div style={{
+            fontSize: '16px',
+            fontWeight: '600',
+            color: '#FFD700',           // Cùng màu vàng
+            textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+            opacity: 0.9
+          }}>
+            {pickupNotif.description}
+          </div>
+        </div>
+      )}
 
     </div>
   );
