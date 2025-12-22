@@ -182,8 +182,11 @@ export const ITEM_CONFIG = {
 // CẬP NHẬT HỆ THỐNG VŨ KHÍ
 export const WEAPON_STATS = {
   BLUE: {
-    cooldown: 200,        // Bắn nhanh
-    damage: 10,
+    // Cân bằng: 3 viên, bắn vừa, hồi trung bình
+    maxAmmo: 3,           // <--- MỚI
+    regenTime: 1500,      // <--- MỚI (1.5s hồi 1 viên)
+    cooldown: 300,        // Tốc độ nhả đạn (giữa các viên trong băng)
+    damage: 1,            // 1 viên = 1 live
     speed: 600,
     range: 500,
     laserSprite: 'laserBlue01',
@@ -192,20 +195,26 @@ export const WEAPON_STATS = {
   },
 
   RED: {
-    cooldown: 400,        // Bắn chậm hơn
-    damage: 25,           // Damage cao
-    speed: 400,
-    range: 450,
+    // Sniper: 1 viên duy nhất, bắn xong phải đợi, damage cực to
+    maxAmmo: 1,           // <--- MỚI
+    regenTime: 3000,      // <--- MỚI (3s mới có lại đạn)
+    cooldown: 1000,
+    damage: 3,            // 1 viên = 3 live (One shot one kill nếu còn ít máu)
+    speed: 400,           // Tốc độ bay chậm
+    range: 800,           // Tầm xa (đã tăng lên để đúng chất sniper)
     laserSprite: 'laserRed01',
     color: 0xFF0000,
-    requireStill: false
+    requireStill: true    // (Optional) Đứng yên mới bắn được để cân bằng
   },
 
   GREEN: {
-    cooldown: 150,        // Bắn cực nhanh
-    damage: 8,            // Damage thấp
-    speed: 700,          // Tốc độ đạn nhanh nhất
-    range: 600,
+    // SMG: 6 viên, xả nhanh, damage bé
+    maxAmmo: 6,           // <--- MỚI
+    regenTime: 600,       // <--- MỚI (Hồi đạn nhanh)
+    cooldown: 100,        // Tốc độ nhả đạn cực nhanh
+    damage: 0.5,          // 2 viên = 1 live
+    speed: 800,           // Đạn bay rất nhanh
+    range: 400,           // Tầm ngắn
     laserSprite: 'laserGreen01',
     color: 0x00FF00,
     requireStill: false

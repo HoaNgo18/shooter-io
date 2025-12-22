@@ -19,7 +19,7 @@ export class Player extends Entity {
     this.id = id;
     this.name = name;
     // SỬA: Dùng constant thay vì số 3
-    this.lives = 3; 
+    this.lives = 3;
     this.maxLives = SHIP_MAX_LIVES;
     this.score = 0;
     this.weapon = 'BLUE';
@@ -55,6 +55,10 @@ export class Player extends Entity {
     this.lastMoveTime = 0;
     this.isMoving = false;
     this.isBoosting = false;
+
+    const stats = WEAPON_STATS[this.weapon];
+    this.currentAmmo = stats ? stats.maxAmmo : 3; 
+    this.lastAmmoRegen = Date.now();
 
     this.input = {
       up: false, down: false, left: false, right: false,
@@ -126,6 +130,9 @@ export class Player extends Entity {
 
     this.isMoving = Math.abs(this.vx) > 10 || Math.abs(this.vy) > 10;
     this.clampToMap();
+
+    // Update Ammo Regen
+    this.updateAmmo();
   }
 
   attack() {
@@ -134,8 +141,13 @@ export class Player extends Entity {
 
     if (now - this.lastAttack < stats.cooldown) return null;
     if (stats.requireStill && this.isMoving) return null;
+    if (this.currentAmmo <= 0) {
+      return null; // Hết đạn, không bắn được (phải đợi hồi)
+    }
 
     this.lastAttack = now;
+    this.currentAmmo--; // Trừ 1 viên đạn
+    this.lastAmmoRegen = Date.now();
 
     // Tính góc bắn dựa trên hướng sprite
     // - Player sprite (hướng LÊN): angle - 90°
@@ -233,7 +245,8 @@ export class Player extends Entity {
 
       case 'weapon':
         this.weapon = effect.weaponType;
-        console.log(`${this.name} equipped ${effect.weaponType} weapon`);
+        this.currentAmmo = WEAPON_STATS[effect.weaponType].maxAmmo;
+        console.log(`${this.name} equipped ${effect.weaponType} (Ammo: ${this.currentAmmo})`);
         break;
 
       case 'coin':
@@ -242,8 +255,9 @@ export class Player extends Entity {
         break;
 
       case 'ammo_refill':
-        this.lastAttack = 0; // Reset attack cooldown
-        console.log(`${this.name} ammo refilled!`);
+        const stats = WEAPON_STATS[this.weapon];
+        this.currentAmmo = stats.maxAmmo;
+        console.log(`${this.name} reloaded full ammo!`);
         break;
     }
   }
@@ -256,6 +270,42 @@ export class Player extends Entity {
     this.lastDamageTime = Date.now();
 
     if (this.lives < 0) this.lives = 0;
+  }
+
+  updateAmmo() {
+    const stats = WEAPON_STATS[this.weapon];
+    if (!stats) return;
+
+    // TRƯỜNG HỢP 1: Đạn đã đầy
+    if (this.currentAmmo >= stats.maxAmmo) {
+      this.currentAmmo = stats.maxAmmo;
+
+      // Luôn cập nhật mốc thời gian về hiện tại. 
+      // Lý do: Để ngay khi vừa bắn 1 viên, game sẽ bắt đầu đếm từ 0ms đến regenTime.
+      this.lastAmmoRegen = Date.now();
+      return;
+    }
+
+    // TRƯỜNG HỢP 2: Đang thiếu đạn -> Tính toán hồi
+    const now = Date.now();
+
+    // Nếu đã qua đủ thời gian hồi của 1 viên
+    if (now - this.lastAmmoRegen >= stats.regenTime) {
+      // 1. Hồi đúng 1 viên
+      this.currentAmmo++;
+
+      // 2. Reset mốc thời gian
+      // Dùng cách cộng dồn (this.lastAmmoRegen += stats.regenTime) sẽ chính xác hơn là gán = now()
+      // vì nó giữ được phần dư thời gian nếu server bị lag nhẹ.
+      this.lastAmmoRegen += stats.regenTime;
+
+      // Chặn lỗi: Nếu lag quá lâu khiến lastAmmoRegen bị cũ quá, ta reset về now để tránh hồi 1 lúc nhiều viên
+      if (this.lastAmmoRegen < now - stats.regenTime) {
+        this.lastAmmoRegen = now;
+      }
+
+      console.log(`${this.name} recovered 1 ammo. (${this.currentAmmo}/${stats.maxAmmo})`);
+    }
   }
 
   isDead() { return this.lives <= 0; }
@@ -273,12 +323,14 @@ export class Player extends Entity {
     if (skinId) this.skinId = skinId;
     this.shieldEndTime = 0;
     this.speedBuffEndTime = 0;
-    this.weapon = 'BLUE';
+
     this.score = 0;
-    
     this.radius = SHIP_RADIUS;
-    
     this.isBoosting = false;
+
+    this.weapon = 'BLUE';
+    this.currentAmmo = WEAPON_STATS.BLUE.maxAmmo; // Đạn hiện tại
+    this.lastAmmoRegen = Date.now();
   }
 
   clampToMap() {
@@ -294,12 +346,14 @@ export class Player extends Entity {
       vx: Math.round(this.vx), vy: Math.round(this.vy),
       angle: this.angle, lives: this.lives,
       maxLives: this.maxLives,
-      score: this.score, dead: this.dead, weapon: this.weapon,
+      score: this.score, dead: this.dead,
       radius: this.radius, coins: this.coins,
       hasShield: Date.now() < this.shieldEndTime,
       isSpeedUp: Date.now() < this.speedBuffEndTime,
       isMoving: this.isMoving, isBoosting: this.isBoosting,
-      skinId: this.skinId, hi: this.isHidden
+      skinId: this.skinId, hi: this.isHidden,
+      weapon: this.weapon, currentAmmo: this.currentAmmo,   // <--- Gửi thêm cái này
+      maxAmmo: WEAPON_STATS[this.weapon].maxAmmo // Gửi max để client vẽ thanh đạn
     };
   }
 }
