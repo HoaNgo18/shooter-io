@@ -61,9 +61,9 @@ export class GameScene extends Phaser.Scene {
         this.load.image('background', '/Backgrounds/blue.png');
 
         //Load laser sprites
-        this.load.image('laserBlue01', '/Lasers/laserBlue01.png');
-        this.load.image('laserGreen01', '/Lasers/laserGreen11.png');
-        this.load.image('laserRed01', '/Lasers/laserRed01.png');
+        this.load.image('laserBlue01', '/Lasers/laserBlue05.png');
+        this.load.image('laserGreen01', '/Lasers/laserGreen13.png');
+        this.load.image('laserRed01', '/Lasers/laserRed16.png');
 
         //Load stars
         this.load.image('star1', '/Effects/star1.png');

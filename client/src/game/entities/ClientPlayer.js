@@ -136,21 +136,21 @@ export class ClientPlayer {
         // 3. Vẽ các chấm tròn mới
         const radius = 35; // Khoảng cách từ tâm tàu đến đạn
         const startAngle = -Math.PI / 2; // Bắt đầu từ phía trên
-        
+
         // Tính góc chia đều: Ví dụ 3 viên thì chia 120 độ, 6 viên chia 60 độ
         // Hoặc bạn có thể fix cứng vị trí nếu muốn giống Astro Party
-        const angleStep = (Math.PI * 2) / (WEAPON_STATS[weaponType].maxAmmo || 3); 
+        const angleStep = (Math.PI * 2) / (WEAPON_STATS[weaponType].maxAmmo || 3);
 
         for (let i = 0; i < count; i++) {
             const angle = startAngle + (i * angleStep);
-            
+
             const x = Math.cos(angle) * radius;
             const y = Math.sin(angle) * radius;
 
             // Vẽ chấm tròn (Orb)
             const orb = this.scene.add.circle(x, y, 2.5, color, 1);
             orb.setStrokeStyle(0.5, 0xFFFFFF, 0.8); // Viền trắng cho rõ
-            
+
             // Hiệu ứng phát sáng nhẹ
             this.scene.tweens.add({
                 targets: orb,
@@ -293,7 +293,15 @@ export class ClientPlayer {
     }
 
     destroy() {
-        this.scene.tweens.killTweensOf(this.shieldSprite); // Cleanup tweens
+        // Kill ALL tweens targeting this player
+        this.scene.tweens.killTweensOf(this.container);
+        this.scene.tweens.killTweensOf(this.shieldSprite);
+        this.scene.tweens.killTweensOf(this.thrustFlame);
+
+        if (this.particles) {
+            this.particles.destroy();
+        }
+
         this.container.destroy();
         this.ammoOrbs.forEach(orb => orb.destroy());
         this.text.destroy();

@@ -35,9 +35,9 @@ function App() {
 
     // Wait for socket to stabilize
     await new Promise(resolve => setTimeout(resolve, 100));
-    socket.send({ 
-        type: PacketType.RESPAWN,
-        skinId: skinToUse 
+    socket.send({
+      type: PacketType.RESPAWN,
+      skinId: skinToUse
     });
     // Directly start game, assuming HomeScreen handles login
     // Set game state to playing
@@ -70,7 +70,7 @@ function App() {
   // (Chạy độc lập với việc đang chơi hay ở Home)
   useEffect(() => {
     const handleGlobalMessage = (packet) => {
-      if (packet.type === 'USER_DATA_UPDATE') {   
+      if (packet.type === 'USER_DATA_UPDATE') {
         setUser(prevUser => {
           if (!prevUser) return null;
           return {
@@ -88,10 +88,11 @@ function App() {
 
     // Đăng ký lắng nghe
     const unsubscribe = socket.subscribe(handleGlobalMessage);
-    
+
     // Hủy đăng ký khi component unmount (tắt app)
     return () => {
       unsubscribe();
+      socket.resetGameScene();
     };
   }, []); // [] nghĩa là chỉ chạy 1 lần khi App bật lên
 
@@ -101,7 +102,7 @@ function App() {
 
     if (gameState === 'playing') {
       console.log("🎮 Game Started - Init Phaser");
-      
+
       const config = {
         type: Phaser.AUTO,
         width: window.innerWidth,

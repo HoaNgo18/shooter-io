@@ -26,7 +26,9 @@ router.post('/register', async (req, res) => {
     }
 
     // Create user
-    const user = new User({ username, email, password });
+    const user = await User.findOne({
+      username: { $eq: username } // Explicit operator
+    });
     await user.save();
 
     // Generate token
@@ -82,9 +84,9 @@ router.post('/login', async (req, res) => {
         email: user.email,
         highScore: user.highScore || 0,
         coins: user.coins || 0,
-        totalKills: user.totalKills || 0,     
+        totalKills: user.totalKills || 0,
         totalDeaths: user.totalDeaths || 0,
-        skins: user.skins, 
+        skins: user.skins,
         equippedSkin: user.equippedSkin || 'default'
       }
     });

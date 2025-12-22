@@ -28,9 +28,11 @@ export class Game {
   }
 
   start() {
-    const tickDelay = 1000 / TICK_RATE;
-    this.tickInterval = setInterval(() => this.tick(), tickDelay);
-    console.log(`Game loop started at ${TICK_RATE} ticks/sec`);
+    const SIMULATION_RATE = 60; // Server vẫn tick 60 FPS
+    const BROADCAST_RATE = 20;   // Nhưng chỉ gửi 20 FPS
+
+    setInterval(() => this.tick(), 1000 / SIMULATION_RATE);
+    setInterval(() => this.sendStateUpdate(), 1000 / BROADCAST_RATE);
   }
 
   tick() {

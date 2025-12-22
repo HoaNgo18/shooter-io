@@ -8,3 +8,12 @@ export default {
   JWT_SECRET: process.env.JWT_SECRET || 'change-this-secret-key',
   NODE_ENV: process.env.NODE_ENV || 'development'
 };
+
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'change-this-secret-key') {
+    throw new Error('CRITICAL: Must set strong JWT_SECRET in production!');
+  }
+  if (!process.env.MONGODB_URI?.includes('mongodb+srv://')) {
+    throw new Error('CRITICAL: Must use MongoDB Atlas in production!');
+  }
+}

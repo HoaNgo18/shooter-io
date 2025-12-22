@@ -57,7 +57,7 @@ export class Player extends Entity {
     this.isBoosting = false;
 
     const stats = WEAPON_STATS[this.weapon];
-    this.currentAmmo = stats ? stats.maxAmmo : 3; 
+    this.currentAmmo = stats ? stats.maxAmmo : 3;
     this.lastAmmoRegen = Date.now();
 
     this.input = {
@@ -141,34 +141,101 @@ export class Player extends Entity {
 
     if (now - this.lastAttack < stats.cooldown) return null;
     if (stats.requireStill && this.isMoving) return null;
-    if (this.currentAmmo <= 0) {
-      return null; // Hết đạn, không bắn được (phải đợi hồi)
-    }
+    if (this.currentAmmo <= 0) return null;
 
     this.lastAttack = now;
-    this.currentAmmo--; // Trừ 1 viên đạn
-    this.lastAmmoRegen = Date.now();
 
-    // Tính góc bắn dựa trên hướng sprite
-    // - Player sprite (hướng LÊN): angle - 90°
-    // - Bot sprite (hướng XUỐNG): angle (không cần offset)
-    const finalAngle = this.spritePointsDown ? this.angle : (this.angle - Math.PI / 2);
+    // Logic tính đạn hồi
+    const currentMax = this.getMaxAmmo();
+    if (this.currentAmmo === currentMax) {
+      this.lastAmmoRegen = now;
+    }
 
-    // Spawn đạn phía trước tàu (30 pixel về phía mũi tàu)
+    this.currentAmmo--;
+
+    // --- CHUẨN BỊ THÔNG SỐ CHUNG ---
+    const baseAngle = this.spritePointsDown ? this.angle : (this.angle - Math.PI / 2);
     const spawnDistance = 30;
-    const spawnX = this.x + Math.cos(finalAngle) * spawnDistance;
-    const spawnY = this.y + Math.sin(finalAngle) * spawnDistance;
-
-    // Kế thừa vận tốc của tàu vào đạn
     const projectileSpeed = stats.speed + Math.sqrt(this.vx ** 2 + this.vy ** 2);
+    const projectiles = [];
 
-    const p = new Projectile(
-      spawnX, spawnY, finalAngle,
-      projectileSpeed, stats.damage, this.id, this.name,
-      this.weapon, stats.range, 8
-    );
+    // --- XỬ LÝ RIÊNG TỪNG LOẠI SÚNG ---
 
-    return [p];
+    if (this.weapon === 'BLUE') {
+      // === BLUE: BẮN SONG SONG (PARALLEL) ===
+      // Level 1: [0]
+      // Level 2: [-10, 10]
+      // Level 3: [-15, 0, 15]
+      let offsets = [0];
+      if (this.weaponLevel === 2) offsets = [-10, 10];
+      if (this.weaponLevel === 3) offsets = [-15, 0, 15];
+
+      offsets.forEach(offset => {
+        // Tọa độ xuất phát cơ bản (tại nòng súng)
+        let spawnX = this.x + Math.cos(baseAngle) * spawnDistance;
+        let spawnY = this.y + Math.sin(baseAngle) * spawnDistance;
+
+        // 1. Dịch chuyển NGANG (Side Offset - Để tạo song song)
+        if (offset !== 0) {
+          spawnX += Math.cos(baseAngle + Math.PI / 2) * offset;
+          spawnY += Math.sin(baseAngle + Math.PI / 2) * offset;
+        }
+
+        // 2. Dịch chuyển DỌC (Forward Offset - Để viên giữa cao hơn)
+        // Chỉ áp dụng khi Level 3 và là viên ở giữa (offset === 0)
+        if (this.weaponLevel === 3 && offset === 0) {
+          const forwardBoost = 15; // Đẩy lên trước 15 pixel
+          spawnX += Math.cos(baseAngle) * forwardBoost;
+          spawnY += Math.sin(baseAngle) * forwardBoost;
+        }
+
+        projectiles.push(new Projectile(
+          spawnX, spawnY, baseAngle,
+          projectileSpeed, stats.damage, this.id, this.name,
+          this.weapon, stats.range, 8
+        ));
+      });
+
+    } else if (this.weapon === 'GREEN') {
+      // === GREEN: BẮN HÌNH NÓN (CONE SPREAD) ===
+      // Level 1: [0]
+      // Level 2: [-5 độ, +5 độ]
+      // Level 3: [-8 độ, 0, +8 độ]
+      // Lưu ý: Đơn vị là Radian (0.08 rad ~ 4.5 độ) -> Spread nhỏ
+      let angleOffsets = [0];
+      if (this.weaponLevel === 2) angleOffsets = [-0.08, 0.08];
+      if (this.weaponLevel === 3) angleOffsets = [-0.12, 0, 0.12];
+
+      angleOffsets.forEach(angleOffset => {
+        // Vị trí xuất phát giống nhau (từ nòng súng)
+        const spawnX = this.x + Math.cos(baseAngle) * spawnDistance;
+        const spawnY = this.y + Math.sin(baseAngle) * spawnDistance;
+
+        // Góc bắn thay đổi (Hình nón)
+        const spreadAngle = baseAngle + angleOffset;
+
+        projectiles.push(new Projectile(
+          spawnX, spawnY, spreadAngle, // Góc thay đổi
+          projectileSpeed, stats.damage, this.id, this.name,
+          this.weapon, stats.range, 8
+        ));
+      });
+
+    } else {
+      // === RED (VÀ MẶC ĐỊNH): BẮN 1 VIÊN THẲNG ===
+      // Red tăng cấp chỉ tăng số lượng đạn dự trữ (Max Ammo), 
+      // không thay đổi cách bắn.
+      const spawnX = this.x + Math.cos(baseAngle) * spawnDistance;
+      const spawnY = this.y + Math.sin(baseAngle) * spawnDistance;
+
+      projectiles.push(new Projectile(
+        spawnX, spawnY, baseAngle,
+        projectileSpeed, stats.damage, this.id, this.name,
+        this.weapon, stats.range, 8
+      ));
+    }
+
+    return projectiles;
   }
 
   performDash() {
@@ -244,9 +311,20 @@ export class Player extends Entity {
         break;
 
       case 'weapon':
-        this.weapon = effect.weaponType;
-        this.currentAmmo = WEAPON_STATS[effect.weaponType].maxAmmo;
-        console.log(`${this.name} equipped ${effect.weaponType} (Ammo: ${this.currentAmmo})`);
+        if (this.weapon === effect.weaponType) {
+          this.weaponLevel = Math.min(this.weaponLevel + 1, 3);
+          console.log(`${this.name} upgraded ${this.weapon} to Level ${this.weaponLevel}`);
+        }
+        // NẾU NHẶT SÚNG KHÁC
+        else {
+          this.weapon = effect.weaponType;
+          this.weaponLevel = 1;
+          console.log(`${this.name} switched to ${this.weapon}`);
+        }
+
+        // Nạp đầy đạn theo Max Ammo mới (quan trọng cho Đạn Đỏ)
+        this.currentAmmo = this.getMaxAmmo();
+        this.lastAmmoRegen = Date.now();
         break;
 
       case 'coin':
@@ -255,9 +333,7 @@ export class Player extends Entity {
         break;
 
       case 'ammo_refill':
-        const stats = WEAPON_STATS[this.weapon];
-        this.currentAmmo = stats.maxAmmo;
-        console.log(`${this.name} reloaded full ammo!`);
+        this.currentAmmo = this.getMaxAmmo();
         break;
     }
   }
@@ -272,39 +348,43 @@ export class Player extends Entity {
     if (this.lives < 0) this.lives = 0;
   }
 
+  getMaxAmmo() {
+    const stats = WEAPON_STATS[this.weapon];
+    if (!stats) return 0;
+
+    // Nếu là Đạn Đỏ: Level 1 = Gốc, Level 2 = +1 viên, Level 3 = +2 viên
+    if (this.weapon === 'RED') {
+      return stats.maxAmmo + (this.weaponLevel - 1);
+    }
+
+    // Các súng khác giữ nguyên maxAmmo mặc định
+    return stats.maxAmmo;
+  }
+
   updateAmmo() {
     const stats = WEAPON_STATS[this.weapon];
     if (!stats) return;
 
-    // TRƯỜNG HỢP 1: Đạn đã đầy
-    if (this.currentAmmo >= stats.maxAmmo) {
-      this.currentAmmo = stats.maxAmmo;
+    // SỬA: Dùng this.getMaxAmmo() thay vì stats.maxAmmo cố định
+    const currentMax = this.getMaxAmmo();
 
-      // Luôn cập nhật mốc thời gian về hiện tại. 
-      // Lý do: Để ngay khi vừa bắn 1 viên, game sẽ bắt đầu đếm từ 0ms đến regenTime.
+    // TRƯỜNG HỢP 1: Đạn đã đầy
+    if (this.currentAmmo >= currentMax) {
+      this.currentAmmo = currentMax;
       this.lastAmmoRegen = Date.now();
       return;
     }
 
     // TRƯỜNG HỢP 2: Đang thiếu đạn -> Tính toán hồi
     const now = Date.now();
-
-    // Nếu đã qua đủ thời gian hồi của 1 viên
     if (now - this.lastAmmoRegen >= stats.regenTime) {
-      // 1. Hồi đúng 1 viên
       this.currentAmmo++;
-
-      // 2. Reset mốc thời gian
-      // Dùng cách cộng dồn (this.lastAmmoRegen += stats.regenTime) sẽ chính xác hơn là gán = now()
-      // vì nó giữ được phần dư thời gian nếu server bị lag nhẹ.
       this.lastAmmoRegen += stats.regenTime;
 
-      // Chặn lỗi: Nếu lag quá lâu khiến lastAmmoRegen bị cũ quá, ta reset về now để tránh hồi 1 lúc nhiều viên
       if (this.lastAmmoRegen < now - stats.regenTime) {
         this.lastAmmoRegen = now;
       }
-
-      console.log(`${this.name} recovered 1 ammo. (${this.currentAmmo}/${stats.maxAmmo})`);
+      // console.log(`${this.name} recovered 1 ammo.`);
     }
   }
 
@@ -353,7 +433,7 @@ export class Player extends Entity {
       isMoving: this.isMoving, isBoosting: this.isBoosting,
       skinId: this.skinId, hi: this.isHidden,
       weapon: this.weapon, currentAmmo: this.currentAmmo,   // <--- Gửi thêm cái này
-      maxAmmo: WEAPON_STATS[this.weapon].maxAmmo // Gửi max để client vẽ thanh đạn
+      maxAmmo: this.getMaxAmmo() // Gửi max để client vẽ thanh đạn
     };
   }
 }
