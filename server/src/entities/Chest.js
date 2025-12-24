@@ -40,7 +40,7 @@ export class Chest {
   }
 
   takeDamage(amount) {
-    this.health -= 1;
+    this.health -= amount;
     if (this.health <= 0) {
       this.health = 0;
       this.dead = true;

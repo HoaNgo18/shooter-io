@@ -40,7 +40,7 @@ export const STATION_STATS = {
   // Thay radius bằng width/height
   width: 86,         // Chiều ngang (tương ứng với ảnh spaceStation_018)
   height: 24,         // Chiều dọc
-  hp: 8,
+  hp: 7,
   dropCount: 3
 };
 
@@ -193,9 +193,9 @@ export const ITEM_CONFIG = {
 
   [ITEM_TYPES.BOMB]: {
     name: 'Space Mine',
-    description: 'Place a trap (150 DMG)',
+    description: 'Place a bomb',
     sprite: 'item_bomb',      // Đã đổi tên để đồng bộ (Client nhớ load key này)
-    effect: { type: 'plant_bomb', damage: 150, radius: 100 },
+    effect: { type: 'plant_bomb', damage: 3, radius: 100 },
     glowColor: 0xFF0000,      // Đỏ
     borderColor: 0xFFFFFF,    // Viền trắng
     dropChance: 0.20

@@ -4,10 +4,10 @@ import { distance } from '../../../shared/src/utils.js';
 
 const BOT_NAMES = [
   "Stardust", "Nebula", "Comet", "Photon", 
-  "Quantum", "Pulsar", "Nova", "Meteor", "Vortex", "Eclipse"
+  "Quantum", "Pulsar", "Nova", "Meteor", "Vortex", "Eclipse",
+  "SunWukong", "Azuki", "Bronze", "HoaThanhQue", "Shiba"
 ];
 
-// Danh sách skin bot (từ Enemies folder)
 const BOT_SKINS = ['bot_black', 'bot_blue', 'bot_green', 'bot_red'];
 
 export class Bot extends Player {
@@ -15,7 +15,6 @@ export class Bot extends Player {
     const name = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)] + 
                  Math.floor(Math.random() * 999);
     
-    // Random chọn 1 bot skin
     const randomSkin = BOT_SKINS[Math.floor(Math.random() * BOT_SKINS.length)];
     
     super(id, name, null, randomSkin);
@@ -24,24 +23,46 @@ export class Bot extends Player {
     this.isBot = true;
     this.target = null;
     
-    // AI params
     this.accuracy = 0.3 + Math.random() * 0.4;
     this.aggression = Math.random();
     this.lastShot = 0;
     
-    // Space ship AI specific
     this.desiredAngle = 0;
     this.stateChangeTime = 0;
-    this.currentState = 'WANDER'; // WANDER, CHASE, ATTACK, EVADE
-
-    // ĐÁU HIỆU QUAN TRỌNG: Bot dùng sprite hướng XUỐNG
+    this.currentState = 'WANDER'; 
     this.spritePointsDown = true;
   }
 
   think(game) {
     if (this.dead) return;
 
-    this.findTarget(game);
+    // --- SỬA ĐỔI: VALIDATE TARGET (Kiểm tra lại mục tiêu hiện tại) ---
+    if (this.target) {
+        // Tìm đối tượng player thực tế trong danh sách players của game
+        // (Giả sử game.players là Map như cấu trúc thường dùng, nếu là Array thì dùng .find)
+        let targetPlayer = null;
+        if (game.players instanceof Map) {
+            targetPlayer = game.players.get(this.target.id);
+        } else if (Array.isArray(game.players)) {
+            targetPlayer = game.players.find(p => p.id === this.target.id);
+        }
+
+        // Nếu mục tiêu không còn tồn tại, đã chết, HOẶC ĐANG TÀNG HÌNH
+        if (!targetPlayer || targetPlayer.dead || targetPlayer.isHidden) {
+            this.target = null; // Quên mục tiêu ngay lập tức
+        } else {
+            // Nếu vẫn thấy, cập nhật vị trí mới nhất để bắn cho chuẩn
+            this.target.x = targetPlayer.x;
+            this.target.y = targetPlayer.y;
+            this.target.distance = distance(this.x, this.y, targetPlayer.x, targetPlayer.y);
+        }
+    }
+    // -------------------------------------------------------------
+
+    // Chỉ tìm mục tiêu mới nếu hiện tại không có mục tiêu
+    if (!this.target) {
+      this.findTarget(game);
+    }
     
     if (this.target) {
       this.engageTarget(game);
@@ -55,8 +76,9 @@ export class Bot extends Player {
     let newTarget = null;
 
     game.players.forEach(other => {
+      // --- SỬA ĐỔI: Xóa dòng thừa, chỉ giữ 1 dòng check đầy đủ ---
+      // Bỏ qua: Chính mình, Bot khác, Người chết, Người tàng hình
       if (other.id === this.id || other.isBot || other.dead || other.isHidden) return;
-      if (other.id === this.id || other.isBot || other.dead) return;
 
       const d = distance(this.x, this.y, other.x, other.y);
       const visionRange = 400 + (this.aggression * 200);
@@ -83,7 +105,6 @@ export class Bot extends Player {
     const dist = this.target.distance;
     
     // Calculate desired angle to face target
-    // LƯU Ý: Vì sprite bot hướng XUỐNG, ta KHÔNG trừ Math.PI/2
     this.desiredAngle = Math.atan2(dy, dx);
 
     // Current angle difference
@@ -92,7 +113,7 @@ export class Bot extends Player {
     while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
 
     // === ROTATION CONTROL ===
-    const angleThreshold = 0.1; // 5 degrees tolerance
+    const angleThreshold = 0.1;
     if (Math.abs(angleDiff) > angleThreshold) {
       this.input.left = angleDiff < 0;
       this.input.right = angleDiff > 0;
@@ -102,25 +123,22 @@ export class Bot extends Player {
     }
 
     // === MOVEMENT CONTROL ===
-    const optimalDist = 300; // Khoảng cách lý tưởng
+    const optimalDist = 300; 
 
     if (dist > optimalDist + 50) {
-      // Too far -> thrust forward
       this.input.up = true;
       this.input.down = false;
     } else if (dist < optimalDist - 50) {
-      // Too close -> brake or rotate away
       this.input.up = false;
       this.input.down = true;
     } else {
-      // Good distance -> maintain
       this.input.up = false;
       this.input.down = false;
     }
 
     // === SHOOTING ===
     const now = Date.now();
-    const isAimingWell = Math.abs(angleDiff) < 0.3; // ~17 degrees
+    const isAimingWell = Math.abs(angleDiff) < 0.3; 
     
     if (isAimingWell && 
         dist < 400 && 
@@ -138,13 +156,11 @@ export class Bot extends Player {
   wander() {
     const now = Date.now();
     
-    // Change direction every 2-4 seconds
     if (now > this.stateChangeTime) {
       this.desiredAngle = Math.random() * Math.PI * 2 - Math.PI;
       this.stateChangeTime = now + 2000 + Math.random() * 2000;
     }
 
-    // Rotate towards desired angle
     let angleDiff = this.desiredAngle - this.angle;
     while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
     while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
@@ -157,7 +173,6 @@ export class Bot extends Player {
       this.input.right = false;
     }
 
-    // Thrust 50% of the time
     this.input.up = Math.random() < 0.5;
     this.input.down = false;
   }

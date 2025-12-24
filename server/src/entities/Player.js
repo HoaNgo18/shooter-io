@@ -328,7 +328,7 @@ export class Player extends Entity {
     if (Date.now() < this.shieldEndTime) return;
 
     // Mỗi lần dính đạn mất 1 mạng
-    this.lives -= 1;
+    this.lives -= amount;
     this.lastDamageTime = Date.now();
 
     if (this.lives < 0) this.lives = 0;
