@@ -4,7 +4,7 @@ import { MAP_SIZE, ITEM_CONFIG, WEAPON_STATS } from '@shared/constants'; // Impo
 
 const MINIMAP_SIZE = 150; // Kích thước Minimap
 
-const HUD = () => {
+const HUD = ({ isArena = false }) => {
   const [stats, setStats] = useState({
     lives: 3,
     maxLives: 3,
@@ -19,41 +19,81 @@ const HUD = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [myPos, setMyPos] = useState({ x: 0, y: 0 });
   const [kingPos, setKingPos] = useState(null);
+  const [aliveCount, setAliveCount] = useState(10);
 
   const [pickupNotif, setPickupNotif] = useState(null);
 
+  // Use interval to poll data from gameScene instead of packet subscription
+  // This prevents re-renders on every packet (20fps -> causes lag)
   useEffect(() => {
-    const unsubscribe = socket.subscribe((packet) => {
-      setIsConnected(true);
-
-      if (packet.players) {
-        const myId = socket.myId;
-        const me = packet.players.find(p => p.id === myId);
-
-        if (me) {
-          setStats({
-            lives: me.lives,
-            maxLives: me.maxLives,
-            score: me.score,
-            currentAmmo: me.currentAmmo !== undefined ? me.currentAmmo : 3,
-            maxAmmo: me.maxAmmo || 3,
-            weapon: me.weapon || 'BLUE',
-            inventory: me.inventory || [null, null, null, null, null],
-            selectedSlot: me.selectedSlot || 0
-          });
-          setMyPos({ x: me.x, y: me.y });
-        }
-
-        const sorted = packet.players
-          .filter(p => !p.dead)
-          .sort((a, b) => b.score - a.score);
-        setLeaderboard(sorted.slice(0, 10));
-
+    const updateInterval = setInterval(() => {
+      if (!socket.gameScene || !socket.myId) return;
+      
+      const scene = socket.gameScene;
+      const myPlayer = scene.players?.[socket.myId];
+      
+      if (myPlayer) {
+        setStats(prev => {
+          // Only update if values changed
+          if (prev.lives !== myPlayer.lives ||
+              prev.score !== myPlayer.score ||
+              prev.currentAmmo !== myPlayer.currentAmmo ||
+              prev.weapon !== myPlayer.weaponType) {
+            return {
+              lives: myPlayer.lives || 3,
+              maxLives: myPlayer.maxLives || 3,
+              score: myPlayer.score || 0,
+              currentAmmo: myPlayer.currentAmmo !== undefined ? myPlayer.currentAmmo : 3,
+              maxAmmo: myPlayer.maxAmmo || 3,
+              weapon: myPlayer.weaponType || 'BLUE',
+              inventory: myPlayer.inventory || [null, null, null, null, null],
+              selectedSlot: myPlayer.selectedSlot || 0
+            };
+          }
+          return prev;
+        });
+        setMyPos({ x: myPlayer.x, y: myPlayer.y });
+      }
+      
+      // Update leaderboard from scene
+      if (scene.players) {
+        const sorted = Object.values(scene.players)
+          .filter(p => !p.dead && p.name)
+          .sort((a, b) => (b.score || 0) - (a.score || 0))
+          .slice(0, 10);
+        
+        setLeaderboard(prev => {
+          // Only update if changed
+          const newIds = sorted.map(p => p.id + p.score).join(',');
+          const oldIds = prev.map(p => p.id + p.score).join(',');
+          if (newIds !== oldIds) {
+            return sorted.map(p => ({
+              id: p.id,
+              name: p.name,
+              score: p.score || 0,
+              x: p.x,
+              y: p.y
+            }));
+          }
+          return prev;
+        });
+        
         if (sorted.length > 0) {
           setKingPos({ x: sorted[0].x, y: sorted[0].y });
         }
+        
+        // Update alive count for arena
+        if (isArena) {
+          const alive = Object.values(scene.players).filter(p => !p.dead).length;
+          setAliveCount(alive);
+        }
       }
+      
+      setIsConnected(socket.isConnected);
+    }, 150); // Update HUD at ~7fps - balance between responsiveness and performance
 
+    // Still listen for special events like item pickup
+    const unsubscribe = socket.subscribe((packet) => {
       if (packet.type === 'ITEM_PICKED_UP' && packet.playerId === socket.myId) {
         const config = ITEM_CONFIG[packet.itemType];
         if (config) {
@@ -61,15 +101,16 @@ const HUD = () => {
             name: config.name,
             description: config.description
           });
-
-          // Auto-hide after 1.5 seconds
           setTimeout(() => setPickupNotif(null), 1500);
         }
       }
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      clearInterval(updateInterval);
+      unsubscribe();
+    };
+  }, [isArena]);
 
   const worldToMinimap = (x, y) => {
     const shiftedX = x + (MAP_SIZE / 2);
@@ -110,6 +151,34 @@ const HUD = () => {
       pointerEvents: 'none', padding: '20px', boxSizing: 'border-box',
       fontFamily: 'Arial, sans-serif'
     }}>
+
+      {/* ========== ARENA ALIVE COUNT (TOP CENTER) ========== */}
+      {isArena && (
+        <div style={{
+          position: 'absolute',
+          top: '25px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          background: 'linear-gradient(135deg, rgba(255,68,68,0.9), rgba(200,50,50,0.9))',
+          padding: '12px 25px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 15px rgba(255,68,68,0.4)',
+          border: '2px solid rgba(255,255,255,0.3)'
+        }}>
+          <span style={{ fontSize: '20px' }}>⚔️</span>
+          <span style={{
+            fontSize: '18px',
+            fontWeight: 'bold',
+            color: '#fff',
+            textShadow: '1px 1px 0 #000'
+          }}>
+            Còn lại: <span style={{ color: '#FFD700', fontSize: '22px' }}>{aliveCount}</span> người chơi
+          </span>
+        </div>
+      )}
 
       {/* ========== LIVES + SCORE + AMMO (GÓC TRÁI TRÊN) ========== */}
       <div style={{

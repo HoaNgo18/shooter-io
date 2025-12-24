@@ -11,6 +11,10 @@ class NetworkManager {
     this.isConnected = false;
     this.listeners = [];
     this.initData = null;
+    
+    // Arena state
+    this.isInArena = false;
+    this.arenaRoomId = null;
   }
 
   connect(authOptions) {
@@ -39,9 +43,66 @@ class NetworkManager {
 
       this.ws.onclose = () => {
         this.isConnected = false;
+        this.isInArena = false;
+        this.arenaRoomId = null;
         console.log('🔌 Disconnected');
       };
     });
+  }
+
+  // Connect to arena
+  connectArena(authOptions) {
+    return new Promise((resolve, reject) => {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        this.ws = new WebSocket('ws://localhost:3000');
+
+        this.ws.onopen = () => {
+          this.isConnected = true;
+          console.log('✅ Connected via WebSocket (Arena)');
+
+          // Send arena join request
+          this.send({
+            type: PacketType.ARENA_JOIN,
+            ...authOptions
+          });
+
+          this.isInArena = true;
+          resolve();
+        };
+
+        this.ws.onerror = (err) => {
+          console.error('WebSocket error', err);
+          reject(err);
+        };
+
+        this.ws.onmessage = (event) => this.handleMessage(event);
+
+        this.ws.onclose = () => {
+          this.isConnected = false;
+          this.isInArena = false;
+          this.arenaRoomId = null;
+          console.log('🔌 Disconnected');
+        };
+      } else {
+        // Already connected, just send arena join
+        this.send({
+          type: PacketType.ARENA_JOIN,
+          ...authOptions
+        });
+        this.isInArena = true;
+        resolve();
+      }
+    });
+  }
+
+  leaveArena() {
+    this.send({ type: PacketType.ARENA_LEAVE });
+    this.isInArena = false;
+    this.arenaRoomId = null;
+    this.gameScene = null;
+    this.initData = null;
+    this.myId = null;
+    console.log('[Socket] Left arena, state reset');
   }
 
   // Ngắt kết nối
@@ -51,23 +112,35 @@ class NetworkManager {
       this.ws = null;
       this.isConnected = false;
       this.myId = null;
-      this.listeners = []; // Reset listeners khi logout
+      this.isInArena = false;
+      this.arenaRoomId = null;
+      // DON'T clear listeners here - they're still needed for reconnection
       console.log('Manually disconnected');
     }
+  }
+
+  // Full reset including listeners (used for logout)
+  fullReset() {
+    this.disconnect();
+    this.listeners = [];
+    this.initData = null;
+    this.gameScene = null;
   }
 
   setGameScene(scene) {
     if (!scene) return;
     this.gameScene = scene;
+    console.log('[Socket] GameScene set, initData:', this.initData ? 'available' : 'null');
     if (this.initData) {
-      console.log('Applying buffered INIT data...');
+      console.log('[Socket] Applying buffered INIT data with', this.initData.foods?.length, 'foods,', this.initData.obstacles?.length, 'obstacles');
       this.gameScene.initGame(this.initData);
+      // Don't clear initData - keep it for potential reconnect
     }
   }
 
   resetGameScene() {
     this.gameScene = null;
-    this.initData = null;
+    // Don't clear initData here - it might be needed when scene is recreated
   }
 
   send(data) {
@@ -89,11 +162,22 @@ class NetworkManager {
 
       // 1. Xử lý Logic Global (Luôn chạy dù có GameScene hay không)
       
-      // Init ID
+      // Init ID (for both normal and arena)
       if (packet.type === PacketType.INIT) {
         console.log('Received INIT packet. My ID:', packet.id);
         this.myId = packet.id;
         this.initData = packet;
+        if (packet.isArena) {
+          this.isInArena = true;
+          this.arenaRoomId = packet.roomId;
+        }
+      }
+
+      // Arena status updates
+      if (packet.type === PacketType.ARENA_STATUS) {
+        if (packet.roomId) {
+          this.arenaRoomId = packet.roomId;
+        }
       }
 
       // Ping/Pong
@@ -102,15 +186,28 @@ class NetworkManager {
         return; // Ping pong không cần báo cho React
       }
 
-      // [QUAN TRỌNG] Bắn tin cho React (App.jsx, HUD) NGAY LẬP TỨC
-      // Việc này đảm bảo USER_DATA_UPDATE luôn đến được App.jsx
-      this.notifyReact(packet);
+      // [QUAN TRỌNG] Bắn tin cho React (App.jsx, HUD)
+      // KHÔNG gửi UPDATE/ARENA_UPDATE packets để tránh lag (quá nhiều - 20fps)
+      // HUD sẽ lấy data trực tiếp từ gameScene
+      if (packet.type !== PacketType.UPDATE && packet.type !== PacketType.ARENA_UPDATE) {
+        this.notifyReact(packet);
+      }
 
-      // 2. Xử lý Logic Game (Phaser) - Chỉ chạy khi đang chơi
+      // 2. Xử lý Logic Game (Phaser) - Chỉ chạy khi đang chơi và có gameScene
       if (this.gameScene) {
         switch (packet.type) {
           case PacketType.UPDATE:
-            this.gameScene.handleServerUpdate(packet);
+            // Only handle UPDATE if not in arena mode
+            if (!this.isInArena) {
+              this.gameScene.handleServerUpdate(packet);
+            }
+            break;
+
+          case PacketType.ARENA_UPDATE:
+            // Only handle ARENA_UPDATE if in arena mode
+            if (this.isInArena) {
+              this.gameScene.handleServerUpdate(packet);
+            }
             break;
 
           case PacketType.INIT:

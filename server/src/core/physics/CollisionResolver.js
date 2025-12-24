@@ -130,7 +130,9 @@ export class CollisionResolver {
       }
     }
 
-    this.game.server.broadcast({
+    // Broadcast death - works for both normal game and arena
+    // Check if this is an arena room (has broadcast method directly) or normal game (has server.broadcast)
+    const broadcastData = {
       type: PacketType.PLAYER_DIED,
       victimId: player.id,
       killerId: killerId,
@@ -138,16 +140,25 @@ export class CollisionResolver {
       score: player.score,
       coins: player.coins,
       kills: player.sessionKills
-    });
+    };
 
-    if (player.isBot) {
+    if (this.game.broadcast) {
+      // This is an ArenaRoom
+      this.game.broadcast(broadcastData);
+    } else if (this.game.server) {
+      // This is the main Game
+      this.game.server.broadcast(broadcastData);
+    }
+
+    // Handle bot cleanup - only for normal game mode (arena handles its own cleanup)
+    if (player.isBot && this.game.bots) {
       setTimeout(() => {
         if (this.game.players.has(player.id)) {
           this.game.removePlayer(player.id);
           this.game.bots.manageBots();
         }
       }, 2000);
-    } else {
+    } else if (!player.isBot) {
       this.game.savePlayerScore(player);
     }
   }

@@ -15,7 +15,7 @@ const SKIN_IMAGES = {
     'ship_9': '/Ships/spaceShips_009.png'
 };
 
-const HomeScreen = ({ user, onPlayClick, onLogout, onLoginSuccess }) => {
+const HomeScreen = ({ user, onPlayClick, onArenaClick, onLogout, onLoginSuccess }) => {
     const [activeTab, setActiveTab] = useState('home');
     const [skins, setSkins] = useState([]);
     const [leaderboard, setLeaderboard] = useState([]);
@@ -252,6 +252,14 @@ const HomeScreen = ({ user, onPlayClick, onLogout, onLoginSuccess }) => {
             boxShadow: '0 0 20px rgba(255,215,0,0.6)',
             transition: 'all 0.3s ease'
         },
+        arenaBtn: {
+            padding: '15px 50px', fontSize: '20px', fontWeight: 'bold',
+            background: 'linear-gradient(45deg, #FF4444, #FF6B35)',
+            color: '#fff', border: 'none', borderRadius: '8px',
+            cursor: 'pointer', marginTop: '15px',
+            boxShadow: '0 0 20px rgba(255,68,68,0.6)',
+            transition: 'all 0.3s ease'
+        },
         loginModal: {
             position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
             background: 'rgba(0,0,0,0.9)', padding: '40px', borderRadius: '12px',
@@ -349,14 +357,24 @@ const HomeScreen = ({ user, onPlayClick, onLogout, onLoginSuccess }) => {
                 <h1 style={styles.title}>SHOOTER<span style={{ color: '#FFD700' }}>.IO</span></h1>
                 <p style={styles.subtitle}>Battle Royale Multiplayer</p>
                 {localUser && (
-                    <button
-                        onClick={() => onPlayClick(localUser.equippedSkin)}
-                        style={styles.playBtn}
-                        onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
-                        onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
-                    >
-                        PLAY NOW
-                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <button
+                            onClick={() => onPlayClick(localUser.equippedSkin)}
+                            style={styles.playBtn}
+                            onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
+                            onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+                        >
+                            CHIẾN NGAY
+                        </button>
+                        <button
+                            onClick={() => onArenaClick(localUser.equippedSkin)}
+                            style={styles.arenaBtn}
+                            onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
+                            onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+                        >
+                            ⚔️ ĐẤU TRƯỜNG
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -386,8 +404,19 @@ const HomeScreen = ({ user, onPlayClick, onLogout, onLoginSuccess }) => {
                                         onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
                                         onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
                                     >
-                                        PLAY NOW
+                                        CHIẾN NGAY
                                     </button>
+                                    <button
+                                        onClick={() => onArenaClick(localUser.equippedSkin)}
+                                        style={{...styles.arenaBtn, display: 'block', margin: '15px auto 0'}}
+                                        onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
+                                        onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+                                    >
+                                        ⚔️ ĐẤU TRƯỜNG
+                                    </button>
+                                    <p style={{ marginTop: '20px', color: '#888', fontSize: '14px' }}>
+                                        🏆 Đấu trường: 10 người chơi, chỉ 1 người sống sót!
+                                    </p>
                                 </div>
                             )}
 
