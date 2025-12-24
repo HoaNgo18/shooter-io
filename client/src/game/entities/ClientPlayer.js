@@ -23,7 +23,7 @@ export class ClientPlayer {
 
         this.id = playerData.id;
         this.name = playerData.name;
-        
+
         // Data sync initialization
         this.updateLocalData(playerData);
         this.targetX = playerData.x;
@@ -36,11 +36,11 @@ export class ClientPlayer {
 
         // 1. Thrust Flame
         this.thrustFlame = scene.add.graphics();
-        
+
         // 2. Ammo Container (Nằm dưới tàu)
         this.ammoContainer = scene.add.container(0, 0);
         this.ammoOrbs = [];
-        
+
         // 3. Ship Sprite
         this.skinId = playerData.skinId || 'default';
         this.shipSprite = this.createShipSprite(this.skinId);
@@ -57,7 +57,7 @@ export class ClientPlayer {
 
         // Add to container (Order matters: Flame -> Ammo -> Ship -> Shield)
         this.container.add([this.thrustFlame, this.ammoContainer, this.shipSprite, this.shieldSprite]);
-        
+
         // State trackers
         this.lastAmmoCount = -1;
         this.lastWeaponType = '';
@@ -87,10 +87,10 @@ export class ClientPlayer {
 
         const isBot = this.skinId.startsWith('bot_');
         const direction = isBot ? -1 : 1;
-        
+
         // Config based on speed state
-        const config = this.isSpeedUp 
-            ? { scale: 1.4, outer: 0x00FFFF, inner: 0xFFFFFF } 
+        const config = this.isSpeedUp
+            ? { scale: 1.4, outer: 0x00FFFF, inner: 0xFFFFFF }
             : { scale: 1.3, outer: 0xFF6600, inner: 0xFFFF00 };
 
         const { scale, outer, inner } = config;
@@ -163,7 +163,7 @@ export class ClientPlayer {
 
         // Check ammo changes
         if (data.currentAmmo !== undefined && (
-            data.currentAmmo !== this.lastAmmoCount || 
+            data.currentAmmo !== this.lastAmmoCount ||
             data.weapon !== this.lastWeaponType ||
             data.maxAmmo !== this.lastMaxAmmo
         )) {
@@ -179,7 +179,7 @@ export class ClientPlayer {
             this.shipSprite.destroy();
             this.shipSprite = this.createShipSprite(this.skinId);
             // Re-add to container at correct index (sau ammo, trước shield)
-            this.container.addAt(this.shipSprite, 2); 
+            this.container.addAt(this.shipSprite, 2);
         }
 
         // Scale
@@ -192,7 +192,7 @@ export class ClientPlayer {
             this.shieldSprite.setVisible(true);
             const shieldScale = (data.radius || 20) / 20 * 0.4;
             this.shieldSprite.setScale(shieldScale);
-            
+
             if (!this.scene.tweens.isTweening(this.shieldSprite)) {
                 this.scene.tweens.add({
                     targets: this.shieldSprite,
@@ -232,12 +232,17 @@ export class ClientPlayer {
 
         if (this.isBoosting) this.updateThrustFlame(true);
         if (this.ammoContainer) this.ammoContainer.rotation += 2 * dt;
+
+        if (this.text) {
+            this.text.x = this.container.x;
+            this.text.y = this.container.y - 40;
+        }
     }
 
     setVisibleState(isVisible) {
         this.container.setVisible(isVisible);
         // Nếu Text add vào container thì không cần dòng dưới, còn nếu add rời thì cần:
-        // this.text.setVisible(isVisible); 
+        this.text.setVisible(isVisible); 
     }
 
     setAlphaState(alpha) {
@@ -250,6 +255,6 @@ export class ClientPlayer {
         this.scene.tweens.killTweensOf(this.thrustFlame);
         this.container.destroy();
         // Text nằm trong container sẽ tự hủy, nếu nằm ngoài thì cần destroy thủ công
-        // this.text.destroy(); 
+        this.text.destroy(); 
     }
 }

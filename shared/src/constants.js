@@ -23,7 +23,7 @@ export const OBSTACLE_RADIUS_MAX = 120;
 // CẬP NHẬT CHỈ SỐ TÀU
 export const SHIP_RADIUS = 20;      // Đổi từ PLAYER_RADIUS
 export const SHIP_MAX_LIVES = 5;    // Đổi từ PLAYER_MAX_LIVES
-export const SHIP_MAX_SPEED = 400;
+export const SHIP_MAX_SPEED = 300;
 export const SHIP_ACCELERATION = 600;
 export const SHIP_DECELERATION = 300;
 export const SHIP_ROTATION_SPEED = 3.5;
@@ -114,7 +114,7 @@ export const ITEM_CONFIG = {
     name: 'Speed Boost',
     description: 'x2 Speed for 10s', // Cập nhật mô tả đúng với thông số
     sprite: 'item_boost',            // Hoặc 'item_speed' tùy file load của bạn
-    effect: { type: 'speed', multiplier: 2.0, duration: 10000 }, // Sửa theo yêu cầu mạnh hơn, lâu hơn
+    effect: { type: 'speed', multiplier: 2.0, duration: 5000 }, // Sửa theo yêu cầu mạnh hơn, lâu hơn
     glowColor: 0x00FFFF,      // Xanh Cyan (cho khác biệt với Shield/Coin)
     borderColor: 0xFFFFFF,    // Viền trắng
     dropChance: 0.20

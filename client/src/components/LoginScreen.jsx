@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { socket } from '../network/socket';
 
-const API_URL = 'http://localhost:8080/api/auth'; // URL Backend của bạn
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_URL = `${BASE_URL}/api/auth`;
 
 const LoginScreen = ({ onLoginSuccess }) => {
   const [tab, setTab] = useState('guest'); // 'guest', 'login', 'register'

@@ -5,7 +5,8 @@ import { distance } from '../../../shared/src/utils.js';
 const BOT_NAMES = [
   "Stardust", "Nebula", "Comet", "Photon", 
   "Quantum", "Pulsar", "Nova", "Meteor", "Vortex", "Eclipse",
-  "SunWukong", "Azuki", "Bronze", "HoaThanhQue", "Shiba"
+  "Wukong", "Azuki", "Bronze", "HoaThanhQue", "Shiba",
+  "DKM", "OKVIP", "FB88", "XYZ"
 ];
 
 const BOT_SKINS = ['bot_black', 'bot_blue', 'bot_green', 'bot_red'];

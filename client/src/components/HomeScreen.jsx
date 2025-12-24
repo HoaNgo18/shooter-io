@@ -28,7 +28,8 @@ const HomeScreen = ({ user, onPlayClick, onLogout, onLoginSuccess }) => {
     const [displayName, setDisplayName] = useState('');
     const [connecting, setConnecting] = useState(false);
     const [error, setError] = useState('');
-    const API_URL = 'http://localhost:8080/api';
+    const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+    const API_URL = `${BASE_URL}/api`;
 
     useEffect(() => {
         setLocalUser(user);
