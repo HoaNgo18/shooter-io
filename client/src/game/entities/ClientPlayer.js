@@ -104,25 +104,37 @@ export class ClientPlayer {
             const isBot = this.skinId.startsWith('bot_');
             const direction = isBot ? -1 : 1;
 
-            // Vẽ lửa cam (lớp ngoài)
-            this.thrustFlame.fillStyle(0xFF6600, 0.8);
+            // --- CẤU HÌNH LỬA ---
+            let scale = 1.0;
+            let outerColor = 0xFF6600; // Cam (Mặc định)
+            let innerColor = 0xFFFF00; // Vàng (Mặc định)
+
+            // Nếu đang cắn lắc (Speed Up) -> Lửa to và đổi màu
+            if (this.isSpeedUp) {
+                scale = 1.5;           // To gấp 2.5 lần
+                outerColor = 0x00FFFF; // Xanh Cyan (Lớp ngoài)
+                innerColor = 0xFFFFFF; // Trắng (Lớp trong)
+            }
+
+            // --- VẼ LỚP NGOÀI (Lớn) ---
+            this.thrustFlame.fillStyle(outerColor, 0.8);
             this.thrustFlame.fillTriangle(
-                -4, 16 * direction,
-                4, 16 * direction,
-                0, (26 + Math.random() * 5) * direction
+                -4 * scale, 16 * direction,             // Trái
+                4 * scale, 16 * direction,              // Phải
+                0, (26 + Math.random() * 5) * direction * scale // Đỉnh (Dài ra theo scale)
             );
 
-            // Vẽ lửa vàng (lớp trong)
-            this.thrustFlame.fillStyle(0xFFFF00, 0.6);
+            // --- VẼ LỚP TRONG (Nhỏ) ---
+            this.thrustFlame.fillStyle(innerColor, 0.6);
             this.thrustFlame.fillTriangle(
-                -2, 16 * direction,
-                2, 16 * direction,
-                0, 22 * direction
+                -2 * scale, 16 * direction,
+                2 * scale, 16 * direction,
+                0, 22 * direction * scale
             );
         }
     }
 
-    updateAmmoVisuals(count, weaponType) {
+    updateAmmoVisuals(count, weaponType, maxAmmo) {
         // 1. Xóa hết đạn cũ
         this.ammoOrbs.forEach(orb => orb.destroy());
         this.ammoOrbs = [];
@@ -139,7 +151,8 @@ export class ClientPlayer {
 
         // Tính góc chia đều: Ví dụ 3 viên thì chia 120 độ, 6 viên chia 60 độ
         // Hoặc bạn có thể fix cứng vị trí nếu muốn giống Astro Party
-        const angleStep = (Math.PI * 2) / (WEAPON_STATS[weaponType].maxAmmo || 3);
+        const actualMax = maxAmmo || stats.maxAmmo || 1;
+        const angleStep = (Math.PI * 2) / actualMax;
 
         for (let i = 0; i < count; i++) {
             const angle = startAngle + (i * angleStep);
@@ -183,14 +196,26 @@ export class ClientPlayer {
         this.isMoving = data.isMoving || false;
         this.isBoosting = data.isBoosting || false;
 
+        this.isSpeedUp = data.isSpeedUp || false;
+
         // Update thrust flame
         this.updateThrustFlame(this.isBoosting);
 
         //Update ammo visuals if changed
-        if (data.currentAmmo !== undefined && (data.currentAmmo !== this.lastAmmoCount || data.weapon !== this.lastWeaponType)) {
-            this.updateAmmoVisuals(data.currentAmmo, data.weapon || 'BLUE');
+        if (
+            data.currentAmmo !== undefined &&
+            (
+                data.currentAmmo !== this.lastAmmoCount ||
+                data.weapon !== this.lastWeaponType ||
+                data.maxAmmo !== this.lastMaxAmmo // Check thêm cái này
+            )
+        ) {
+            // Truyền thêm data.maxAmmo vào hàm vẽ
+            this.updateAmmoVisuals(data.currentAmmo, data.weapon || 'BLUE', data.maxAmmo);
+
             this.lastAmmoCount = data.currentAmmo;
             this.lastWeaponType = data.weapon || 'BLUE';
+            this.lastMaxAmmo = data.maxAmmo; // Lưu lại để check lần sau
         }
 
         // Update skin

@@ -24,6 +24,7 @@ export class GameScene extends Phaser.Scene {
 
         // Group cho explosions
         this.explosionGroup = null;
+        this.playedExplosions = new Set();
     }
 
     preload() {
@@ -102,12 +103,18 @@ export class GameScene extends Phaser.Scene {
 
         //Load shield sprite
         this.load.image('shield', '/Effects/shield3.png');
+
+        this.load.image('item_invisible', '/Power-ups/hidden.png');      // Icon mắt
+        this.load.image('item_bomb', '/Power-ups/floating_mine.png');
     }
 
     create() {
+
         //  Tạo background repeating
         const bg = this.add.tileSprite(0, 0, MAP_SIZE, MAP_SIZE, 'background');
         bg.setDepth(-100);
+
+        this.playedExplosions = new Set();
 
         // 2. Input Keyboard
         this.keys = this.input.keyboard.addKeys({
@@ -119,7 +126,12 @@ export class GameScene extends Phaser.Scene {
             DOWN: Phaser.Input.Keyboard.KeyCodes.DOWN,
             LEFT: Phaser.Input.Keyboard.KeyCodes.LEFT,
             RIGHT: Phaser.Input.Keyboard.KeyCodes.RIGHT,
-            SPACE: Phaser.Input.Keyboard.KeyCodes.SPACE
+            SPACE: Phaser.Input.Keyboard.KeyCodes.SPACE,
+            ONE: Phaser.Input.Keyboard.KeyCodes.ONE,     // Chọn slot 1
+            TWO: Phaser.Input.Keyboard.KeyCodes.TWO,     // Chọn slot 2
+            THREE: Phaser.Input.Keyboard.KeyCodes.THREE, // Chọn slot 3
+            FOUR: Phaser.Input.Keyboard.KeyCodes.FOUR,
+            FIVE: Phaser.Input.Keyboard.KeyCodes.FIVE
         });
 
         // 3. Groups (KHỞI TẠO TRƯỚC KHI SOCKET CHẠY)
@@ -140,10 +152,26 @@ export class GameScene extends Phaser.Scene {
             socket.send({ type: PacketType.ATTACK });
         });
 
-        // Dash khi nhấn Space
+        // 2. Space dùng Item
         this.input.keyboard.on('keydown-SPACE', () => {
-            console.log("Space pressed -> Sending DASH packet"); // Log để debug
-            socket.send({ type: PacketType.DASH });
+            socket.send({ type: PacketType.USE_ITEM });
+        });
+
+        // 3. Chọn Inventory Slot (1-4)
+        this.input.keyboard.on('keydown-ONE', () => {
+            socket.send({ type: PacketType.SELECT_SLOT, slotIndex: 0 });
+        });
+        this.input.keyboard.on('keydown-TWO', () => {
+            socket.send({ type: PacketType.SELECT_SLOT, slotIndex: 1 });
+        });
+        this.input.keyboard.on('keydown-THREE', () => {
+            socket.send({ type: PacketType.SELECT_SLOT, slotIndex: 2 });
+        });
+        this.input.keyboard.on('keydown-FOUR', () => {
+            socket.send({ type: PacketType.SELECT_SLOT, slotIndex: 3 });
+        });
+        this.input.keyboard.on('keydown-FIVE', () => {
+            socket.send({ type: PacketType.SELECT_SLOT, slotIndex: 4 });
         });
 
         console.log('GameScene Created - Waiting for socket...');
@@ -327,23 +355,40 @@ export class GameScene extends Phaser.Scene {
         if (packet.projectiles) {
             this.projectileGroup.clear(true, true);
             packet.projectiles.forEach(p => {
-                const stats = WEAPON_STATS[p.weaponType] || WEAPON_STATS.BLUE; // Fallback về BLUE
-                const laserSprite = stats.laserSprite || 'laserBlue01';
+                if (p.weaponType === 'BOMB') {
+                    // 1. Vẽ BOM
+                    const bombSprite = this.add.sprite(p.x, p.y, 'item_bomb'); // Dùng key 'item_bomb' đã load (floating_mine.png)
 
-                // Tạo laser sprite
-                const laser = this.add.sprite(p.x, p.y, laserSprite);
-                laser.setRotation(p.angle + Math.PI / 2);
-                laser.setScale(1.0); // Tăng size lên để dễ nhìn
-                laser.setDepth(5);
+                    // Chỉnh kích thước
+                    bombSprite.setDisplaySize(32, 32);
+                    bombSprite.setDepth(5);
 
-                this.projectileGroup.add(laser);
+                    // LOGIC QUAY: Xoay dựa trên thời gian thực
+                    // Quay 1 vòng (360 độ) mỗi 500ms
+                    const rotationSpeed = 0.01;
+                    bombSprite.rotation = Date.now() * rotationSpeed;
+
+                    this.projectileGroup.add(bombSprite);
+
+                } else {
+                    // 2. Vẽ ĐẠN THƯỜNG (Giữ nguyên code cũ)
+                    const stats = WEAPON_STATS[p.weaponType] || WEAPON_STATS.BLUE;
+                    const laserSprite = stats.laserSprite || 'laserBlue01';
+
+                    const laser = this.add.sprite(p.x, p.y, laserSprite);
+                    laser.setRotation(p.angle + Math.PI / 2);
+                    laser.setScale(1.0);
+                    laser.setDepth(5);
+                    this.projectileGroup.add(laser);
+                }
             });
         }
 
         //  4. Update Explosions (Hiệu ứng nổ)
         if (packet.explosions) {
-            this.explosionGroup.clear(true, true);
             packet.explosions.forEach(e => {
+                if (this.playedExplosions.has(e.id)) return;
+                this.playedExplosions.add(e.id);
                 // Vẽ vòng tròn nổ với hiệu ứng
                 const circle = this.add.circle(e.x, e.y, e.radius, 0xFF4400, 0.4);
                 circle.setStrokeStyle(3, 0xFF0000, 0.8);
@@ -354,7 +399,7 @@ export class GameScene extends Phaser.Scene {
                     scaleX: 1.5,
                     scaleY: 1.5,
                     alpha: 0,
-                    duration: 200,
+                    duration: 350,
                     ease: 'Power2',
                     onComplete: () => circle.destroy()
                 });
@@ -539,7 +584,18 @@ export class GameScene extends Phaser.Scene {
 
         // === ITEM SPRITE ===
         const sprite = this.add.sprite(0, 0, config.sprite);
-        sprite.setScale(0.6);
+
+        // --- SỬA ĐỔI TẠI ĐÂY ---
+        // Thay vì dùng setScale (dựa trên ảnh gốc), ta dùng setDisplaySize (ép về size mong muốn)
+
+        if (itemData.type === 'BOMB' || itemData.type === 'INVISIBLE') {
+            // Ép kích thước cố định cho 2 món này (vì ảnh gốc quá to hoặc không đều)
+            sprite.setDisplaySize(30, 30);
+        } else {
+            // Các item cũ giữ nguyên logic scale 0.6
+            sprite.setScale(0.6);
+        }
+
         sprite.setOrigin(0.5);
 
         // Add to container (thứ tự: outerGlow → innerGlow → sprite)

@@ -7,6 +7,7 @@ import { Physics } from './Physics.js';
 import { WorldManager } from './WorldManager.js';
 import { BotManager } from './BotManager.js';
 import { StatsService } from './StatsService.js';
+import { Explosion } from '../entities/Explosion.js';
 
 export class Game {
   constructor(server) {
@@ -143,6 +144,25 @@ export class Game {
     }
   }
 
+  handleSelectSlot(clientId, slotIndex) {
+    const player = this.players.get(clientId);
+    if (player && !player.dead) {
+      // Đảm bảo index nằm trong khoảng 0-3
+      if (slotIndex >= 0 && slotIndex <= 4) {
+        player.selectedSlot = slotIndex;
+      }
+    }
+  }
+
+  handleUseItem(clientId) {
+    const player = this.players.get(clientId);
+    if (player && !player.dead) {
+      // Gọi hàm kích hoạt item mà ta vừa viết trong Player.js
+      // Truyền 'this' (chính là Game instance) vào để có thể spawn bomb
+      player.activateCurrentItem(this); 
+    }
+  }
+
   respawnPlayer(clientId, skinId) {
     const player = this.players.get(clientId);
     if (player) {
@@ -181,6 +201,38 @@ export class Game {
 
   async saveKillerStats(player) {
     await StatsService.saveKillerStats(this.server, player);
+  }
+
+  updateProjectiles(dt) {
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      const proj = this.projectiles[i];
+      proj.update(dt);
+
+      // Kiểm tra các điều kiện xóa đạn (Hết tầm, hết giờ, va chạm)
+      const isExpired = proj.distanceTraveled >= proj.range && !proj.isMine; // Mine không tính range
+      const shouldRemove = proj.shouldRemove(); // Bao gồm cả maxLifetime (1.5s)
+      const isHit = proj.hit; // Set bởi Physics.js khi va chạm
+
+      if (isExpired || shouldRemove || isHit) {
+        
+        // --- THÊM LOGIC: Nếu là BOM thì NỔ ---
+        if (proj.weaponType === 'BOMB') {
+          // Tạo vụ nổ tại vị trí quả bom
+          // Explosion(x, y, radius, damage, ownerId, ownerName)
+          const explosion = new Explosion(
+            proj.x, 
+            proj.y, 
+            100, // Bán kính nổ (radius)
+            proj.damage, 
+            proj.ownerId, 
+            proj.ownerName
+          );
+          this.explosions.push(explosion);
+        }
+
+        this.projectiles.splice(i, 1);
+      }
+    }
   }
 
   // --- NETWORK ---

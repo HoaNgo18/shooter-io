@@ -6,6 +6,8 @@ export const PacketType = {
   ATTACK: 'attack',
   CHAT: 'chat',
   RESPAWN: 'respawn',
+  SELECT_SLOT: 'SELECT_SLOT', // Khi bấm 1, 2, 3, 4
+  USE_ITEM: 'USE_ITEM',
   
   // Server -> Client
   INIT: 'init',

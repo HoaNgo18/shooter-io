@@ -11,7 +11,9 @@ const HUD = () => {
     score: 0,
     currentAmmo: 3,     // <--- Thêm mới
     maxAmmo: 3,         // <--- Thêm mới
-    weapon: 'BLUE'
+    weapon: 'BLUE',
+    inventory: [null, null, null, null, null], // Mảng 4 ô
+    selectedSlot: 0
   });
   const [leaderboard, setLeaderboard] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -35,7 +37,9 @@ const HUD = () => {
             score: me.score,
             currentAmmo: me.currentAmmo !== undefined ? me.currentAmmo : 3,
             maxAmmo: me.maxAmmo || 3,
-            weapon: me.weapon || 'BLUE'
+            weapon: me.weapon || 'BLUE',
+            inventory: me.inventory || [null, null, null, null, null],
+            selectedSlot: me.selectedSlot || 0
           });
           setMyPos({ x: me.x, y: me.y });
         }
@@ -86,6 +90,17 @@ const HUD = () => {
     return weaponStats ? '#' + weaponStats.color.toString(16).padStart(6, '0') : '#00E5FF';
   };
 
+  const getItemImage = (type) => {
+    if (!type) return null;
+    switch (type) {
+      case 'SPEED_BOOST': return '/Power-ups/bolt_gold.png';
+      case 'SHIELD': return '/Power-ups/shield_gold.png';
+      case 'INVISIBLE': return '/Power-ups/hidden.png';
+      case 'BOMB': return '/Power-ups/floating_mine.png';
+      default: return null;
+    }
+  };
+
   const myMinimapPos = worldToMinimap(myPos.x, myPos.y);
   const kingMinimapPos = kingPos ? worldToMinimap(kingPos.x, kingPos.y) : null;
 
@@ -95,7 +110,7 @@ const HUD = () => {
       pointerEvents: 'none', padding: '20px', boxSizing: 'border-box',
       fontFamily: 'Arial, sans-serif'
     }}>
-    
+
       {/* ========== LIVES + SCORE + AMMO (GÓC TRÁI TRÊN) ========== */}
       <div style={{
         position: 'absolute',
@@ -381,6 +396,65 @@ const HUD = () => {
           </div>
         </div>
       )}
+
+      {/* ========== INVENTORY BAR (GÓC TRÁI DƯỚI) ========== */}
+      <div style={{
+        position: 'absolute',
+        bottom: '20px',
+        left: '20px',
+        display: 'flex',
+        gap: '10px',
+        pointerEvents: 'none' // Để click xuyên qua nếu cần
+      }}>
+        {stats.inventory.map((item, index) => (
+          <div key={index} style={{
+            position: 'relative',
+            width: '50px',
+            height: '50px',
+
+            // --- SỬA Ở ĐÂY: Nền trắng xám nhẹ, độ trong suốt 0.4 ---
+            backgroundColor: 'rgba(255, 255, 255, 0.4)',
+
+            border: index === stats.selectedSlot
+              ? '3px solid #FFD700' // Viền vàng nếu đang chọn
+              : '2px solid #555',   // Viền xám nếu không chọn
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.1s ease',
+            transform: index === stats.selectedSlot ? 'scale(1.1)' : 'scale(1)'
+          }}>
+            {/* Số thứ tự phím tắt */}
+            <span style={{
+              position: 'absolute',
+              top: '2px',
+              left: '5px',
+              fontSize: '10px',
+
+              // --- SỬA NHẸ: Đổi màu chữ sang đen để nổi trên nền trắng ---
+              color: '#000',
+
+              fontWeight: 'bold'
+            }}>
+              {index + 1}
+            </span>
+
+            {/* Hình ảnh vật phẩm */}
+            {item && (
+              <img
+                src={getItemImage(item)}
+                alt={item}
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  objectFit: 'contain'
+                }}
+              />
+            )}
+          </div>
+        ))}
+      </div>
 
     </div>
   );

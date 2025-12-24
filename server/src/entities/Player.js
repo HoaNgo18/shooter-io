@@ -23,6 +23,7 @@ export class Player extends Entity {
     this.maxLives = SHIP_MAX_LIVES;
     this.score = 0;
     this.weapon = 'BLUE';
+    this.weaponLevel = 1;
     this.angle = 0;
     this.dead = true;
     this.lastDamageTime = 0;
@@ -59,6 +60,10 @@ export class Player extends Entity {
     const stats = WEAPON_STATS[this.weapon];
     this.currentAmmo = stats ? stats.maxAmmo : 3;
     this.lastAmmoRegen = Date.now();
+
+    this.inventory = [null, null, null, null, null]; // 4 ô trống
+    this.selectedSlot = 0; // Ô đang chọn (0-3)
+    this.invisibleEndTime = 0; // Thời gian hết tàng hình
 
     this.input = {
       up: false, down: false, left: false, right: false,
@@ -283,59 +288,40 @@ export class Player extends Entity {
 
     const effect = config.effect;
 
-    switch (effect.type) {
-      case 'heal':
-        this.lives = Math.min(this.lives + effect.value, this.maxLives);
-        console.log(`${this.name} healed +${effect.value} life`);
-        break;
+    // NHÓM 1: Dùng ngay lập tức (Máu, Xu, Súng, Đạn)
+    // Lưu ý: Đảm bảo kiểm tra đúng string type trong ITEM_CONFIG
+    if (['heal', 'coin', 'weapon', 'ammo_refill'].includes(effect.type)) {
 
-      case 'full_heal':
-        this.lives = this.maxLives;
-        console.log(`${this.name} fully healed!`);
-        break;
+      switch (effect.type) {
+        case 'heal':
+          this.lives = Math.min(this.lives + effect.value, this.maxLives);
+          console.log(`${this.name} healed +${effect.value}`);
+          break;
 
-      case 'shield':
-        this.shieldEndTime = Date.now() + effect.duration;
-        console.log(`${this.name} activated shield for ${effect.duration}ms`);
-        break;
+        case 'coin':
+          this.coins += effect.value;
+          console.log(`${this.name} got ${effect.value} coins`);
+          break; // <-- Coin xử lý xong ở đây
 
-      case 'speed':
-        this.speedBuffEndTime = Date.now() + effect.duration;
-        this.speedMultiplier = effect.multiplier;
-        console.log(`${this.name} speed boost x${effect.multiplier}`);
-        break;
+        case 'weapon':
+          // Logic đổi súng (giữ nguyên code cũ của bạn)
+          if (this.weapon === effect.weaponType) {
+            this.weaponLevel = Math.min(this.weaponLevel + 1, 3);
+          } else {
+            this.weapon = effect.weaponType;
+            this.weaponLevel = 1;
+          }
+          this.currentAmmo = this.getMaxAmmo();
+          this.lastAmmoRegen = Date.now();
+          break;
+      }
 
-      case 'dash_reset':
-        this.dashCooldownTime = 0; // Reset cooldown instantly
-        console.log(`${this.name} dash reset!`);
-        break;
-
-      case 'weapon':
-        if (this.weapon === effect.weaponType) {
-          this.weaponLevel = Math.min(this.weaponLevel + 1, 3);
-          console.log(`${this.name} upgraded ${this.weapon} to Level ${this.weaponLevel}`);
-        }
-        // NẾU NHẶT SÚNG KHÁC
-        else {
-          this.weapon = effect.weaponType;
-          this.weaponLevel = 1;
-          console.log(`${this.name} switched to ${this.weapon}`);
-        }
-
-        // Nạp đầy đạn theo Max Ammo mới (quan trọng cho Đạn Đỏ)
-        this.currentAmmo = this.getMaxAmmo();
-        this.lastAmmoRegen = Date.now();
-        break;
-
-      case 'coin':
-        this.coins += effect.value;
-        console.log(`${this.name} earned ${effect.value} coins`);
-        break;
-
-      case 'ammo_refill':
-        this.currentAmmo = this.getMaxAmmo();
-        break;
+      // QUAN TRỌNG: Phải return ngay để không chạy xuống dòng addToInventory bên dưới
+      return;
     }
+
+    // NHÓM 2: Nhặt vào túi đồ (Shield, Speed, Invisible, Bomb...)
+    this.addToInventory(type);
   }
 
   takeDamage(amount, attackerId) {
@@ -409,14 +395,83 @@ export class Player extends Entity {
     this.isBoosting = false;
 
     this.weapon = 'BLUE';
+    this.weaponLevel = 1;
     this.currentAmmo = WEAPON_STATS.BLUE.maxAmmo; // Đạn hiện tại
     this.lastAmmoRegen = Date.now();
+
+    this.inventory = [null, null, null, null, null];
+    this.selectedSlot = 0;
   }
 
   clampToMap() {
     const max = MAP_SIZE / 2 - 20;
     this.x = Math.max(-max, Math.min(max, this.x));
     this.y = Math.max(-max, Math.min(max, this.y));
+  }
+
+  // Thêm method mới này vào class Player
+  activateCurrentItem(game) { // Cần tham số 'game' để spawn bomb nếu cần
+    if (this.dead) return;
+
+    const itemType = this.inventory[this.selectedSlot];
+    if (!itemType) return; // Ô này rỗng
+
+    const config = ITEM_CONFIG[itemType];
+    const effect = config.effect;
+
+    console.log(`${this.name} used ${itemType}`);
+
+    // Xử lý hiệu ứng
+    switch (effect.type) {
+      case 'shield':
+        this.shieldEndTime = Date.now() + effect.duration;
+        break;
+
+      case 'speed':
+        this.speedBuffEndTime = Date.now() + effect.duration;
+        this.speedMultiplier = effect.multiplier;
+        break;
+
+      case 'invisible':
+        this.invisibleEndTime = Date.now() + effect.duration;
+        // Logic: Khi tàng hình, bot sẽ không nhìn thấy (sẽ update ở Bot.js sau)
+        break;
+
+      case 'plant_bomb':
+        const bomb = new Projectile(
+          this.x, this.y, 0, 0, // speed = 0
+          effect.damage,
+          this.id, this.name,
+          'BOMB',
+          0,
+          25
+        );
+        // SỬA: Thời gian tồn tại đúng 1.5 giây
+        bomb.maxLifetime = 1500;
+        bomb.isMine = true;
+
+        if (game && game.projectiles) {
+          game.projectiles.push(bomb);
+        }
+        break;
+    }
+
+    // Dùng xong thì xóa khỏi túi
+    this.inventory[this.selectedSlot] = null;
+  }
+
+  // Hàm phụ trợ: Tìm ô trống đầu tiên để nhét đồ vào
+  addToInventory(itemType) {
+    // 1. Tìm ô trống đầu tiên
+    const emptyIndex = this.inventory.findIndex(slot => slot === null);
+
+    if (emptyIndex !== -1) {
+      this.inventory[emptyIndex] = itemType;
+      console.log(`${this.name} picked up ${itemType} into slot ${emptyIndex}`);
+    } else {
+      console.log(`${this.name} inventory full!`);
+      // (Tùy chọn: Có thể thay thế ô đang chọn hoặc không làm gì)
+    }
   }
 
   serialize() {
@@ -433,7 +488,10 @@ export class Player extends Entity {
       isMoving: this.isMoving, isBoosting: this.isBoosting,
       skinId: this.skinId, hi: this.isHidden,
       weapon: this.weapon, currentAmmo: this.currentAmmo,   // <--- Gửi thêm cái này
-      maxAmmo: this.getMaxAmmo() // Gửi max để client vẽ thanh đạn
+      maxAmmo: this.getMaxAmmo(), // Gửi max để client vẽ thanh đạn
+      isInvisible: Date.now() < this.invisibleEndTime, // Báo cho client biết đang tàng hình để vẽ mờ đi
+      inventory: this.inventory,      // Gửi mảng túi đồ
+      selectedSlot: this.selectedSlot // Gửi ô đang chọn
     };
   }
 }

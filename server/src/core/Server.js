@@ -6,7 +6,7 @@ import config from '../config.js';
 import { User } from '../db/models/User.model.js';
 import { SKINS } from '../../../shared/src/constants.js';
 // Đảm bảo bạn đã tạo file này tại đường dẫn bên dưới
-import { rateLimit } from '../utils/rateLimit.js'; 
+import { rateLimit } from '../utils/rateLimit.js';
 
 export class Server {
   constructor(port = 3000) {
@@ -128,6 +128,17 @@ export class Server {
         if (player && typeof player.performDash === 'function') {
           player.performDash();
         }
+        break;
+      case PacketType.SELECT_SLOT:
+        // Client gửi lên: { type: 'SELECT_SLOT', slotIndex: 0 }
+        if (typeof packet.slotIndex === 'number') {
+          this.game.handleSelectSlot(clientId, packet.slotIndex);
+        }
+        break;
+
+      case PacketType.USE_ITEM:
+        // Client gửi lên: { type: 'USE_ITEM' }
+        this.game.handleUseItem(clientId);
         break;
     }
   }

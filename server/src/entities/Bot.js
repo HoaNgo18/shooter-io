@@ -55,6 +55,7 @@ export class Bot extends Player {
     let newTarget = null;
 
     game.players.forEach(other => {
+      if (other.id === this.id || other.isBot || other.dead || other.isHidden) return;
       if (other.id === this.id || other.isBot || other.dead) return;
 
       const d = distance(this.x, this.y, other.x, other.y);

@@ -68,10 +68,12 @@ export const NEBULA_RADIUS = 70; // Tinh vân thường to hơn bụi cây
 export const ITEM_TYPES = {
   // Health & Defense
   HEALTH_PACK: 'HEALTH_PACK',
-  SHIELD: 'SHIELD',
 
-  // Movement
+  //Special abilities
+  SHIELD: 'SHIELD',
   SPEED_BOOST: 'SPEED_BOOST',
+  BOMB: 'BOMB',
+  INVISIBLE: 'INVISIBLE',
 
   // Weapons
   WEAPON_BLUE: 'WEAPON_BLUE',
@@ -95,7 +97,7 @@ export const ITEM_CONFIG = {
     effect: { type: 'heal', value: 1 },
     glowColor: 0x00FF00,      // Xanh lá
     borderColor: 0xFFFFFF,    // Viền trắng
-    dropChance: 0.25
+    dropChance: 0.15
   },
 
   [ITEM_TYPES.SHIELD]: {
@@ -105,17 +107,17 @@ export const ITEM_CONFIG = {
     effect: { type: 'shield', duration: 5000 },
     glowColor: 0xFFD700,      // Vàng
     borderColor: 0xFFFFFF,    // Viền trắng
-    dropChance: 0.30
+    dropChance: 0.20
   },
 
   [ITEM_TYPES.SPEED_BOOST]: {
     name: 'Speed Boost',
-    description: '+50% Speed 8s',
-    sprite: 'item_boost',
-    effect: { type: 'speed', multiplier: 2.0, duration: 1000 },
-    glowColor: 0xFFD700,      // Vàng
+    description: 'x2 Speed for 10s', // Cập nhật mô tả đúng với thông số
+    sprite: 'item_boost',            // Hoặc 'item_speed' tùy file load của bạn
+    effect: { type: 'speed', multiplier: 2.0, duration: 10000 }, // Sửa theo yêu cầu mạnh hơn, lâu hơn
+    glowColor: 0x00FFFF,      // Xanh Cyan (cho khác biệt với Shield/Coin)
     borderColor: 0xFFFFFF,    // Viền trắng
-    dropChance: 0.15
+    dropChance: 0.20
   },
 
   [ITEM_TYPES.WEAPON_BLUE]: {
@@ -123,9 +125,9 @@ export const ITEM_CONFIG = {
     description: 'Balanced weapon',
     sprite: 'item_weapon_blue',
     effect: { type: 'weapon', weaponType: 'BLUE' },
-    glowColor: 0xFF0000,      // Đỏ
+    glowColor: 0x0000FF,      // Xanh dương (Sửa lại cho đúng màu súng)
     borderColor: 0xFFFFFF,    // Viền trắng
-    dropChance: 0.25
+    dropChance: 0.20
   },
 
   [ITEM_TYPES.WEAPON_RED]: {
@@ -143,9 +145,9 @@ export const ITEM_CONFIG = {
     description: 'Fast fire, low damage',
     sprite: 'item_weapon_green',
     effect: { type: 'weapon', weaponType: 'GREEN' },
-    glowColor: 0xFF0000,      // Đỏ
+    glowColor: 0x00FF00,      // Xanh lá
     borderColor: 0xFFFFFF,    // Viền trắng
-    dropChance: 0.20
+    dropChance: 0.15
   },
 
   [ITEM_TYPES.COIN_BRONZE]: {
@@ -153,9 +155,9 @@ export const ITEM_CONFIG = {
     description: '+1 Coin',
     sprite: 'item_bronze_coin',
     effect: { type: 'coin', value: 1 },
-    glowColor: 0xFFD700,      // Vàng
+    glowColor: 0xCD7F32,      // Màu Đồng
     borderColor: 0xFFFFFF,    // Viền trắng
-    dropChance: 0.40
+    dropChance: 0.20
   },
 
   [ITEM_TYPES.COIN_SILVER]: {
@@ -163,9 +165,9 @@ export const ITEM_CONFIG = {
     description: '+3 Coins',
     sprite: 'item_silver_coin',
     effect: { type: 'coin', value: 3 },
-    glowColor: 0xFFD700,      // Vàng
+    glowColor: 0xC0C0C0,      // Màu Bạc
     borderColor: 0xFFFFFF,    // Viền trắng
-    dropChance: 0.25
+    dropChance: 0.15
   },
 
   [ITEM_TYPES.COIN_GOLD]: {
@@ -173,10 +175,31 @@ export const ITEM_CONFIG = {
     description: '+5 Coins',
     sprite: 'item_gold_coin',
     effect: { type: 'coin', value: 5 },
-    glowColor: 0xFFD700,      // Vàng
+    glowColor: 0xFFD700,      // Màu Vàng
     borderColor: 0xFFFFFF,    // Viền trắng
     dropChance: 0.10
   },
+
+  // --- MỚI (Đã chuẩn hóa) ---
+  [ITEM_TYPES.INVISIBLE]: {
+    name: 'Cloaking Device',
+    description: 'Invisible for 5s',
+    sprite: 'item_invisible', // Đã đổi tên để đồng bộ (Client nhớ load key này)
+    effect: { type: 'invisible', duration: 5000 },
+    glowColor: 0xFFFFFF,      // Trắng
+    borderColor: 0xFFFFFF,    // Viền trắng
+    dropChance: 0.20
+  },
+
+  [ITEM_TYPES.BOMB]: {
+    name: 'Space Mine',
+    description: 'Place a trap (150 DMG)',
+    sprite: 'item_bomb',      // Đã đổi tên để đồng bộ (Client nhớ load key này)
+    effect: { type: 'plant_bomb', damage: 150, radius: 100 },
+    glowColor: 0xFF0000,      // Đỏ
+    borderColor: 0xFFFFFF,    // Viền trắng
+    dropChance: 0.20
+  }
 };
 
 // CẬP NHẬT HỆ THỐNG VŨ KHÍ
