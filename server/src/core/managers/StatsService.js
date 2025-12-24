@@ -1,4 +1,4 @@
-import { User } from '../db/models/User.model.js';
+import { User } from '../../db/models/User.model.js';
 
 export const StatsService = {
   async savePlayerScore(server, player) {

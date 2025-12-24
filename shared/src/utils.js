@@ -45,3 +45,56 @@ export function getRandomPosition(mapSize) {
     y: Math.random() * mapSize - mapSize / 2
   };
 }
+
+export function circleRotatedRectCollision(cx, cy, cr, rectX, rectY, width, height, rotation) {
+  const cos = Math.cos(-rotation);
+  const sin = Math.sin(-rotation);
+  const dx = cx - rectX;
+  const dy = cy - rectY;
+
+  const localX = dx * cos - dy * sin;
+  const localY = dx * sin + dy * cos;
+
+  const closestX = Math.max(-width / 2, Math.min(localX, width / 2));
+  const closestY = Math.max(-height / 2, Math.min(localY, height / 2));
+
+  const distX = localX - closestX;
+  const distY = localY - closestY;
+  
+  // Optimized: so sánh bình phương khoảng cách để tránh căn bậc 2 nếu không cần thiết
+  return (distX * distX + distY * distY) < (cr * cr);
+}
+
+// [THÊM MỚI] Tính toán vector đẩy ra khỏi hình chữ nhật xoay
+// Trả về { pushX, pushY } hoặc null nếu không va chạm
+export function getPushVectorFromRotatedRect(entityX, entityY, entityRadius, rectX, rectY, width, height, rotation) {
+  const cos = Math.cos(-rotation);
+  const sin = Math.sin(-rotation);
+  const dx = entityX - rectX;
+  const dy = entityY - rectY;
+
+  const localX = dx * cos - dy * sin;
+  const localY = dx * sin + dy * cos;
+
+  const closestX = Math.max(-width / 2, Math.min(localX, width / 2));
+  const closestY = Math.max(-height / 2, Math.min(localY, height / 2));
+
+  const distX = localX - closestX;
+  const distY = localY - closestY;
+  const dist = Math.sqrt(distX * distX + distY * distY);
+
+  if (dist < entityRadius && dist > 0) {
+    const pushOut = entityRadius - dist;
+    const pushLocalX = (distX / dist) * pushOut;
+    const pushLocalY = (distY / dist) * pushOut;
+
+    const cosWorld = Math.cos(rotation);
+    const sinWorld = Math.sin(rotation);
+    
+    return {
+      x: pushLocalX * cosWorld - pushLocalY * sinWorld,
+      y: pushLocalX * sinWorld + pushLocalY * cosWorld
+    };
+  }
+  return null;
+}

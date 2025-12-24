@@ -6,7 +6,7 @@ import {
   WEAPON_STATS, ITEM_TYPES,
   SHIP_MAX_SPEED, SHIP_ACCELERATION,
   SHIP_DECELERATION, SHIP_ROTATION_SPEED, SHIP_BRAKE_FORCE,
-  ITEM_CONFIG
+  ITEM_CONFIG, BOMB_STATS
 } from '../../../shared/src/constants.js';
 import { getRandomPosition } from '../../../shared/src/utils.js';
 import { Projectile } from './Projectile.js';
@@ -447,8 +447,10 @@ export class Player extends Entity {
           25
         );
         // SỬA: Thời gian tồn tại đúng 1.5 giây
-        bomb.maxLifetime = 1500;
-        bomb.isMine = true;
+        bomb.maxLifetime = BOMB_STATS.LIFETIME; // Tồn tại 60s
+        bomb.isTrap = true; // Đánh dấu là Bẫy
+        bomb.isMine = true; // Để client vẽ kiểu khác (nếu cần)
+        bomb.armingTime = Date.now() + BOMB_STATS.ARMING_TIME;
 
         if (game && game.projectiles) {
           game.projectiles.push(bomb);

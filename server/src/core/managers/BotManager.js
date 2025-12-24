@@ -1,5 +1,5 @@
-import { PacketType } from '../../../shared/src/packetTypes.js';
-import { Bot } from '../entities/Bot.js';
+import { PacketType } from '../../../../shared/src/packetTypes.js';
+import { Bot } from '../../entities/Bot.js';
 
 export class BotManager {
   constructor(game) {

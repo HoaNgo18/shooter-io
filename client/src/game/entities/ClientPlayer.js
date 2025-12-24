@@ -90,8 +90,8 @@ export class ClientPlayer {
         
         // Config based on speed state
         const config = this.isSpeedUp 
-            ? { scale: 1.5, outer: 0x00FFFF, inner: 0xFFFFFF } 
-            : { scale: 1.0, outer: 0xFF6600, inner: 0xFFFF00 };
+            ? { scale: 1.4, outer: 0x00FFFF, inner: 0xFFFFFF } 
+            : { scale: 1.3, outer: 0xFF6600, inner: 0xFFFF00 };
 
         const { scale, outer, inner } = config;
 

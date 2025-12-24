@@ -4,9 +4,9 @@ import { Player } from '../entities/Player.js';
 import { Physics } from './Physics.js';
 
 // Import các Module mới
-import { WorldManager } from './WorldManager.js';
-import { BotManager } from './BotManager.js';
-import { StatsService } from './StatsService.js';
+import { WorldManager } from './managers/WorldManager.js';
+import { BotManager } from './managers/BotManager.js';
+import { StatsService } from './managers/StatsService.js';
 import { Explosion } from '../entities/Explosion.js';
 
 export class Game {

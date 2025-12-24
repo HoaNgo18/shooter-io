@@ -17,7 +17,7 @@ export class Projectile extends Entity {
     this.weaponType = weaponType; // Lưu loại vũ khí
     this.range = range;            // Tầm bắn
     this.radius = radius;
-    this.mine = false;        // Bán kính đạn
+    this.isMine = false;        // Bán kính đạn
 
     this.startX = x;               // Vị trí bắt đầu
     this.startY = y;

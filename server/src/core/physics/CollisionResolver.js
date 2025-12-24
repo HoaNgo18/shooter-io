@@ -1,0 +1,154 @@
+// server/src/core/physics/CollisionResolver.js
+import { PacketType } from '../../../../shared/src/packetTypes.js';
+import { XP_PER_FOOD, CHEST_TYPES, ITEM_RADIUS, SHIP_RADIUS } from '../../../../shared/src/constants.js';
+
+export class CollisionResolver {
+  constructor(game) {
+    this.game = game;
+  }
+
+  // --- PROJECTILES HITS ---
+
+  hitPlayer(player, projectile) {
+    player.takeDamage(projectile.damage, projectile.ownerId);
+    if (player.isDead()) {
+      this.handlePlayerDeath(player, projectile.ownerId, projectile.ownerName);
+    }
+  }
+
+  hitChest(chest, projectile) {
+    chest.takeDamage(projectile.damage);
+    if (chest.dead) {
+      this.game.world.spawnItem(chest.x, chest.y, chest.type);
+      this.game.world.delta.chestsRemoved.push(chest.id);
+      
+      // Xóa khỏi mảng chests của world
+      const idx = this.game.world.chests.indexOf(chest);
+      if (idx !== -1) this.game.world.chests.splice(idx, 1);
+
+      if (chest.type === CHEST_TYPES.STATION) {
+        console.log("Station Destroyed!");
+        setTimeout(() => this.game.world.spawnStationIfNeeded(), 60000);
+      }
+    }
+  }
+
+  // --- PLAYER COLLECTIBLES ---
+
+  collectFood(player, food) {
+    player.score += XP_PER_FOOD;
+    player.checkLevelUp();
+    this.game.world.removeFood(food.id);
+  }
+
+  collectItem(player, item) {
+    player.applyItem(item.type);
+    
+    if (!player.isBot) {
+      this.game.server.sendToClient(player.id, {
+        type: 'ITEM_PICKED_UP',
+        playerId: player.id,
+        itemType: item.type
+      });
+    }
+    
+    this.game.world.delta.itemsRemoved.push(item.id);
+    const idx = this.game.world.items.indexOf(item);
+    if (idx !== -1) this.game.world.items.splice(idx, 1);
+  }
+
+  // --- PHYSICS PUSH ---
+
+  resolveEntityPush(dynamicEntity, staticEntityX, staticEntityY, staticRadius) {
+    const dx = dynamicEntity.x - staticEntityX;
+    const dy = dynamicEntity.y - staticEntityY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const minDist = (dynamicEntity.radius || SHIP_RADIUS) + staticRadius;
+
+    if (dist < minDist) {
+      if (dist > 0) {
+        const pushOut = minDist - dist;
+        dynamicEntity.x += (dx / dist) * pushOut;
+        dynamicEntity.y += (dy / dist) * pushOut;
+      } else {
+        dynamicEntity.x += minDist; // Fallback trùng tâm
+      }
+    }
+  }
+
+  resolvePlayerVsPlayerPush(p1, p2) {
+    const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    const minDist = (p1.radius || SHIP_RADIUS) + (p2.radius || SHIP_RADIUS);
+    
+    if (dist < minDist && dist > 0) {
+      const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      const overlap = (minDist - dist) / 2;
+      
+      p1.x -= Math.cos(angle) * overlap;
+      p1.y -= Math.sin(angle) * overlap;
+      p2.x += Math.cos(angle) * overlap;
+      p2.y += Math.sin(angle) * overlap;
+    }
+  }
+
+  applyPushVector(player, vector) {
+    if (vector) {
+      player.x += vector.x;
+      player.y += vector.y;
+    }
+  }
+
+  // --- EXPLOSIONS ---
+
+  applyExplosionDamage(player, explosion) {
+    player.takeDamage(explosion.damage, explosion.ownerId);
+  }
+
+  // --- DEATH LOGIC ---
+
+  handlePlayerDeath(player, killerId, killerName) {
+    this.game.world.spawnItem(player.x, player.y, 'ENEMY');
+
+    player.dead = true;
+    player.lives = 0;
+    player.inventory = [null, null, null, null, null];
+
+    const killer = this.game.players.get(killerId);
+    if (killer) {
+      killer.score += 100;
+      killer.lives = Math.min(killer.lives + 1, killer.maxLives);
+      killer.sessionKills = (killer.sessionKills || 0) + 1;
+
+      if (!killer.isBot) {
+        // Logic tìm Top 1 để thưởng coin
+        const sortedPlayers = Array.from(this.game.players.values()).sort((a, b) => b.score - a.score);
+        const kingId = sortedPlayers.length > 0 ? sortedPlayers[0].id : null;
+        const isKing = (player.id === kingId);
+        
+        killer.coins += isKing ? 5 : 1;
+        this.game.saveKillerStats(killer);
+      }
+    }
+
+    this.game.server.broadcast({
+      type: PacketType.PLAYER_DIED,
+      victimId: player.id,
+      killerId: killerId,
+      killerName: killerName || 'Unknown',
+      score: player.score,
+      coins: player.coins,
+      kills: player.sessionKills
+    });
+
+    if (player.isBot) {
+      setTimeout(() => {
+        if (this.game.players.has(player.id)) {
+          this.game.removePlayer(player.id);
+          this.game.bots.manageBots();
+        }
+      }, 2000);
+    } else {
+      this.game.savePlayerScore(player);
+    }
+  }
+}

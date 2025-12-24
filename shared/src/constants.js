@@ -250,3 +250,9 @@ export const ENTITY_TYPES = {
   EXPLOSION: 'explosion', // Thêm explosion type
   FOOD: 'food'
 };
+
+export const BOMB_STATS = {
+    TRIGGER_RADIUS: 100, // Kẻ địch đi vào phạm vi 100px sẽ kích nổ
+    LIFETIME: 60000,     // Tồn tại 60 giây (1 phút) mới tự biến mất
+    ARMING_TIME: 1000    // 1 giây sau khi đặt mới bắt đầu kích hoạt cảm biến (tránh nổ ngay vào người đặt)
+};

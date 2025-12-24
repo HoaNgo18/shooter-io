@@ -3,9 +3,9 @@ import {
   CHEST_COUNT, CHEST_RADIUS, CHEST_TYPES, ITEM_TYPES, ITEM_CONFIG,
   NEBULA_COUNT, NEBULA_RADIUS,
   STATION_COUNT, STATION_STATS
-} from '../../../shared/src/constants.js';
-import { Chest } from '../entities/Chest.js';
-import { Item } from '../entities/Item.js';
+} from '../../../../shared/src/constants.js';
+import { Chest } from '../../entities/Chest.js';
+import { Item } from '../../entities/Item.js';
 
 export class WorldManager {
   constructor() {
