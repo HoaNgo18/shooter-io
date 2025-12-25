@@ -23,7 +23,7 @@ export class ClientPlayer {
 
         this.id = playerData.id;
         this.name = playerData.name;
-        
+
         // Data sync initialization
         this.updateLocalData(playerData);
         this.targetX = playerData.x;
@@ -36,11 +36,11 @@ export class ClientPlayer {
 
         // 1. Thrust Flame
         this.thrustFlame = scene.add.graphics();
-        
+
         // 2. Ammo Container (Nằm dưới tàu)
         this.ammoContainer = scene.add.container(0, 0);
         this.ammoOrbs = [];
-        
+
         // 3. Ship Sprite
         this.skinId = playerData.skinId || 'default';
         this.shipSprite = this.createShipSprite(this.skinId);
@@ -57,11 +57,13 @@ export class ClientPlayer {
 
         // Add to container (Order matters: Flame -> Ammo -> Ship -> Shield)
         this.container.add([this.thrustFlame, this.ammoContainer, this.shipSprite, this.shieldSprite]);
-        
+
         // State trackers
         this.lastAmmoCount = -1;
         this.lastWeaponType = '';
         this.lastMaxAmmo = 0;
+        this.lastFlameUpdate = 0;  // ← THÊM
+        this.lastAmmoRotate = 0;
 
         // Init visuals
         this.updateThrustFlame(false);
@@ -87,10 +89,10 @@ export class ClientPlayer {
 
         const isBot = this.skinId.startsWith('bot_');
         const direction = isBot ? -1 : 1;
-        
+
         // Config based on speed state
-        const config = this.isSpeedUp 
-            ? { scale: 1.4, outer: 0x00FFFF, inner: 0xFFFFFF } 
+        const config = this.isSpeedUp
+            ? { scale: 1.4, outer: 0x00FFFF, inner: 0xFFFFFF }
             : { scale: 1.3, outer: 0xFF6600, inner: 0xFFFF00 };
 
         const { scale, outer, inner } = config;
@@ -163,7 +165,7 @@ export class ClientPlayer {
 
         // Check ammo changes
         if (data.currentAmmo !== undefined && (
-            data.currentAmmo !== this.lastAmmoCount || 
+            data.currentAmmo !== this.lastAmmoCount ||
             data.weapon !== this.lastWeaponType ||
             data.maxAmmo !== this.lastMaxAmmo
         )) {
@@ -179,7 +181,7 @@ export class ClientPlayer {
             this.shipSprite.destroy();
             this.shipSprite = this.createShipSprite(this.skinId);
             // Re-add to container at correct index (sau ammo, trước shield)
-            this.container.addAt(this.shipSprite, 2); 
+            this.container.addAt(this.shipSprite, 2);
         }
 
         // Scale
@@ -192,7 +194,7 @@ export class ClientPlayer {
             this.shieldSprite.setVisible(true);
             const shieldScale = (data.radius || 20) / 20 * 0.4;
             this.shieldSprite.setScale(shieldScale);
-            
+
             if (!this.scene.tweens.isTweening(this.shieldSprite)) {
                 this.scene.tweens.add({
                     targets: this.shieldSprite,
@@ -218,7 +220,10 @@ export class ClientPlayer {
     tick(dt) {
         if (!this.container.visible) return;
 
-        const t = 0.2;
+        // Interpolation mượt hơn với lerp factor động
+        const distance = Math.hypot(this.targetX - this.container.x, this.targetY - this.container.y);
+        const t = distance > 100 ? 0.3 : 0.15; // Lerp nhanh hơn khi xa
+
         this.container.x = Phaser.Math.Linear(this.container.x, this.targetX, t);
         this.container.y = Phaser.Math.Linear(this.container.y, this.targetY, t);
 
@@ -226,12 +231,21 @@ export class ClientPlayer {
         const rotationOffset = isBot ? (-Math.PI / 2) : 0;
         this.container.rotation = this.targetAngle + rotationOffset;
 
-        // Sync properties for access outside
+        // ✅ THÊM: Sync properties để HUD và các component khác truy cập được
         this.x = this.container.x;
         this.y = this.container.y;
 
-        if (this.isBoosting) this.updateThrustFlame(true);
-        if (this.ammoContainer) this.ammoContainer.rotation += 2 * dt;
+        // Throttle flame animation
+        if (this.isBoosting && (!this.lastFlameUpdate || Date.now() - this.lastFlameUpdate > 50)) {
+            this.updateThrustFlame(true);
+            this.lastFlameUpdate = Date.now();
+        }
+
+        // Throttle ammo rotation
+        if (this.ammoContainer && (!this.lastAmmoRotate || Date.now() - this.lastAmmoRotate > 100)) {
+            this.ammoContainer.rotation += 0.2;
+            this.lastAmmoRotate = Date.now();
+        }
     }
 
     setVisibleState(isVisible) {

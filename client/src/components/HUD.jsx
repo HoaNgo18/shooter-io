@@ -26,19 +26,26 @@ const HUD = ({ isArena = false }) => {
   // Use interval to poll data from gameScene instead of packet subscription
   // This prevents re-renders on every packet (20fps -> causes lag)
   useEffect(() => {
+    let lastUpdate = Date.now();
+    const UPDATE_THROTTLE = 250;
+
     const updateInterval = setInterval(() => {
-      if (!socket.gameScene || !socket.myId) return;
+      const now = Date.now();
+      if (now - lastUpdate < UPDATE_THROTTLE) return; // Skip nếu chưa đủ thời gian
+      lastUpdate = now;
       
+      if (!socket.gameScene || !socket.myId) return;
+
       const scene = socket.gameScene;
       const myPlayer = scene.players?.[socket.myId];
-      
+
       if (myPlayer) {
         setStats(prev => {
           // Only update if values changed
           if (prev.lives !== myPlayer.lives ||
-              prev.score !== myPlayer.score ||
-              prev.currentAmmo !== myPlayer.currentAmmo ||
-              prev.weapon !== myPlayer.weaponType) {
+            prev.score !== myPlayer.score ||
+            prev.currentAmmo !== myPlayer.currentAmmo ||
+            prev.weapon !== myPlayer.weaponType) {
             return {
               lives: myPlayer.lives || 3,
               maxLives: myPlayer.maxLives || 3,
@@ -54,14 +61,14 @@ const HUD = ({ isArena = false }) => {
         });
         setMyPos({ x: myPlayer.x, y: myPlayer.y });
       }
-      
+
       // Update leaderboard from scene
       if (scene.players) {
         const sorted = Object.values(scene.players)
           .filter(p => !p.dead && p.name)
           .sort((a, b) => (b.score || 0) - (a.score || 0))
           .slice(0, 10);
-        
+
         setLeaderboard(prev => {
           // Only update if changed
           const newIds = sorted.map(p => p.id + p.score).join(',');
@@ -77,20 +84,20 @@ const HUD = ({ isArena = false }) => {
           }
           return prev;
         });
-        
+
         if (sorted.length > 0) {
           setKingPos({ x: sorted[0].x, y: sorted[0].y });
         }
-        
+
         // Update alive count for arena
         if (isArena) {
           const alive = Object.values(scene.players).filter(p => !p.dead).length;
           setAliveCount(alive);
         }
       }
-      
+
       setIsConnected(socket.isConnected);
-    }, 150); // Update HUD at ~7fps - balance between responsiveness and performance
+    }, 250); // Update HUD at ~7fps - balance between responsiveness and performance
 
     // Still listen for special events like item pickup
     const unsubscribe = socket.subscribe((packet) => {

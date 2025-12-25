@@ -16,6 +16,7 @@ export class ArenaScene extends Phaser.Scene {
         this.inputManager = null;
         this.rangeCircle = null;
         this.isArena = true;
+        this.lastRangeUpdate = 0;
     }
 
     preload() {
@@ -44,7 +45,7 @@ export class ArenaScene extends Phaser.Scene {
         }).setScrollFactor(0).setDepth(1000);
 
         console.log('ArenaScene Created - Waiting for socket...');
-        
+
         // 5. Connect Socket Logic
         socket.setGameScene(this);
     }
@@ -65,8 +66,10 @@ export class ArenaScene extends Phaser.Scene {
             if (player.tick) player.tick(dt);
         });
 
-        // 2. Update Range Circle Visuals
-        this.updateRangeCircle();
+        if (!this.lastRangeUpdate || time - this.lastRangeUpdate > 100) {
+            this.updateRangeCircle();
+            this.lastRangeUpdate = time;
+        }
 
         // 3. Send Input
         const inputData = this.inputManager.getInputData();
@@ -78,7 +81,7 @@ export class ArenaScene extends Phaser.Scene {
         if (myPlayer && myPlayer.container.visible) {
             const weaponType = myPlayer.weaponType || 'BLUE';
             const stats = WEAPON_STATS[weaponType] || WEAPON_STATS.BLUE;
-            
+
             this.rangeCircle.x = myPlayer.x;
             this.rangeCircle.y = myPlayer.y;
             this.rangeCircle.radius = stats.range;
@@ -98,7 +101,7 @@ export class ArenaScene extends Phaser.Scene {
 
     initGame(data) {
         console.log('[ArenaScene] initGame called', data);
-        
+
         // Init Players
         if (data.players) {
             data.players.forEach(p => this.updateOrAddPlayer(p));
@@ -123,7 +126,7 @@ export class ArenaScene extends Phaser.Scene {
         if (packet.players) {
             packet.players.forEach(p => this.updateOrAddPlayer(p));
         }
-        
+
         // Ensure Camera Follows Me
         if (socket.myId && this.players[socket.myId] && !this.cameras.main._follow) {
             this.cameras.main.startFollow(this.players[socket.myId].container);
