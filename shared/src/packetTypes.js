@@ -20,5 +20,16 @@ export const PacketType = {
   PONG: 'pong',
   BUY_SKIN: 'buy_skin',
   EQUIP_SKIN: 'equip_skin',
-  USER_DATA_UPDATE: 'user_data_update'
+  USER_DATA_UPDATE: 'user_data_update',
+
+  // Arena Mode
+  ARENA_JOIN: 'arena_join',           // Client -> Server: Xin vào đấu trường
+  ARENA_LEAVE: 'arena_leave',         // Client -> Server: Rời hàng chờ/phòng
+  ARENA_STATUS: 'arena_status',       // Server -> Client: Trạng thái phòng (waiting/playing)
+  ARENA_START: 'arena_start',         // Server -> Client: Trận đấu bắt đầu
+  ARENA_UPDATE: 'arena_update',       // Server -> Client: Update state đấu trường
+  ARENA_VICTORY: 'arena_victory',     // Server -> Client: Thông báo người thắng
+  ARENA_END: 'arena_end',             // Server -> Client: Trận đấu kết thúc
+  ARENA_COUNTDOWN: 'arena_countdown', // Server -> Client: Đếm ngược trước khi bắt đầu
+  ARENA_PLAYER_COUNT: 'arena_player_count' // Server -> Client: Số người trong phòng
 };

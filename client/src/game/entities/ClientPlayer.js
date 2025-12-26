@@ -62,6 +62,8 @@ export class ClientPlayer {
         this.lastAmmoCount = -1;
         this.lastWeaponType = '';
         this.lastMaxAmmo = 0;
+        this.lastFlameUpdate = 0;  // ← THÊM
+        this.lastAmmoRotate = 0;
 
         // Init visuals
         this.updateThrustFlame(false);
@@ -144,9 +146,17 @@ export class ClientPlayer {
     }
 
     updateServerData(data) {
+
         if (data.dead) {
+            this.dead = true;
             this.setVisibleState(false);
+            this.container.setActive(false);
+            this.container.setVisible(false);
+            if (this.text) this.text.setVisible(false);
             return;
+
+        } else {
+            this.dead = false; // Hồi sinh nếu server báo còn sống
         }
 
         // Logic sync giữ nguyên vì đã ổn
@@ -158,6 +168,11 @@ export class ClientPlayer {
         this.isMoving = data.isMoving || false;
         this.isBoosting = data.isBoosting || false;
         this.isSpeedUp = data.isSpeedUp || false;
+
+        if (data.lives !== undefined) this.lives = data.lives;
+        if (data.maxLives !== undefined) this.maxLives = data.maxLives;
+        if (data.inventory !== undefined) this.inventory = data.inventory;
+        if (data.selectedSlot !== undefined) this.selectedSlot = data.selectedSlot;
 
         this.updateThrustFlame(this.isBoosting);
 
@@ -207,18 +222,23 @@ export class ClientPlayer {
 
         // Visibility (Nebula / Invisible)
         const isHidden = data.hi;
-        if (isHidden) {
-            this.isMe ? (this.setAlphaState(0.5), this.setVisibleState(true)) : this.setVisibleState(false);
-        } else {
-            this.setVisibleState(true);
-            this.setAlphaState(1);
+        if (!this.dead) { // <--- THÊM ĐIỀU KIỆN NÀY
+            if (isHidden) {
+                this.isMe ? (this.setAlphaState(0.5), this.setVisibleState(true)) : this.setVisibleState(false);
+            } else {
+                this.setVisibleState(true);
+                this.setAlphaState(1);
+            }
         }
     }
 
     tick(dt) {
-        if (!this.container.visible) return;
+        if (this.dead || !this.container.visible) return;
 
-        const t = 0.2;
+        // Interpolation mượt hơn với lerp factor động
+        const distance = Math.hypot(this.targetX - this.container.x, this.targetY - this.container.y);
+        const t = distance > 100 ? 0.3 : 0.15; // Lerp nhanh hơn khi xa
+
         this.container.x = Phaser.Math.Linear(this.container.x, this.targetX, t);
         this.container.y = Phaser.Math.Linear(this.container.y, this.targetY, t);
 
@@ -226,7 +246,7 @@ export class ClientPlayer {
         const rotationOffset = isBot ? (-Math.PI / 2) : 0;
         this.container.rotation = this.targetAngle + rotationOffset;
 
-        // Sync properties for access outside
+        // ✅ THÊM: Sync properties để HUD và các component khác truy cập được
         this.x = this.container.x;
         this.y = this.container.y;
 
@@ -242,7 +262,7 @@ export class ClientPlayer {
     setVisibleState(isVisible) {
         this.container.setVisible(isVisible);
         // Nếu Text add vào container thì không cần dòng dưới, còn nếu add rời thì cần:
-        this.text.setVisible(isVisible); 
+        this.text.setVisible(isVisible);
     }
 
     setAlphaState(alpha) {
@@ -255,6 +275,6 @@ export class ClientPlayer {
         this.scene.tweens.killTweensOf(this.thrustFlame);
         this.container.destroy();
         // Text nằm trong container sẽ tự hủy, nếu nằm ngoài thì cần destroy thủ công
-        this.text.destroy(); 
+        this.text.destroy();
     }
 }

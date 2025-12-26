@@ -15,7 +15,7 @@ const SKIN_IMAGES = {
     'ship_9': '/Ships/spaceShips_009.png'
 };
 
-const HomeScreen = ({ user, onPlayClick, onLogout, onLoginSuccess }) => {
+const HomeScreen = ({ user, onPlayClick, onArenaClick, onLogout, onLoginSuccess }) => {
     const [activeTab, setActiveTab] = useState('home');
     const [skins, setSkins] = useState([]);
     const [leaderboard, setLeaderboard] = useState([]);
@@ -245,13 +245,46 @@ const HomeScreen = ({ user, onPlayClick, onLogout, onLoginSuccess }) => {
         subtitle: {
             fontSize: '18px', color: '#ccc', marginTop: '10px', letterSpacing: '2px'
         },
+        buttonContainer: {
+            display: 'flex',
+            flexDirection: 'column', // <--- QUAN TRỌNG: Xếp dọc
+            alignItems: 'center',    // Căn giữa
+            gap: '20px',             // <--- QUAN TRỌNG: Khoảng cách giữa các nút
+            marginTop: '40px'
+        },
+
         playBtn: {
-            padding: '20px 60px', fontSize: '24px', fontWeight: 'bold',
+            padding: '20px 0',
+            fontSize: '24px',
+            fontWeight: 'bold',
             background: 'linear-gradient(45deg, #FFD700, #FFA500)',
-            color: '#000', border: 'none', borderRadius: '8px',
-            cursor: 'pointer', marginTop: '40px',
+            color: '#000',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            // Xóa marginTop ở đây đi, để container quản lý
             boxShadow: '0 0 20px rgba(255,215,0,0.6)',
-            transition: 'all 0.3s ease'
+            transition: 'all 0.3s ease',
+            width: '350px',       // Đặt chiều rộng cố định (đủ lớn cho cả 2 nút)
+            textAlign: 'center',  // Căn giữa chữ
+            display: 'block',
+        },
+
+        arenaBtn: {
+            padding: '20px 0',
+            fontSize: '24px',
+            fontWeight: 'bold',
+            background: 'linear-gradient(45deg, #FF4444, #FF6B35)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            // Xóa marginTop ở đây đi
+            boxShadow: '0 0 20px rgba(255,68,68,0.6)',
+            transition: 'all 0.3s ease',
+            width: '350px',       // Đặt chiều rộng cố định (đủ lớn cho cả 2 nút)
+            textAlign: 'center',  // Căn giữa chữ
+            display: 'block',
         },
         loginModal: {
             position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
@@ -350,14 +383,25 @@ const HomeScreen = ({ user, onPlayClick, onLogout, onLoginSuccess }) => {
                 <h1 style={styles.title}>SHOOTER<span style={{ color: '#FFD700' }}>.IO</span></h1>
                 <p style={styles.subtitle}>Battle Royale Multiplayer</p>
                 {localUser && (
-                    <button
-                        onClick={() => onPlayClick(localUser.equippedSkin)}
-                        style={styles.playBtn}
-                        onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
-                        onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
-                    >
-                        PLAY NOW
-                    </button>
+                    <div style={styles.buttonContainer}>
+                        <button
+                            onClick={() => onPlayClick(localUser.equippedSkin)}
+                            style={styles.playBtn}
+                            onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
+                            onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+                        >
+                            ENDLESS
+                        </button>
+
+                        <button
+                            onClick={() => onArenaClick(localUser.equippedSkin)}
+                            style={styles.arenaBtn} // Đã cập nhật style ở trên
+                            onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
+                            onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+                        >
+                            BATTLE ROYALE
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -378,7 +422,7 @@ const HomeScreen = ({ user, onPlayClick, onLogout, onLoginSuccess }) => {
 
                         <div style={styles.content}>
                             {activeTab === 'home' && (
-                                <div style={{ textAlign: 'center', paddingTop: '50px' }}>
+                                <div style={styles.buttonContainer}>
                                     <h2>Welcome back, {localUser.username}!</h2>
                                     <p>Ready to dominate the battlefield?</p>
                                     <button
@@ -387,7 +431,17 @@ const HomeScreen = ({ user, onPlayClick, onLogout, onLoginSuccess }) => {
                                         onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
                                         onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
                                     >
-                                        PLAY NOW
+                                        ENDLESS
+                                    </button>
+
+                                    {/* Nút Battle Royale - ĐÃ SỬA GỌN LẠI */}
+                                    <button
+                                        onClick={() => onArenaClick(localUser.equippedSkin)}
+                                        style={styles.arenaBtn} // Không cần margin auto hay display block nữa vì container cha đã lo
+                                        onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
+                                        onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+                                    >
+                                        BATTLE ROYALE
                                     </button>
                                 </div>
                             )}

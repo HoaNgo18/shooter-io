@@ -21,7 +21,7 @@ export class CollisionResolver {
     if (chest.dead) {
       this.game.world.spawnItem(chest.x, chest.y, chest.type);
       this.game.world.delta.chestsRemoved.push(chest.id);
-      
+
       // Xóa khỏi mảng chests của world
       const idx = this.game.world.chests.indexOf(chest);
       if (idx !== -1) this.game.world.chests.splice(idx, 1);
@@ -43,7 +43,7 @@ export class CollisionResolver {
 
   collectItem(player, item) {
     player.applyItem(item.type);
-    
+
     if (!player.isBot) {
       this.game.server.sendToClient(player.id, {
         type: 'ITEM_PICKED_UP',
@@ -51,7 +51,7 @@ export class CollisionResolver {
         itemType: item.type
       });
     }
-    
+
     this.game.world.delta.itemsRemoved.push(item.id);
     const idx = this.game.world.items.indexOf(item);
     if (idx !== -1) this.game.world.items.splice(idx, 1);
@@ -79,11 +79,11 @@ export class CollisionResolver {
   resolvePlayerVsPlayerPush(p1, p2) {
     const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
     const minDist = (p1.radius || SHIP_RADIUS) + (p2.radius || SHIP_RADIUS);
-    
+
     if (dist < minDist && dist > 0) {
       const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
       const overlap = (minDist - dist) / 2;
-      
+
       p1.x -= Math.cos(angle) * overlap;
       p1.y -= Math.sin(angle) * overlap;
       p2.x += Math.cos(angle) * overlap;
@@ -111,6 +111,7 @@ export class CollisionResolver {
 
     player.dead = true;
     player.lives = 0;
+    player.deathTime = Date.now();
     player.inventory = [null, null, null, null, null];
 
     const killer = this.game.players.get(killerId);
@@ -124,13 +125,15 @@ export class CollisionResolver {
         const sortedPlayers = Array.from(this.game.players.values()).sort((a, b) => b.score - a.score);
         const kingId = sortedPlayers.length > 0 ? sortedPlayers[0].id : null;
         const isKing = (player.id === kingId);
-        
+
         killer.coins += isKing ? 5 : 1;
         this.game.saveKillerStats(killer);
       }
     }
 
-    this.game.server.broadcast({
+    // Broadcast death - works for both normal game and arena
+    // Check if this is an arena room (has broadcast method directly) or normal game (has server.broadcast)
+    const broadcastData = {
       type: PacketType.PLAYER_DIED,
       victimId: player.id,
       killerId: killerId,
@@ -138,16 +141,38 @@ export class CollisionResolver {
       score: player.score,
       coins: player.coins,
       kills: player.sessionKills
-    });
+    };
 
+    if (this.game.broadcast) {
+      // This is an ArenaRoom
+      this.game.broadcast(broadcastData);
+    } else if (this.game.server) {
+      // This is the main Game
+      this.game.server.broadcast(broadcastData);
+    }
+
+    // Handle bot cleanup - only for normal game mode (arena handles its own cleanup)
     if (player.isBot) {
       setTimeout(() => {
-        if (this.game.players.has(player.id)) {
-          this.game.removePlayer(player.id);
-          this.game.bots.manageBots();
+        if (this.game.broadcast) {
+          // Arena
+          if (this.game.players.has(player.id)) {
+            this.game.players.delete(player.id);
+            this.game.broadcast({
+              type: PacketType.PLAYER_LEAVE,
+              id: player.id
+            });
+            console.log(`[Arena] Bot ${player.name} removed`);
+          }
+        } else if (this.game.bots) {
+          // Normal game
+          if (this.game.players.has(player.id)) {
+            this.game.removePlayer(player.id);
+            this.game.bots.manageBots();
+          }
         }
       }, 2000);
-    } else {
+    } else if (!player.isBot) {
       this.game.savePlayerScore(player);
     }
   }

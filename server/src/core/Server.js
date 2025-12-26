@@ -7,12 +7,14 @@ import { User } from '../db/models/User.model.js';
 import { SKINS } from '../../../shared/src/constants.js';
 // Đảm bảo bạn đã tạo file này tại đường dẫn bên dưới
 import { rateLimit } from '../utils/rateLimit.js';
+import { ArenaManager } from '../arena/ArenaManager.js';
 
 export class Server {
   constructor(port = 3000) {
     this.wss = new WebSocketServer({ port });
     this.game = new Game(this);
     this.clients = new Map();
+    this.arena = new ArenaManager(this);
 
     console.log(`WebSocket server running on port ${port}`);
     this.setupWSS();
@@ -42,14 +44,25 @@ export class Server {
 
       ws.on('close', () => {
         console.log(`Client disconnected: ${clientId}`);
-        this.game.removePlayer(clientId);
+        // Check if client was in arena
+        const client = this.clients.get(clientId);
+        if (client?.arenaRoomId) {
+          this.arena.leaveArena(clientId);
+        } else {
+          this.game.removePlayer(clientId);
+        }
         this.clients.delete(clientId);
         this.broadcast({ type: PacketType.PLAYER_LEAVE, id: clientId });
       });
 
       ws.on('error', (err) => {
         console.error('WebSocket error:', err);
-        this.game.removePlayer(clientId);
+        const client = this.clients.get(clientId);
+        if (client?.arenaRoomId) {
+          this.arena.leaveArena(clientId);
+        } else {
+          this.game.removePlayer(clientId);
+        }
         this.clients.delete(clientId);
       });
     });
@@ -58,6 +71,15 @@ export class Server {
   async handleMessage(clientId, packet) {
     const client = this.clients.get(clientId);
     if (!client) return;
+
+    // Check if client is in arena room
+    if (client.arenaRoomId) {
+      const room = this.arena.getRoom(client.arenaRoomId);
+      if (room) {
+        await this.handleArenaMessage(clientId, packet, room);
+        return;
+      }
+    }
 
     switch (packet.type) {
       case PacketType.JOIN:
@@ -92,6 +114,14 @@ export class Server {
           }
         }
         this.game.addPlayer(clientId, playerName, userId, userSkin);
+        break;
+
+      case PacketType.ARENA_JOIN:
+        await this.handleArenaJoin(clientId, packet);
+        break;
+
+      case PacketType.ARENA_LEAVE:
+        this.arena.leaveArena(clientId);
         break;
 
       case PacketType.INPUT:
@@ -140,6 +170,90 @@ export class Server {
         // Client gửi lên: { type: 'USE_ITEM' }
         this.game.handleUseItem(clientId);
         break;
+    }
+  }
+
+  // Handle arena-specific messages
+  async handleArenaMessage(clientId, packet, room) {
+    switch (packet.type) {
+      case PacketType.INPUT:
+        room.handleInput(clientId, packet.data);
+        break;
+
+      case PacketType.ATTACK:
+        room.handleAttack(clientId);
+        break;
+
+      case PacketType.DASH:
+        room.handleDash(clientId);
+        break;
+
+      case PacketType.SELECT_SLOT:
+        if (typeof packet.slotIndex === 'number') {
+          room.handleSelectSlot(clientId, packet.slotIndex);
+        }
+        break;
+
+      case PacketType.USE_ITEM:
+        room.handleUseItem(clientId);
+        break;
+
+      case PacketType.ARENA_LEAVE:
+        this.arena.leaveArena(clientId);
+        break;
+
+      case PacketType.PONG:
+        const client = this.clients.get(clientId);
+        if (client?.player) {
+          client.player.lastPong = Date.now();
+        }
+        break;
+    }
+  }
+
+  // Handle arena join request
+  async handleArenaJoin(clientId, packet) {
+    const client = this.clients.get(clientId);
+    if (!client) return;
+
+    let playerName = packet.name || 'Anonymous';
+    let userId = null;
+    let userSkin = packet.skinId || 'default';
+
+    if (packet.token) {
+      try {
+        const decoded = jwt.verify(packet.token, config.JWT_SECRET);
+        userId = decoded.id;
+        client.userId = userId;
+
+        const user = await User.findById(userId);
+        if (user) {
+          playerName = user.username;
+          userSkin = user.equippedSkin || 'default';
+
+          this.sendToClient(clientId, {
+            type: 'USER_DATA_UPDATE',
+            coins: user.coins,
+            skins: user.skins,
+            equippedSkin: user.equippedSkin,
+            highScore: user.highScore,
+            totalKills: user.totalKills,
+            totalDeaths: user.totalDeaths
+          });
+        }
+      } catch (err) {
+        console.log('Invalid token for arena, playing as guest');
+      }
+    }
+
+    const room = this.arena.joinArena(clientId, playerName, userId, userSkin);
+    if (room) {
+      console.log(`[Arena] Player ${playerName} joined arena queue`);
+    } else {
+      this.sendToClient(clientId, {
+        type: PacketType.ARENA_STATUS,
+        error: 'Failed to join arena'
+      });
     }
   }
 

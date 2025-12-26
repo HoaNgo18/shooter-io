@@ -4,7 +4,7 @@ import { MAP_SIZE, ITEM_CONFIG, WEAPON_STATS } from '@shared/constants'; // Impo
 
 const MINIMAP_SIZE = 150; // Kích thước Minimap
 
-const HUD = () => {
+const HUD = ({ isArena = false }) => {
   const [stats, setStats] = useState({
     lives: 3,
     maxLives: 3,
@@ -19,41 +19,89 @@ const HUD = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [myPos, setMyPos] = useState({ x: 0, y: 0 });
   const [kingPos, setKingPos] = useState(null);
+  const [aliveCount, setAliveCount] = useState(10);
 
   const [pickupNotif, setPickupNotif] = useState(null);
 
+  // Use interval to poll data from gameScene instead of packet subscription
+  // This prevents re-renders on every packet (20fps -> causes lag)
   useEffect(() => {
-    const unsubscribe = socket.subscribe((packet) => {
-      setIsConnected(true);
+    let lastUpdate = Date.now();
+    const UPDATE_THROTTLE = 250;
 
-      if (packet.players) {
-        const myId = socket.myId;
-        const me = packet.players.find(p => p.id === myId);
+    const updateInterval = setInterval(() => {
+      const now = Date.now();
+      if (now - lastUpdate < UPDATE_THROTTLE) return; // Skip nếu chưa đủ thời gian
+      lastUpdate = now;
 
-        if (me) {
-          setStats({
-            lives: me.lives,
-            maxLives: me.maxLives,
-            score: me.score,
-            currentAmmo: me.currentAmmo !== undefined ? me.currentAmmo : 3,
-            maxAmmo: me.maxAmmo || 3,
-            weapon: me.weapon || 'BLUE',
-            inventory: me.inventory || [null, null, null, null, null],
-            selectedSlot: me.selectedSlot || 0
-          });
-          setMyPos({ x: me.x, y: me.y });
-        }
+      if (!socket.gameScene || !socket.myId) return;
 
-        const sorted = packet.players
-          .filter(p => !p.dead)
-          .sort((a, b) => b.score - a.score);
-        setLeaderboard(sorted.slice(0, 10));
+      const scene = socket.gameScene;
+      const myPlayer = scene.players?.[socket.myId];
+
+      if (myPlayer) {
+        setStats(prev => {
+          // Only update if values changed
+          if (prev.lives !== myPlayer.lives ||
+            prev.score !== myPlayer.score ||
+            prev.currentAmmo !== myPlayer.currentAmmo ||
+            prev.weapon !== myPlayer.weaponType) {
+            return {
+              lives: myPlayer.lives || 3,
+              maxLives: myPlayer.maxLives || 3,
+              score: myPlayer.score || 0,
+              currentAmmo: myPlayer.currentAmmo !== undefined ? myPlayer.currentAmmo : 3,
+              maxAmmo: myPlayer.maxAmmo || 3,
+              weapon: myPlayer.weaponType || 'BLUE',
+              inventory: myPlayer.inventory || [null, null, null, null, null],
+              selectedSlot: myPlayer.selectedSlot || 0
+            };
+          }
+          return prev;
+        });
+        setMyPos({ x: myPlayer.x, y: myPlayer.y });
+      }
+
+      // Update leaderboard from scene
+      if (scene.players) {
+        const sorted = Object.values(scene.players)
+          .filter(p => !p.dead && p.name)
+          .sort((a, b) => (b.score || 0) - (a.score || 0))
+          .slice(0, 10);
+
+        setLeaderboard(prev => {
+          // Only update if changed
+          const newIds = sorted.map(p => p.id + p.score).join(',');
+          const oldIds = prev.map(p => p.id + p.score).join(',');
+          if (newIds !== oldIds) {
+            return sorted.map(p => ({
+              id: p.id,
+              name: p.name,
+              score: p.score || 0,
+              x: p.x,
+              y: p.y
+            }));
+          }
+          return prev;
+        });
 
         if (sorted.length > 0) {
           setKingPos({ x: sorted[0].x, y: sorted[0].y });
         }
+
+        // Update alive count for arena
+        if (isArena) {
+          // Lấy dữ liệu từ biến aliveCount mà ta đã giữ lại ở Scene
+          const alive = scene.aliveCount !== undefined ? scene.aliveCount : 10;
+          setAliveCount(alive);
+        }
       }
 
+      setIsConnected(socket.isConnected);
+    }, 250); // Update HUD at ~7fps - balance between responsiveness and performance
+
+    // Still listen for special events like item pickup
+    const unsubscribe = socket.subscribe((packet) => {
       if (packet.type === 'ITEM_PICKED_UP' && packet.playerId === socket.myId) {
         const config = ITEM_CONFIG[packet.itemType];
         if (config) {
@@ -61,15 +109,16 @@ const HUD = () => {
             name: config.name,
             description: config.description
           });
-
-          // Auto-hide after 1.5 seconds
           setTimeout(() => setPickupNotif(null), 1500);
         }
       }
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      clearInterval(updateInterval);
+      unsubscribe();
+    };
+  }, [isArena]);
 
   const worldToMinimap = (x, y) => {
     const shiftedX = x + (MAP_SIZE / 2);
@@ -111,36 +160,23 @@ const HUD = () => {
       fontFamily: 'Arial, sans-serif'
     }}>
 
-      {/* ========== LIVES + SCORE + AMMO (GÓC TRÁI TRÊN) ========== */}
+      {/* ========== LIVES + SCORE + AMMO + ALIVE (GÓC TRÁI TRÊN) ========== */}
       <div style={{
         position: 'absolute',
         top: '25px',
         left: '25px',
         display: 'flex',
-        flexDirection: 'column',
-        gap: '8px', // Khoảng cách đều giữa các dòng
+        flexDirection: 'column', // Xếp dọc từ trên xuống
+        gap: '12px',             // Tăng khoảng cách giữa các dòng cho thoáng
         fontFamily: "'Segoe UI', 'Arial', sans-serif",
         pointerEvents: 'none'
       }}>
 
-        {/* --- 1. LIVES ROW (ICONS) --- */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px' // Khoảng cách giữa chữ LIVES và Icon
-        }}>
-          {/* Label */}
-          <span style={{
-            fontSize: '14px',
-            fontWeight: '800',
-            color: '#DDD',
-            letterSpacing: '1px',
-            textShadow: '1px 1px 0 #000'
-          }}>
+        {/* --- 1. LIVES ROW --- */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '14px', fontWeight: '800', color: '#DDD', letterSpacing: '1px', textShadow: '1px 1px 0 #000', width: '50px' }}>
             LIVES
           </span>
-
-          {/* Icon Row */}
           <div style={{ display: 'flex', gap: '5px' }}>
             {Array.from({ length: stats.maxLives }).map((_, index) => (
               <img
@@ -148,12 +184,9 @@ const HUD = () => {
                 src="/UI/playerLife3_red.png"
                 alt="life"
                 style={{
-                  width: '32px', // Kích thước icon
+                  width: '28px',
                   height: 'auto',
-                  // Logic hiển thị: Nếu còn mạng thì sáng, mất mạng thì tối + đen trắng
-                  filter: index < stats.lives
-                    ? 'drop-shadow(2px 2px 0 rgba(0,0,0,0.5))'
-                    : 'grayscale(100%) brightness(30%) opacity(0.5)',
+                  filter: index < stats.lives ? 'drop-shadow(2px 2px 0 rgba(0,0,0,0.5))' : 'grayscale(100%) brightness(30%) opacity(0.5)',
                   transform: index < stats.lives ? 'scale(1)' : 'scale(0.9)',
                   transition: 'all 0.3s ease'
                 }}
@@ -163,78 +196,47 @@ const HUD = () => {
         </div>
 
         {/* --- 2. SCORE ROW --- */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: '10px'
-        }}>
-          <span style={{
-            fontSize: '14px',
-            fontWeight: '800',
-            color: '#DDD',
-            letterSpacing: '1px',
-            textShadow: '1px 1px 0 #000'
-          }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+          <span style={{ fontSize: '14px', fontWeight: '800', color: '#DDD', letterSpacing: '1px', textShadow: '1px 1px 0 #000', width: '50px' }}>
             SCORE
           </span>
-          <span style={{
-            fontSize: '26px',
-            fontWeight: '900',
-            color: '#FFD700', // Vàng Gold
-            textShadow: '2px 2px 0 #000',
-            fontFamily: 'monospace' // Dùng font này để số không bị nhảy khi tăng điểm
-          }}>
+          <span style={{ fontSize: '24px', fontWeight: '900', color: '#FFD700', textShadow: '2px 2px 0 #000', fontFamily: 'monospace' }}>
             {stats.score.toString().padStart(6, '0')}
           </span>
         </div>
 
-        {/* --- 3. AMMO ROW (BAR STYLE) --- */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px'
-        }}>
-          <span style={{
-            fontSize: '14px',
-            fontWeight: '800',
-            color: '#DDD',
-            letterSpacing: '1px',
-            textShadow: '1px 1px 0 #000'
-          }}>
+        {/* --- 3. AMMO ROW --- */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '14px', fontWeight: '800', color: '#DDD', letterSpacing: '1px', textShadow: '1px 1px 0 #000', width: '50px' }}>
             AMMO
           </span>
-
-          {/* Thanh chứa đạn */}
           <div style={{
-            display: 'flex',
-            height: '16px',
-            background: 'rgba(0, 0, 0, 0.4)', // Nền tối cho thanh đạn
-            padding: '3px',
-            borderRadius: '4px',
-            border: '1px solid rgba(255,255,255,0.2)',
-            gap: '2px' // Khoảng cách nhỏ tạo cảm giác "chia nấc"
+            display: 'flex', height: '14px', background: 'rgba(0, 0, 0, 0.4)', padding: '3px',
+            borderRadius: '4px', border: '1px solid rgba(255,255,255,0.2)', gap: '2px'
           }}>
             {Array.from({ length: stats.maxAmmo }).map((_, index) => (
-              <div
-                key={index}
-                style={{
-                  width: '20px', // Độ rộng mỗi nấc
-                  height: '100%',
-                  // Logic màu: Đầy đủ thì lấy màu súng, rỗng thì trong suốt
-                  backgroundColor: index < stats.currentAmmo ? getAmmoColor() : 'transparent',
-                  // Hiệu ứng phát sáng nếu có đạn
-                  boxShadow: index < stats.currentAmmo ? `0 0 8px ${getAmmoColor()}` : 'none',
-
-                  // Style nấc đạn
-                  borderRadius: '2px',
-                  opacity: index < stats.currentAmmo ? 1 : 0.1,
-                  transform: 'skewX(-15deg)', // Nghiêng để tạo cảm giác tốc độ/sci-fi
-                  transition: 'all 0.1s ease'
-                }}
-              />
+              <div key={index} style={{
+                width: '18px', height: '100%',
+                backgroundColor: index < stats.currentAmmo ? getAmmoColor() : 'transparent',
+                boxShadow: index < stats.currentAmmo ? `0 0 8px ${getAmmoColor()}` : 'none',
+                borderRadius: '2px', opacity: index < stats.currentAmmo ? 1 : 0.1,
+                transform: 'skewX(-15deg)', transition: 'all 0.1s ease'
+              }} />
             ))}
           </div>
         </div>
+
+        {/* --- 4. ALIVE ROW (Chỉ hiện khi đấu trường) --- */}
+        {isArena && (
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+            <span style={{ fontSize: '14px', fontWeight: '800', color: '#DDD', letterSpacing: '1px', textShadow: '1px 1px 0 #000', width: '50px' }}>
+              ALIVE
+            </span>
+            <span style={{ fontSize: '24px', fontWeight: '900', color: '#FF4444', textShadow: '2px 2px 0 #000', fontFamily: 'monospace' }}>
+              {aliveCount} <span style={{ fontSize: '14px', color: '#AAA' }}>/ 10</span>
+            </span>
+          </div>
+        )}
 
       </div>
 
