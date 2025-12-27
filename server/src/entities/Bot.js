@@ -1,4 +1,4 @@
-// server/src/entities/Bot.js - SPACE SHIP AI
+// server/src/entities/Bot.js - SPACE SHIP AI WITH ZONE AVOIDANCE
 import { Player } from './Player.js';
 import { distance } from '../../../shared/src/utils.js';
 
@@ -32,53 +32,222 @@ export class Bot extends Player {
     this.stateChangeTime = 0;
     this.currentState = 'WANDER'; 
     this.spritePointsDown = true;
+
+    // ========================================
+    // ZONE AVOIDANCE SETTINGS
+    // ========================================
+    this.zoneAwareness = 0.7 + Math.random() * 0.3; // 0.7-1.0: Mức độ "thông minh" tránh bo
+    this.panicThreshold = 0.8; // Khi ở 80% bán kính thì bắt đầu lo lắng
+    this.dangerThreshold = 0.95; // Khi ở 95% bán kính thì PANIC CHẠY NGAY
   }
 
   think(game) {
     if (this.dead) return;
 
-    // --- SỬA ĐỔI: VALIDATE TARGET (Kiểm tra lại mục tiêu hiện tại) ---
-    if (this.target) {
-        // Tìm đối tượng player thực tế trong danh sách players của game
-        // (Giả sử game.players là Map như cấu trúc thường dùng, nếu là Array thì dùng .find)
-        let targetPlayer = null;
-        if (game.players instanceof Map) {
-            targetPlayer = game.players.get(this.target.id);
-        } else if (Array.isArray(game.players)) {
-            targetPlayer = game.players.find(p => p.id === this.target.id);
-        }
-
-        // Nếu mục tiêu không còn tồn tại, đã chết, HOẶC ĐANG TÀNG HÌNH
-        if (!targetPlayer || targetPlayer.dead || targetPlayer.isHidden) {
-            this.target = null; // Quên mục tiêu ngay lập tức
-        } else {
-            // Nếu vẫn thấy, cập nhật vị trí mới nhất để bắn cho chuẩn
-            this.target.x = targetPlayer.x;
-            this.target.y = targetPlayer.y;
-            this.target.distance = distance(this.x, this.y, targetPlayer.x, targetPlayer.y);
-        }
+    // ========================================
+    // PRIORITY 1: ZONE AVOIDANCE (CAO NHẤT)
+    // ========================================
+    const zoneStatus = this.checkZoneStatus(game);
+    
+    if (zoneStatus.inDanger) {
+      this.handleZoneDanger(zoneStatus);
+      return; // Ưu tiên cao nhất - bỏ qua combat
     }
-    // -------------------------------------------------------------
 
-    // Chỉ tìm mục tiêu mới nếu hiện tại không có mục tiêu
+    // ========================================
+    // PRIORITY 2: VALIDATE TARGET
+    // ========================================
+    if (this.target) {
+      let targetPlayer = null;
+      
+      if (game.players instanceof Map) {
+        targetPlayer = game.players.get(this.target.id);
+      } else if (Array.isArray(game.players)) {
+        targetPlayer = game.players.find(p => p.id === this.target.id);
+      }
+
+      if (!targetPlayer || targetPlayer.dead || targetPlayer.isHidden) {
+        this.target = null;
+      } else {
+        this.target.x = targetPlayer.x;
+        this.target.y = targetPlayer.y;
+        this.target.distance = distance(this.x, this.y, targetPlayer.x, targetPlayer.y);
+      }
+    }
+
+    // ========================================
+    // PRIORITY 3: COMBAT OR WANDER
+    // ========================================
     if (!this.target) {
       this.findTarget(game);
     }
     
     if (this.target) {
-      this.engageTarget(game);
+      // Nếu có mục tiêu NHƯNG gần bo, ưu tiên tránh bo hơn
+      if (zoneStatus.needsAttention) {
+        this.engageTargetWithZoneAwareness(game, zoneStatus);
+      } else {
+        this.engageTarget(game);
+      }
     } else {
-      this.wander();
+      // Nếu đang lang thang, vẫn cần tránh bo
+      if (zoneStatus.needsAttention) {
+        this.moveTowardsSafeZone(zoneStatus);
+      } else {
+        this.wander();
+      }
     }
   }
+
+  // ========================================
+  // ZONE AVOIDANCE LOGIC
+  // ========================================
+
+  checkZoneStatus(game) {
+    // Kiểm tra xem có phải Arena không
+    const zone = game.zone;
+    
+    if (!zone || zone.radius <= 0) {
+      return { 
+        inDanger: false, 
+        needsAttention: false,
+        distanceFromCenter: 0,
+        distanceToEdge: Infinity 
+      };
+    }
+
+    // Tính khoảng cách từ bot đến tâm bo
+    const distanceFromCenter = Math.hypot(
+      this.x - zone.x,
+      this.y - zone.y
+    );
+
+    // Khoảng cách đến viền bo
+    const distanceToEdge = zone.radius - distanceFromCenter;
+
+    // Tỷ lệ so với bán kính
+    const edgeRatio = distanceFromCenter / zone.radius;
+
+    return {
+      zone: zone,
+      distanceFromCenter: distanceFromCenter,
+      distanceToEdge: distanceToEdge,
+      edgeRatio: edgeRatio,
+      inDanger: edgeRatio >= this.dangerThreshold, // 95%: NGUY HIỂM NGAY LẬP TỨC
+      needsAttention: edgeRatio >= this.panicThreshold, // 80%: CẦN CHÚ Ý
+      isOutside: distanceFromCenter > zone.radius // Đã ở ngoài bo
+    };
+  }
+
+  handleZoneDanger(zoneStatus) {
+    // PANIC MODE: Chạy thẳng về tâm bo
+    const zone = zoneStatus.zone;
+    
+    // Tính góc về tâm bo
+    const angleToCenter = Math.atan2(
+      zone.y - this.y,
+      zone.x - this.x
+    );
+
+    this.desiredAngle = angleToCenter;
+
+    // Điều khiển: Xoay về hướng tâm
+    let angleDiff = this.desiredAngle - this.angle;
+    while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+    while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+    const angleThreshold = 0.2; // Cho phép sai số lớn hơn trong panic mode
+
+    if (Math.abs(angleDiff) > angleThreshold) {
+      this.input.left = angleDiff < 0;
+      this.input.right = angleDiff > 0;
+    } else {
+      this.input.left = false;
+      this.input.right = false;
+    }
+
+    // LUÔN LUÔN TĂNG TỐC về tâm
+    this.input.up = true;
+    this.input.down = false;
+
+    // Không bắn khi panic (tập trung chạy)
+    console.log(`[Bot] ${this.name} PANIC - Running to safe zone (${Math.round(zoneStatus.distanceToEdge)}px from edge)`);
+  }
+
+  moveTowardsSafeZone(zoneStatus) {
+    // Mode "Cẩn thận": Di chuyển về phía an toàn hơn
+    const zone = zoneStatus.zone;
+
+    // Tính góc về tâm bo
+    const angleToCenter = Math.atan2(
+      zone.y - this.y,
+      zone.x - this.x
+    );
+
+    // Nếu gần viền, di chuyển về tâm
+    // Nếu còn xa, có thể di chuyển tự do hơn
+    const urgency = zoneStatus.edgeRatio;
+
+    if (urgency > 0.85) {
+      // Rất gần viền - đi thẳng về tâm
+      this.desiredAngle = angleToCenter;
+    } else {
+      // Còn xa - di chuyển chéo về phía an toàn
+      // Thêm 1 chút random để không đi thẳng quá
+      const randomOffset = (Math.random() - 0.5) * (Math.PI / 4); // ±45°
+      this.desiredAngle = angleToCenter + randomOffset * (1 - urgency);
+    }
+
+    // Xoay về hướng mong muốn
+    let angleDiff = this.desiredAngle - this.angle;
+    while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+    while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+    if (Math.abs(angleDiff) > 0.1) {
+      this.input.left = angleDiff < 0;
+      this.input.right = angleDiff > 0;
+    } else {
+      this.input.left = false;
+      this.input.right = false;
+    }
+
+    // Di chuyển với tốc độ vừa phải
+    this.input.up = true;
+    this.input.down = false;
+  }
+
+  engageTargetWithZoneAwareness(game, zoneStatus) {
+    // Combat nhưng ưu tiên tránh bo
+
+    const zone = zoneStatus.zone;
+    const angleToCenter = Math.atan2(zone.y - this.y, zone.x - this.x);
+    const angleToTarget = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+
+    // Tính góc giữa hướng đến tâm và hướng đến mục tiêu
+    let angleDifference = Math.abs(angleToTarget - angleToCenter);
+    if (angleDifference > Math.PI) angleDifference = Math.PI * 2 - angleDifference;
+
+    // Nếu mục tiêu và tâm bo cùng hướng -> Tấn công bình thường
+    // Nếu ngược hướng -> Ưu tiên tránh bo
+    if (angleDifference < Math.PI / 3) {
+      // Mục tiêu nằm về phía tâm bo - An toàn để tấn công
+      this.engageTarget(game);
+    } else {
+      // Mục tiêu nằm xa tâm bo - Ưu tiên tránh bo
+      console.log(`[Bot] ${this.name} prioritizing zone safety over combat`);
+      this.moveTowardsSafeZone(zoneStatus);
+    }
+  }
+
+  // ========================================
+  // ORIGINAL COMBAT LOGIC (KHÔNG THAY ĐỔI)
+  // ========================================
 
   findTarget(game) {
     let closestDist = Infinity;
     let newTarget = null;
 
     game.players.forEach(other => {
-      // --- SỬA ĐỔI: Xóa dòng thừa, chỉ giữ 1 dòng check đầy đủ ---
-      // Bỏ qua: Chính mình, Bot khác, Người chết, Người tàng hình
       if (other.id === this.id || other.isBot || other.dead || other.isHidden) return;
 
       const d = distance(this.x, this.y, other.x, other.y);
@@ -105,15 +274,12 @@ export class Bot extends Player {
     const dy = this.target.y - this.y;
     const dist = this.target.distance;
     
-    // Calculate desired angle to face target
     this.desiredAngle = Math.atan2(dy, dx);
 
-    // Current angle difference
     let angleDiff = this.desiredAngle - this.angle;
     while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
     while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
 
-    // === ROTATION CONTROL ===
     const angleThreshold = 0.1;
     if (Math.abs(angleDiff) > angleThreshold) {
       this.input.left = angleDiff < 0;
@@ -123,7 +289,6 @@ export class Bot extends Player {
       this.input.right = false;
     }
 
-    // === MOVEMENT CONTROL ===
     const optimalDist = 300; 
 
     if (dist > optimalDist + 50) {
@@ -137,7 +302,6 @@ export class Bot extends Player {
       this.input.down = false;
     }
 
-    // === SHOOTING ===
     const now = Date.now();
     const isAimingWell = Math.abs(angleDiff) < 0.3; 
     

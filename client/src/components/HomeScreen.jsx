@@ -399,7 +399,7 @@ const HomeScreen = ({ user, onPlayClick, onArenaClick, onLogout, onLoginSuccess 
                             onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
                             onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
                         >
-                            BATTLE ROYALE
+                            ARENA
                         </button>
                     </div>
                 )}
@@ -441,7 +441,7 @@ const HomeScreen = ({ user, onPlayClick, onArenaClick, onLogout, onLoginSuccess 
                                         onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
                                         onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
                                     >
-                                        BATTLE ROYALE
+                                        ARENA
                                     </button>
                                 </div>
                             )}
