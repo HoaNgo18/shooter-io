@@ -252,36 +252,34 @@ export const ENTITY_TYPES = {
 };
 
 export const BOMB_STATS = {
-    TRIGGER_RADIUS: 100, // Kẻ địch đi vào phạm vi 100px sẽ kích nổ
-    LIFETIME: 60000,     // Tồn tại 60 giây (1 phút) mới tự biến mất
-    ARMING_TIME: 1000    // 1 giây sau khi đặt mới bắt đầu kích hoạt cảm biến (tránh nổ ngay vào người đặt)
+  TRIGGER_RADIUS: 100, // Kẻ địch đi vào phạm vi 100px sẽ kích nổ
+  LIFETIME: 60000,     // Tồn tại 60 giây (1 phút) mới tự biến mất
+  ARMING_TIME: 1000    // 1 giây sau khi đặt mới bắt đầu kích hoạt cảm biến (tránh nổ ngay vào người đặt)
 };
 
 export const ARENA_CONFIG = {
-  // Cấu hình phòng
-  WAITING_TIME: 60000,      // 60 giây chờ
-  COUNTDOWN_TIME: 5000,     // 5 giây đếm ngược bắt đầu
-  GAME_DURATION: 180,       // 3 phút (giây)
-  
+  // Thời gian chính
+  WAITING_TIME: 45 * 1000,        // 45 giây chờ
+  COUNTDOWN_TIME: 5 * 1000,       // 5 giây đếm ngược
+  GAME_DURATION: 5 * 60 * 1000,   // 5 phút chơi
+
   // Cấu hình Vòng Bo (Zone)
   ZONE: {
-    DAMAGE_PER_SECOND_BASE: 5, // Sát thương cơ bản mỗi giây
-    DAMAGE_INCREASE_PER_PHASE: 2, // Tăng thêm mỗi phase
-    SHRINK_DURATION: 30,    // Thời gian để co xong 1 giai đoạn (giây)
-    
-    // Các giai đoạn bán kính (Tỷ lệ so với MAP_SIZE)
-    // Tổng thời gian = số phase * SHRINK_DURATION = 6 * 30 = 180s
-    RADII_PERCENT: [
-      0.8, // 0-30s: Còn 80% map
-      0.6, // 30-60s
-      0.4, // 60-90s
-      0.25, // 90-120s
-      0.1, // 120-150s
-      0.0  // 150-180s: Đóng hoàn toàn
-    ],
-    
-    // Màu sắc hiển thị (Client dùng)
-    COLOR_DANGER: 0xFF0000,
-    COLOR_SAFE_STROKE: 0x00FF00
+    // Sát thương cơ bản
+    DAMAGE_PER_SECOND: 0.5,
+
+    // Thời gian (giây)
+    WAIT_TIME: 45,      // 15 giây nghỉ để loot đồ
+    SHRINK_TIME: 15,    // 45 giây chạy bo (15s chờ + 45s co = 60s/vòng)
+
+    // 5 Giai đoạn co đều đặn
+    // Bắt đầu: 100% map
+    // Sau 5 lần: 80% -> 60% -> 40% -> 20% -> 0% (đóng hẳn)
+    RADII_PERCENT: [0.7, 0.5, 0.3, 0.2, 0.0],
+
+    // Màu sắc
+    COLOR_DANGER: 0xFF0000,   // Đỏ
+    COLOR_BORDER: 0xFFFFFF,   // Trắng
+    BORDER_WIDTH: 3           // Viền rõ ràng
   }
 };
