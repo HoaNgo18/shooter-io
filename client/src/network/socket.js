@@ -11,7 +11,7 @@ class NetworkManager {
     this.isConnected = false;
     this.listeners = [];
     this.initData = null;
-    
+
     // Arena state
     this.isInArena = false;
     this.arenaRoomId = null;
@@ -24,7 +24,7 @@ class NetworkManager {
 
       this.ws.onopen = () => {
         this.isConnected = true;
-        console.log('✅ Connected via WebSocket');
+        // Connected via WebSocket
 
         // Gửi gói tin JOIN kèm thông tin xác thực
         this.send({
@@ -46,7 +46,6 @@ class NetworkManager {
         this.isConnected = false;
         this.isInArena = false;
         this.arenaRoomId = null;
-        console.log('🔌 Disconnected');
       };
     });
   }
@@ -59,7 +58,7 @@ class NetworkManager {
 
         this.ws.onopen = () => {
           this.isConnected = true;
-          console.log('✅ Connected via WebSocket (Arena)');
+          // Connected via WebSocket (Arena)
 
           // Send arena join request
           this.send({
@@ -82,7 +81,6 @@ class NetworkManager {
           this.isConnected = false;
           this.isInArena = false;
           this.arenaRoomId = null;
-          console.log('🔌 Disconnected');
         };
       } else {
         // Already connected, just send arena join
@@ -103,7 +101,6 @@ class NetworkManager {
     this.gameScene = null;
     this.initData = null;
     this.myId = null;
-    console.log('[Socket] Left arena, state reset');
   }
 
   // Ngắt kết nối
@@ -116,7 +113,6 @@ class NetworkManager {
       this.isInArena = false;
       this.arenaRoomId = null;
       // DON'T clear listeners here - they're still needed for reconnection
-      console.log('Manually disconnected');
     }
   }
 
@@ -131,9 +127,7 @@ class NetworkManager {
   setGameScene(scene) {
     if (!scene) return;
     this.gameScene = scene;
-    console.log('[Socket] GameScene set, initData:', this.initData ? 'available' : 'null');
     if (this.initData) {
-      console.log('[Socket] Applying buffered INIT data with', this.initData.foods?.length, 'foods,', this.initData.obstacles?.length, 'obstacles');
       this.gameScene.initGame(this.initData);
       // Don't clear initData - keep it for potential reconnect
     }
@@ -162,10 +156,9 @@ class NetworkManager {
       const packet = JSON.parse(event.data);
 
       // 1. Xử lý Logic Global (Luôn chạy dù có GameScene hay không)
-      
+
       // Init ID (for both normal and arena)
       if (packet.type === PacketType.INIT) {
-        console.log('Received INIT packet. My ID:', packet.id);
         this.myId = packet.id;
         this.initData = packet;
         if (packet.isArena) {

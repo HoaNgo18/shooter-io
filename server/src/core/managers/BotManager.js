@@ -47,8 +47,6 @@ export class BotManager {
         type: PacketType.PLAYER_JOIN,
         player: bot.serialize()
       });
-
-      console.log(`Spawned Bot: ${bot.name} with skin ${bot.skinId} (Real: ${realPlayerCount}, Bots: ${botCount + 1})`);
     }
   }
 }

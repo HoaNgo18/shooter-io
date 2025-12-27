@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { socket } from '../../network/socket';
 import { PacketType } from '@shared/packetTypes';
 import { ClientPlayer } from '../entities/ClientPlayer';
-import { WEAPON_STATS, MAP_SIZE, ARENA_CONFIG } from '@shared/constants'; // Nhớ import ARENA_CONFIG
+import { WEAPON_STATS, MAP_SIZE, ARENA_CONFIG } from '@shared/constants';
 import { AssetLoader } from '../AssetLoader';
 import { InputManager } from '../InputManager';
 import { EntityManager } from '../EntityManager';
@@ -38,9 +38,7 @@ export class ArenaScene extends Phaser.Scene {
         // 3. Setup UI/Helpers
         this.createRangeCircle();
 
-        // --- [NEW] ZONE VISUALS INIT ---
-        // Layer vẽ zone (Depth 5: Trên background, dưới items/players)
-        // Hoặc Depth 100: Trên tất cả để tạo hiệu ứng phủ đỏ lên màn hình
+        // 4. ZONE VISUALS INIT
         this.zoneGraphics = this.add.graphics();
         this.zoneGraphics.setDepth(100);
 
@@ -54,18 +52,15 @@ export class ArenaScene extends Phaser.Scene {
             strokeThickness: 6
         });
         this.zoneWarningText.setOrigin(0.5);
-        this.zoneWarningText.setScrollFactor(0); // Dính vào màn hình (HUD)
-        // Đặt ở giữa màn hình, hơi lệch lên trên
+        this.zoneWarningText.setScrollFactor(0);
         this.zoneWarningText.setPosition(this.scale.width / 2, this.scale.height / 3);
         this.zoneWarningText.setDepth(200);
         this.zoneWarningText.setVisible(false);
 
-        // 4. Create Arena-specific UI (alive count)
+        // 5. Create Arena-specific UI (alive count)
         this.aliveCount = 10;
 
-        console.log('ArenaScene Created - Waiting for socket...');
-
-        // 5. Connect Socket Logic
+        // 6. Connect Socket Logic
         socket.setGameScene(this);
     }
 
@@ -92,9 +87,8 @@ export class ArenaScene extends Phaser.Scene {
         const inputData = this.inputManager.getInputData();
         socket.send({ type: PacketType.INPUT, data: inputData });
 
-        // --- [NEW] UPDATE WARNING TEXT ANIMATION ---
+        // 4. UPDATE WARNING TEXT ANIMATION
         if (this.zoneWarningText.visible) {
-            // Hiệu ứng nhấp nháy
             this.zoneWarningText.setAlpha(0.5 + Math.sin(time / 150) * 0.5);
         }
     }
@@ -165,7 +159,7 @@ export class ArenaScene extends Phaser.Scene {
             this.aliveCount = packet.aliveCount;
         }
 
-        // --- [NEW] 4. HANDLE ZONE UPDATE ---
+        // 4. HANDLE ZONE UPDATE
         if (packet.zone) {
             this.zoneData = packet.zone;
             this.drawZone();
@@ -173,13 +167,13 @@ export class ArenaScene extends Phaser.Scene {
         }
     }
 
-    // --- [NEW] ZONE VISUAL LOGIC ---
+    // --- ZONE VISUAL LOGIC ---
 
     drawZone() {
         if (!this.zoneData || !this.zoneGraphics) return;
 
         const zoneKey = `${this.zoneData.x}_${this.zoneData.y}_${this.zoneData.r}`;
-        if (this.lastZoneKey === zoneKey) return; // Không cần vẽ lại
+        if (this.lastZoneKey === zoneKey) return;
         this.lastZoneKey = zoneKey;
 
         const g = this.zoneGraphics;
@@ -189,39 +183,29 @@ export class ArenaScene extends Phaser.Scene {
         const x = this.zoneData.x;
         const y = this.zoneData.y;
 
-        // ===================================
-        // VẼ VÙNG NGUY HIỂM (BÊN NGOÀI BO)
-        // ===================================
-
-        const mapSize = MAP_SIZE * 2; // Đủ lớn để cover cả map khi camera di chuyển
+        const mapSize = MAP_SIZE * 2;
 
         if (r > 0) {
-            // Phương pháp mới: Vẽ 4 hình thang bao quanh vòng tròn
-            // Chia vùng đỏ thành nhiều segments để tránh lỗi fill
+            g.fillStyle(ARENA_CONFIG.ZONE.COLOR_DANGER, 0.4);
 
-            g.fillStyle(ARENA_CONFIG.ZONE.COLOR_DANGER, 0.4); // Đỏ, alpha 40%
-
-            const segments = 64; // Số lượng segments để vẽ vùng ngoài
+            const segments = 64;
             const angleStep = (Math.PI * 2) / segments;
 
             for (let i = 0; i < segments; i++) {
                 const angle1 = i * angleStep;
                 const angle2 = (i + 1) * angleStep;
 
-                // Điểm trên vòng tròn bo
                 const x1 = x + Math.cos(angle1) * r;
                 const y1 = y + Math.sin(angle1) * r;
                 const x2 = x + Math.cos(angle2) * r;
                 const y2 = y + Math.sin(angle2) * r;
 
-                // Điểm ở rìa ngoài (xa hơn rất nhiều)
                 const outerDist = mapSize;
                 const ox1 = x + Math.cos(angle1) * outerDist;
                 const oy1 = y + Math.sin(angle1) * outerDist;
                 const ox2 = x + Math.cos(angle2) * outerDist;
                 const oy2 = y + Math.sin(angle2) * outerDist;
 
-                // Vẽ hình thang từ vòng tròn ra ngoài
                 g.beginPath();
                 g.moveTo(x1, y1);
                 g.lineTo(x2, y2);
@@ -231,14 +215,11 @@ export class ArenaScene extends Phaser.Scene {
                 g.fillPath();
             }
         } else {
-            // r = 0: Phủ toàn bộ màu đỏ
             g.fillStyle(ARENA_CONFIG.ZONE.COLOR_DANGER, 0.4);
             g.fillRect(x - mapSize, y - mapSize, mapSize * 2, mapSize * 2);
         }
 
-        // ===================================
         // VẼ VIỀN BO (TRẮNG)
-        // ===================================
         if (r > 0) {
             g.lineStyle(
                 ARENA_CONFIG.ZONE.BORDER_WIDTH,
@@ -253,7 +234,6 @@ export class ArenaScene extends Phaser.Scene {
         const myPlayer = this.players[socket.myId];
         if (!myPlayer || !this.zoneData) return;
 
-        // Tính khoảng cách từ tàu đến tâm bo
         const dist = Phaser.Math.Distance.Between(
             myPlayer.x,
             myPlayer.y,
@@ -261,13 +241,13 @@ export class ArenaScene extends Phaser.Scene {
             this.zoneData.y
         );
 
-        // Hiển thị cảnh báo khi ở ngoài bo
         if (dist > this.zoneData.r) {
             this.zoneWarningText.setVisible(true);
         } else {
             this.zoneWarningText.setVisible(false);
         }
     }
+
     // --- HELPER METHODS ---
     updateOrAddPlayer(pData) {
         const player = this.players[pData.id];

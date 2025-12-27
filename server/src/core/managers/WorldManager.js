@@ -200,7 +200,7 @@ export class WorldManager {
   // ==========================================================
   // LOGIC RƠI ĐỒ ĐÃ SỬA ĐỔI
   // ==========================================================
-  
+
   /**
    * Hàm spawn đồ dùng chung.
    * @param {number} x - Tọa độ X
@@ -212,24 +212,22 @@ export class WorldManager {
     let spawnRadius = 20;
 
     // --- LOGIC XÁC ĐỊNH SỐ LƯỢNG VÀ LOẠI ITEM ---
-    
+
     if (sourceType === CHEST_TYPES.STATION || sourceType === 'STATION') {
       // LOGIC STATION: Rơi 2 món
       // Món 1: Chắc chắn là Coin (Bronze/Silver/Gold)
       // Món 2: Random bất kỳ món nào (Weapon, Powerup, Shield, Bomb...)
       itemsToSpawn.push(this.rollCoinOnly());
       itemsToSpawn.push(this.rollAnyItem());
-      
+
       spawnRadius = 60; // Station to nên văng xa hơn
-      console.log("Station destroyed! Dropping 1 Coin + 1 Random Item");
 
     } else if (sourceType === 'ENEMY') {
       // LOGIC ENEMY: Rơi 1 món random
       // Tỷ lệ: Tất cả mọi đồ đều có thể xuất hiện
       itemsToSpawn.push(this.rollAnyItem());
-      
+
       spawnRadius = 30;
-      // console.log("Enemy destroyed! Dropping 1 Random Item");
 
     } else {
       // LOGIC CHEST THƯỜNG (Mặc định)
@@ -257,7 +255,7 @@ export class WorldManager {
 
       // Tạo ID duy nhất tại Server
       const uniqueId = `item_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-      
+
       const item = new Item(itemX, itemY, itemType);
       item.id = uniqueId;
 
@@ -305,9 +303,9 @@ export class WorldManager {
     // (Giả sử ITEM_CONFIG có chứa dropChance cho mọi item)
     const weights = itemTypes.map(type => {
       // Fallback nếu item chưa config dropChance thì cho mặc định là 10
-      return ITEM_CONFIG[type]?.dropChance || 10; 
+      return ITEM_CONFIG[type]?.dropChance || 10;
     });
-    
+
     const totalWeight = weights.reduce((sum, w) => sum + w, 0);
     let random = Math.random() * totalWeight;
 

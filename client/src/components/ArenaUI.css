@@ -1,0 +1,174 @@
+/* ArenaUI.css */
+.arena-waiting-container {
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(135deg, #1a0a0a 0%, #2d1515 50%, #1a0a0a 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-family: Arial, sans-serif;
+}
+
+.arena-title {
+    font-size: 48px;
+    color: #FF4444;
+    margin-bottom: 20px;
+}
+
+.arena-countdown-container,
+.arena-status-container {
+    text-align: center;
+}
+
+.arena-countdown-text {
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+.arena-countdown-number {
+    font-size: 80px;
+    font-weight: bold;
+    color: #FFD700;
+    text-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+}
+
+.arena-status-text {
+    font-size: 24px;
+    margin-bottom: 10px;
+}
+
+.arena-player-count {
+    font-size: 48px;
+    font-weight: bold;
+    color: #FFD700;
+    margin-bottom: 20px;
+}
+
+.arena-wait-time {
+    font-size: 18px;
+    color: #888;
+}
+
+.arena-hint {
+    font-size: 14px;
+    color: #666;
+    margin-top: 10px;
+}
+
+.arena-cancel-btn {
+    margin-top: 40px;
+    padding: 15px 40px;
+    font-size: 18px;
+    font-weight: bold;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid #FF4444;
+    color: #FF4444;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.arena-cancel-btn:hover {
+    background: rgba(255, 68, 68, 0.1);
+}
+
+.phaser-container {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+/* Victory / End Screen */
+.arena-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    color: #fff;
+    font-family: Arial, sans-serif;
+}
+
+.victory-title {
+    font-size: 64px;
+    color: #FFD700;
+    margin-bottom: 20px;
+}
+
+.end-title {
+    font-size: 48px;
+    color: #FF4444;
+    margin-bottom: 20px;
+}
+
+.result-text {
+    font-size: 24px;
+}
+
+.result-highlight {
+    font-size: 32px;
+    color: #FFD700;
+    margin-top: 20px;
+}
+
+.result-sub {
+    font-size: 36px;
+    color: #FFD700;
+    margin-top: 10px;
+}
+
+.return-text {
+    font-size: 18px;
+    color: #888;
+    margin-top: 30px;
+}
+
+.eliminated-title {
+    font-size: 48px;
+    color: #FF4444;
+}
+
+.eliminated-info {
+    font-size: 24px;
+    margin-top: 20px;
+}
+
+.eliminated-highlight {
+    color: #FFD700;
+}
+
+.score-info {
+    font-size: 20px;
+    margin-top: 10px;
+}
+
+.spectating-text {
+    font-size: 16px;
+    color: #888;
+    margin-top: 30px;
+}
+
+.quit-menu-btn {
+    margin-top: 20px;
+    padding: 12px 30px;
+    font-size: 16px;
+    background: #333;
+    border: none;
+    color: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.quit-menu-btn:hover {
+    background: #444;
+}

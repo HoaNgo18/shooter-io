@@ -16,6 +16,11 @@ const userSchema = new mongoose.Schema({
     unique: true, // Mongoose tự động tạo index unique
     lowercase: true
   },
+  displayName: {
+    type: String,
+    trim: true,
+    maxlength: 20
+  },
   password: {
     type: String,
     required: true,

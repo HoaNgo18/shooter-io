@@ -12,7 +12,6 @@ export const StatsService = {
         user.totalDeaths += 1;
 
         await user.save();
-        console.log(`Saved: Score=${player.score}, Earned Coins=${player.coins}`);
 
         server.sendToClient(player.id, {
           type: 'USER_DATA_UPDATE',
@@ -37,7 +36,7 @@ export const StatsService = {
       if (user) {
         user.totalKills = (user.totalKills || 0) + 1;
         await user.save();
-        
+
         server.sendToClient(player.id, {
           type: 'USER_DATA_UPDATE',
           totalKills: user.totalKills

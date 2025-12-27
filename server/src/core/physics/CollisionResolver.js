@@ -27,7 +27,6 @@ export class CollisionResolver {
       if (idx !== -1) this.game.world.chests.splice(idx, 1);
 
       if (chest.type === CHEST_TYPES.STATION) {
-        console.log("Station Destroyed!");
         setTimeout(() => this.game.world.spawnStationIfNeeded(), 60000);
       }
     }
@@ -162,7 +161,6 @@ export class CollisionResolver {
               type: PacketType.PLAYER_LEAVE,
               id: player.id
             });
-            console.log(`[Arena] Bot ${player.name} removed`);
           }
         } else if (this.game.bots) {
           // Normal game
@@ -174,6 +172,6 @@ export class CollisionResolver {
       }, 2000);
     } else if (!player.isBot) {
       this.game.savePlayerScore(player);
-    } 
+    }
   }
 }

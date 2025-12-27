@@ -5,7 +5,6 @@ import jwt from 'jsonwebtoken';
 import config from '../config.js';
 import { User } from '../db/models/User.model.js';
 import { SKINS } from '../../../shared/src/constants.js';
-// Đảm bảo bạn đã tạo file này tại đường dẫn bên dưới
 import { rateLimit } from '../utils/rateLimit.js';
 import { ArenaManager } from '../arena/ArenaManager.js';
 
@@ -21,7 +20,6 @@ export class Server {
   }
 
   setupWSS() {
-    // Sử dụng hàm rateLimit đã import
     const limiter = rateLimit('10s', 100, (ws) => {
       ws.close(1008, 'Rate limit exceeded');
     });
@@ -29,7 +27,6 @@ export class Server {
     this.wss.on('connection', (ws) => {
       limiter(ws);
       const clientId = this.generateId();
-      console.log(`Client connected: ${clientId}`);
 
       this.clients.set(clientId, { ws, id: clientId, player: null });
 
@@ -43,7 +40,6 @@ export class Server {
       });
 
       ws.on('close', () => {
-        console.log(`Client disconnected: ${clientId}`);
         // Check if client was in arena
         const client = this.clients.get(clientId);
         if (client?.arenaRoomId) {
@@ -95,7 +91,7 @@ export class Server {
 
             const user = await User.findById(userId);
             if (user) {
-              playerName = user.username;
+              playerName = user.displayName || user.username;
               userSkin = user.equippedSkin || 'default';
 
               this.sendToClient(clientId, {
@@ -108,9 +104,8 @@ export class Server {
                 totalDeaths: user.totalDeaths
               });
             }
-            console.log(`User ${userId} logged in via token`);
           } catch (err) {
-            console.log('Invalid token, playing as guest');
+            // Invalid token, playing as guest
           }
         }
         this.game.addPlayer(clientId, playerName, userId, userSkin);
@@ -144,12 +139,10 @@ export class Server {
         break;
 
       case PacketType.BUY_SKIN:
-        // Gọi hàm xử lý riêng, tránh duplicate code
         await this.handleBuySkin(clientId, packet.skinId);
         break;
 
       case PacketType.EQUIP_SKIN:
-        // Gọi hàm xử lý riêng, tránh duplicate code
         await this.handleEquipSkin(clientId, packet.skinId);
         break;
 
@@ -160,20 +153,17 @@ export class Server {
         }
         break;
       case PacketType.SELECT_SLOT:
-        // Client gửi lên: { type: 'SELECT_SLOT', slotIndex: 0 }
         if (typeof packet.slotIndex === 'number') {
           this.game.handleSelectSlot(clientId, packet.slotIndex);
         }
         break;
 
       case PacketType.USE_ITEM:
-        // Client gửi lên: { type: 'USE_ITEM' }
         this.game.handleUseItem(clientId);
         break;
     }
   }
 
-  // Handle arena-specific messages
   async handleArenaMessage(clientId, packet, room) {
     switch (packet.type) {
       case PacketType.INPUT:
@@ -211,7 +201,6 @@ export class Server {
     }
   }
 
-  // Handle arena join request
   async handleArenaJoin(clientId, packet) {
     const client = this.clients.get(clientId);
     if (!client) return;
@@ -228,7 +217,7 @@ export class Server {
 
         const user = await User.findById(userId);
         if (user) {
-          playerName = user.username;
+          playerName = user.displayName || user.username;
           userSkin = user.equippedSkin || 'default';
 
           this.sendToClient(clientId, {
@@ -242,14 +231,12 @@ export class Server {
           });
         }
       } catch (err) {
-        console.log('Invalid token for arena, playing as guest');
+        // Invalid token
       }
     }
 
     const room = this.arena.joinArena(clientId, playerName, userId, userSkin);
-    if (room) {
-      console.log(`[Arena] Player ${playerName} joined arena queue`);
-    } else {
+    if (!room) {
       this.sendToClient(clientId, {
         type: PacketType.ARENA_STATUS,
         error: 'Failed to join arena'
@@ -283,13 +270,10 @@ export class Server {
 
       if (!user || !skinInfo) return;
 
-      // Kiểm tra: Chưa sở hữu và Đủ tiền
       if (!user.skins.includes(skinId) && user.coins >= skinInfo.price) {
         user.coins -= skinInfo.price;
         user.skins.push(skinId);
         await user.save();
-
-        console.log(`User ${user.username} bought skin ${skinId}`);
 
         this.sendToClient(clientId, {
           type: 'USER_DATA_UPDATE',
@@ -308,23 +292,18 @@ export class Server {
 
     try {
       const user = await User.findById(client.userId);
-      // Kiểm tra sở hữu skin
       if (!user || !user.skins.includes(skinId)) {
-        console.log("Equip failed: Skin not owned or User not found");
         return;
       }
 
       user.equippedSkin = skinId;
       await user.save();
-      console.log(`User ${user.username} equipped skin ${skinId}`);
 
-      // 1. Gửi cập nhật UI về Client
       this.sendToClient(clientId, {
         type: 'USER_DATA_UPDATE',
         equippedSkin: user.equippedSkin
       });
 
-      // 2. Cập nhật ngay vào nhân vật trong game (nếu đang chơi)
       if (client.player) {
         client.player.skinId = skinId;
       }

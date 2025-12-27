@@ -48,7 +48,6 @@ export class ArenaRoom {
     // Zone initialization
     this.initZone();
 
-    console.log(`[Arena] Room ${id} created`);
     this.startWaitTimer();
   }
 
@@ -94,8 +93,6 @@ export class ArenaRoom {
 
     this.zone.state = 'SHRINKING';
     this.zone.nextActionTime = Date.now() + (ARENA_CONFIG.ZONE.SHRINK_TIME * 1000);
-
-    console.log(`[Arena] Zone phase ${this.zone.phase} shrinking - From R=${Math.round(this.zone.radius)} to R=${Math.round(this.zone.targetRadius)} over ${ARENA_CONFIG.ZONE.SHRINK_TIME}s`);
   }
 
   updateZoneShrink(dt, now) {
@@ -114,15 +111,12 @@ export class ArenaRoom {
     this.zone.x = this.zone.targetX;
     this.zone.y = this.zone.targetY;
 
-    console.log(`[Arena] Zone phase ${this.zone.phase} completed - At (${Math.round(this.zone.x)}, ${Math.round(this.zone.y)}), R=${Math.round(this.zone.radius)}`);
-
     // Tăng phase cho lần co tiếp theo
     this.zone.phase++;
 
     // Kiểm tra xem còn phase nào không
     if (this.zone.phase >= ARENA_CONFIG.ZONE.RADII_PERCENT.length) {
       this.zone.state = 'FINISHED';
-      console.log(`[Arena] Zone finished - All phases completed`);
       return;
     }
 
@@ -135,8 +129,6 @@ export class ArenaRoom {
     // Chuyển sang trạng thái WAITING
     this.zone.state = 'WAITING';
     this.zone.nextActionTime = Date.now() + (ARENA_CONFIG.ZONE.WAIT_TIME * 1000);
-
-    console.log(`[Arena] Next phase ${this.zone.phase} will shrink to R=${Math.round(this.zone.targetRadius)} in ${ARENA_CONFIG.ZONE.WAIT_TIME}s`);
   }
 
   interpolateZone(dt, timeLeft) {
@@ -169,8 +161,6 @@ export class ArenaRoom {
 
     this.zone.targetX = this.zone.x + Math.cos(angle) * distance;
     this.zone.targetY = this.zone.y + Math.sin(angle) * distance;
-
-    console.log(`[Arena] Zone phase ${this.zone.phase} target: Center (${Math.round(this.zone.x)}, ${Math.round(this.zone.y)}) → (${Math.round(this.zone.targetX)}, ${Math.round(this.zone.targetY)}), Radius ${Math.round(currentR)} → ${Math.round(nextR)}`);
   }
 
   checkZoneDamage(dt) {
@@ -208,8 +198,6 @@ export class ArenaRoom {
         newLives: player.lives
       });
 
-      console.log(`[Arena] ${player.name} took zone damage (${player.lives} lives left)`);
-
       if (player.lives <= 0 && !player.dead) {
         this.handlePlayerDeath(player);
       }
@@ -227,7 +215,6 @@ export class ArenaRoom {
       killerName: 'The Zone'
     });
 
-    console.log(`[Arena] ${player.name} eliminated by zone`);
     this.checkGameEnd();
   }
 
@@ -279,8 +266,6 @@ export class ArenaRoom {
 
     this.broadcastRoomStatus();
 
-    console.log(`[Arena] ${name} joined room ${this.id} (${this.getRealPlayerCount()}/${this.maxPlayers})`);
-
     if (this.getRealPlayerCount() >= this.maxPlayers) {
       this.startCountdown();
     }
@@ -322,8 +307,6 @@ export class ArenaRoom {
       id: clientId
     });
 
-    console.log(`[Arena] ${player.name} left room ${this.id}`);
-
     this.broadcastRoomStatus();
     this.checkGameEnd();
   }
@@ -346,8 +329,6 @@ export class ArenaRoom {
         type: PacketType.PLAYER_JOIN,
         player: bot.serialize()
       });
-
-      console.log(`[Arena] Bot ${bot.name} added to room ${this.id}`);
     }
   }
 
@@ -428,8 +409,6 @@ export class ArenaRoom {
 
     this.tickInterval = setInterval(() => this.tick(), 1000 / SIMULATION_RATE);
     this.broadcastInterval = setInterval(() => this.sendStateUpdate(), 1000 / BROADCAST_RATE);
-
-    console.log(`[Arena] Room ${this.id} game started with ${this.players.size} players`);
   }
 
   resetZoneForGame() {
@@ -445,8 +424,6 @@ export class ArenaRoom {
     this.calculateNextZoneTarget();
 
     this.zone.nextActionTime = Date.now() + (ARENA_CONFIG.ZONE.WAIT_TIME * 1000);
-
-    console.log(`[Arena] Zone initialized - Radius: ${Math.round(startRadius)}, First shrink to ${Math.round(this.zone.targetRadius)} in ${ARENA_CONFIG.ZONE.WAIT_TIME}s`);
   }
 
   tick() {
@@ -550,7 +527,6 @@ export class ArenaRoom {
         type: PacketType.ARENA_END,
         reason: 'time_up'
       });
-      console.log(`[Arena] Room ${this.id} ended - Time limit reached`);
     }
 
     setTimeout(() => this.destroy(), 5000);
@@ -594,7 +570,6 @@ export class ArenaRoom {
         type: PacketType.ARENA_END,
         reason: 'no_players'
       });
-      console.log(`[Arena] Room ${this.id} ended - No real players remaining`);
     }
 
     setTimeout(() => this.destroy(), 5000);
@@ -612,8 +587,6 @@ export class ArenaRoom {
       winnerName: winner.name,
       score: winner.score
     });
-
-    console.log(`[Arena] Room ${this.id} - Winner: ${winner.name}`);
   }
 
   async saveWinnerStats(winner) {
@@ -667,7 +640,6 @@ export class ArenaRoom {
     this.clientIds.clear();
 
     this.manager.removeRoom(this.id);
-    console.log(`[Arena] Room ${this.id} destroyed`);
   }
 
   // ========================================

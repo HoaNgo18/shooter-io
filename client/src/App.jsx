@@ -7,6 +7,7 @@ import DeathScreen from './components/DeathScreen';
 import HomeScreen from './components/HomeScreen';
 import { socket } from './network/socket';
 import { PacketType } from '@shared/packetTypes';
+import './components/ArenaUI.css';
 
 function App() {
   const [gameState, setGameState] = useState('home');
@@ -22,7 +23,7 @@ function App() {
   const [arenaWaitTime, setArenaWaitTime] = useState(60);
   const arenaTimeoutRef = useRef(null);
 
-  // Hàm dọn dẹp timeout an toàn
+  // Safe timeout cleanup
   const clearArenaTimeout = () => {
     if (arenaTimeoutRef.current) {
       clearTimeout(arenaTimeoutRef.current);
@@ -59,6 +60,7 @@ function App() {
       return;
     }
 
+    // Small delay to ensure connection
     await new Promise(resolve => setTimeout(resolve, 100));
     socket.send({
       type: PacketType.RESPAWN,
@@ -81,12 +83,6 @@ function App() {
     const skinToUse = selectedSkinId || user.equippedSkin || 'default';
 
     try {
-      // if (socket.ws) {
-      //   socket.ws.close();
-      //   socket.ws = null;
-      //   socket.isConnected = false;
-      // }
-
       await socket.connectArena({
         token: localStorage.getItem('game_token'),
         name: user.username,
@@ -146,14 +142,9 @@ function App() {
     socket.send({ type: PacketType.RESPAWN });
   };
 
-  // USEEFFECT 1: GLOBAL LISTENER (ĐÃ TỐI ƯU - Xử lý tất cả packets)
+  // GLOBAL LISTENER
   useEffect(() => {
     const handleGlobalMessage = (packet) => {
-      // Debug log cho arena
-      if (packet.type && packet.type.startsWith('arena')) {
-        console.log('[App] Arena packet:', packet.type);
-      }
-
       // User data updates
       if (packet.type === 'USER_DATA_UPDATE') {
         setUser(prevUser => {
@@ -188,14 +179,13 @@ function App() {
         setArenaCountdown(null);
       }
 
-      // ✅ XỬ LÝ DEATH CHO CẢ NORMAL VÀ ARENA
+      // PLAYER DIED EVENT
       if (packet.type === PacketType.PLAYER_DIED && packet.victimId === socket.myId) {
-        console.log("Player Died");
         setIsDead(true);
         setKillerName(packet.killerName);
         setFinalScore(packet.score);
 
-        // Xử lý riêng cho Guest
+        // Handle Guest Data update
         setUser(prevUser => {
           if (prevUser && prevUser.isGuest) {
             const savedGuest = localStorage.getItem('guest_data');
@@ -224,13 +214,11 @@ function App() {
 
       if (packet.type === PacketType.ARENA_END) {
         clearArenaTimeout();
-
-        // Thiết lập timeout mới và lưu vào Ref
         arenaTimeoutRef.current = setTimeout(() => {
           setGameState('home');
           setArenaWinner(null);
           socket.resetGameScene();
-          arenaTimeoutRef.current = null; // Reset ref sau khi chạy xong
+          arenaTimeoutRef.current = null;
         }, 5000);
       }
     };
@@ -243,13 +231,11 @@ function App() {
     };
   }, []);
 
-  // ✅ USEEFFECT 2: GAME INITIALIZATION (Khởi tạo Phaser khi vào game)
+  // GAME INITIALIZATION
   useEffect(() => {
     let game = null;
 
     if (gameState === 'playing') {
-      console.log("🎮 Normal Game Started");
-
       const config = {
         type: Phaser.AUTO,
         width: window.innerWidth,
@@ -262,15 +248,12 @@ function App() {
       game = new Phaser.Game(config);
 
       return () => {
-        console.log("🛑 Normal Game Cleanup");
         if (game) game.destroy(true);
         socket.resetGameScene();
       };
     }
 
     if (gameState === 'arena_playing') {
-      console.log("⚔️ Arena Started");
-
       socket.resetGameScene();
 
       const config = {
@@ -285,7 +268,6 @@ function App() {
       game = new Phaser.Game(config);
 
       return () => {
-        console.log("🛑 Arena Cleanup");
         if (game) game.destroy(true);
         socket.resetGameScene();
       };
@@ -306,41 +288,28 @@ function App() {
 
       {/* Arena Waiting Room */}
       {gameState === 'arena_waiting' && (
-        <div style={{
-          width: '100vw', height: '100vh',
-          background: 'linear-gradient(135deg, #1a0a0a 0%, #2d1515 50%, #1a0a0a 100%)',
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontFamily: 'Arial, sans-serif'
-        }}>
-          <h1 style={{ fontSize: '48px', color: '#FF4444', marginBottom: '20px' }}>
+        <div className="arena-waiting-container">
+          <h1 className="arena-title">
             ⚔️ ĐẤU TRƯỜNG
           </h1>
 
           {arenaCountdown !== null ? (
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: '24px', marginBottom: '20px' }}>Trận đấu bắt đầu trong...</p>
-              <div style={{
-                fontSize: '80px', fontWeight: 'bold',
-                color: '#FFD700',
-                textShadow: '0 0 30px rgba(255,215,0,0.5)'
-              }}>
+            <div className="arena-countdown-container">
+              <p className="arena-countdown-text">Trận đấu bắt đầu trong...</p>
+              <div className="arena-countdown-number">
                 {arenaCountdown}
               </div>
             </div>
           ) : (
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: '24px', marginBottom: '10px' }}>Đang chờ người chơi...</p>
-              <div style={{
-                fontSize: '48px', fontWeight: 'bold',
-                color: '#FFD700', marginBottom: '20px'
-              }}>
+            <div className="arena-status-container">
+              <p className="arena-status-text">Đang chờ người chơi...</p>
+              <div className="arena-player-count">
                 {arenaPlayerCount} / 10
               </div>
-              <p style={{ fontSize: '18px', color: '#888' }}>
+              <p className="arena-wait-time">
                 Phòng sẽ tự động bắt đầu sau {arenaWaitTime}s
               </p>
-              <p style={{ fontSize: '14px', color: '#666', marginTop: '10px' }}>
+              <p className="arena-hint">
                 (Bot sẽ được thêm nếu không đủ người)
               </p>
             </div>
@@ -348,14 +317,7 @@ function App() {
 
           <button
             onClick={handleLeaveArena}
-            style={{
-              marginTop: '40px', padding: '15px 40px',
-              fontSize: '18px', fontWeight: 'bold',
-              background: 'rgba(255,255,255,0.1)',
-              border: '2px solid #FF4444',
-              color: '#FF4444', borderRadius: '8px',
-              cursor: 'pointer'
-            }}
+            className="arena-cancel-btn"
           >
             HỦY
           </button>
@@ -365,74 +327,55 @@ function App() {
       {/* Arena Playing */}
       {gameState === 'arena_playing' && (
         <>
-          <div id="phaser-container" style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }} />
+          <div id="phaser-container" className="phaser-container" />
           {!isDead && !arenaWinner && <HUD isArena={true} />}
 
           {/* Victory Screen */}
           {arenaWinner && (
-            <div style={{
-              position: 'absolute', top: 0, left: 0,
-              width: '100%', height: '100%',
-              background: 'rgba(0,0,0,0.8)',
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center',
-              zIndex: 1000, color: '#fff'
-            }}>
+            <div className="arena-overlay">
               {arenaWinner.isMe ? (
                 <>
-                  <h1 style={{ fontSize: '64px', color: '#FFD700', marginBottom: '20px' }}>
+                  <h1 className="victory-title">
                     🏆 CHIẾN THẮNG! 🏆
                   </h1>
-                  <p style={{ fontSize: '24px' }}>Bạn là người sống sót cuối cùng!</p>
-                  <p style={{ fontSize: '32px', color: '#FFD700', marginTop: '20px' }}>
+                  <p className="result-text">Bạn là người sống sót cuối cùng!</p>
+                  <p className="result-highlight">
                     Điểm: {arenaWinner.score}
                   </p>
                 </>
               ) : (
                 <>
-                  <h1 style={{ fontSize: '48px', color: '#FF4444', marginBottom: '20px' }}>
+                  <h1 className="end-title">
                     TRẬN ĐẤU KẾT THÚC
                   </h1>
-                  <p style={{ fontSize: '24px' }}>Người chiến thắng:</p>
-                  <p style={{ fontSize: '36px', color: '#FFD700', marginTop: '10px' }}>
+                  <p className="result-text">Người chiến thắng:</p>
+                  <p className="result-sub">
                     {arenaWinner.name}
                   </p>
                 </>
               )}
-              <p style={{ fontSize: '18px', color: '#888', marginTop: '30px' }}>
+              <p className="return-text">
                 Đang quay về menu...
               </p>
             </div>
           )}
 
-          {/* Death screen - không có respawn */}
+          {/* Death screen - no respawn */}
           {isDead && !arenaWinner && (
-            <div style={{
-              position: 'absolute', top: 0, left: 0,
-              width: '100%', height: '100%',
-              background: 'rgba(0,0,0,0.7)',
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center',
-              zIndex: 1000, color: '#fff'
-            }}>
-              <h1 style={{ fontSize: '48px', color: '#FF4444' }}>BẠN ĐÃ BỊ LOẠI!</h1>
-              <p style={{ fontSize: '24px', marginTop: '20px' }}>
-                Bị tiêu diệt bởi: <span style={{ color: '#FFD700' }}>{killerName}</span>
+            <div className="arena-overlay">
+              <h1 className="eliminated-title">BẠN ĐÃ BỊ LOẠI!</h1>
+              <p className="eliminated-info">
+                Bị tiêu diệt bởi: <span className="eliminated-highlight">{killerName}</span>
               </p>
-              <p style={{ fontSize: '20px', marginTop: '10px' }}>
+              <p className="score-info">
                 Điểm của bạn: {finalScore}
               </p>
-              <p style={{ fontSize: '16px', color: '#888', marginTop: '30px' }}>
+              <p className="spectating-text">
                 Đang theo dõi trận đấu...
               </p>
               <button
                 onClick={handleQuitToMenu}
-                style={{
-                  marginTop: '20px', padding: '12px 30px',
-                  fontSize: '16px', background: '#333',
-                  border: 'none', color: '#fff',
-                  borderRadius: '8px', cursor: 'pointer'
-                }}
+                className="quit-menu-btn"
               >
                 THOÁT VỀ MENU
               </button>
@@ -444,7 +387,7 @@ function App() {
       {/* Normal Game */}
       {gameState === 'playing' && (
         <>
-          <div id="phaser-container" style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }} />
+          <div id="phaser-container" className="phaser-container" />
           {!isDead && <HUD />}
           {isDead && (
             <DeathScreen

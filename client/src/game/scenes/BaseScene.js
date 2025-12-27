@@ -36,8 +36,6 @@ export class BaseScene extends Phaser.Scene {
 
         // 4. Hook socket
         socket.setGameScene(this);
-        
-        console.log(`${this.scene.key} Created & Ready`);
     }
 
     update(time, delta) {
