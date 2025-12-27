@@ -174,6 +174,6 @@ export class CollisionResolver {
       }, 2000);
     } else if (!player.isBot) {
       this.game.savePlayerScore(player);
-    }
+    } 
   }
 }

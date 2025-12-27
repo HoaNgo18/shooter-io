@@ -38,7 +38,7 @@ export class Game {
 
   tick() {
     // 1. Reset Delta Tracking từ World
-    this.world.resetDelta();
+   
 
     const now = Date.now();
     let dt = (now - this.lastTick) / 1000;
@@ -260,5 +260,7 @@ export class Game {
     };
 
     this.server.broadcast(state);
+
+     this.world.resetDelta();
   }
 }

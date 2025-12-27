@@ -648,10 +648,12 @@ export class ArenaRoom {
     clearInterval(this.broadcastInterval);
     clearInterval(this.waitUpdateInterval);
 
-    this.broadcast({
-      type: PacketType.ARENA_END,
-      reason: 'room_closed'
-    });
+    if (this.status !== 'ended') {
+      this.broadcast({
+        type: PacketType.ARENA_END,
+        reason: 'room_closed'
+      });
+    }
 
     this.clientIds.forEach(clientId => {
       const client = this.server.clients.get(clientId);

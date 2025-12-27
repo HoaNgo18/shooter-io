@@ -4,7 +4,7 @@ import { WEAPON_STATS, ITEM_CONFIG } from '@shared/constants';
 export class EntityManager {
     constructor(scene) {
         this.scene = scene;
-        
+
         // Groups
         this.projectileGroup = scene.add.group();
         this.foodGroup = scene.add.group();
@@ -18,7 +18,7 @@ export class EntityManager {
         this.chests = {};
         this.items = {};
         this.nebulas = []; // Array for nebulas
-        
+
         // Explosion tracking
         this.playedExplosions = new Set();
     }
@@ -46,7 +46,7 @@ export class EntityManager {
         const texture = Phaser.Math.RND.pick(['star1', 'star2']);
         const food = this.scene.add.sprite(f.x, f.y, texture);
         food.setDisplaySize(24, 24);
-        
+
         this.scene.tweens.add({
             targets: food,
             alpha: 0.5,
@@ -57,7 +57,7 @@ export class EntityManager {
             repeat: -1,
             ease: 'Sine.easeInOut'
         });
-        
+
         this.foodGroup.add(food);
         this.foods[f.id] = food;
     }
@@ -66,7 +66,7 @@ export class EntityManager {
     updateProjectiles(projectilesData) {
         if (!projectilesData) return;
         this.projectileGroup.clear(true, true);
-        
+
         projectilesData.forEach(p => {
             if (p.weaponType === 'BOMB') {
                 const bombSprite = this.scene.add.sprite(p.x, p.y, 'item_bomb');
@@ -89,7 +89,7 @@ export class EntityManager {
     // --- EXPLOSION LOGIC ---
     updateExplosions(explosionsData) {
         if (!explosionsData) return;
-        
+
         explosionsData.forEach(e => {
             if (this.playedExplosions.has(e.id)) return;
             this.playedExplosions.add(e.id);
@@ -149,17 +149,17 @@ export class EntityManager {
                 const tex = Phaser.Math.RND.pick(['nebula1', 'nebula2', 'nebula3', 'nebula4', 'nebula5']);
                 const offsetX = Phaser.Math.RND.between(-data.radius * 0.3, data.radius * 0.3);
                 const offsetY = Phaser.Math.RND.between(-data.radius * 0.3, data.radius * 0.3);
-                
+
                 const cloud = this.scene.add.image(offsetX, offsetY, tex);
                 const baseScale = (data.radius * 3.5) / 256;
                 cloud.setScale(baseScale * Phaser.Math.RND.realInRange(0.8, 1.2));
                 cloud.setRotation(Phaser.Math.RND.rotation());
                 cloud.setTint(0x9C27B0);
                 cloud.setAlpha(0.4);
-                
+
                 container.add(cloud);
             }
-            
+
             container.setDepth(15);
             this.scene.tweens.add({
                 targets: container,
@@ -195,13 +195,13 @@ export class EntityManager {
         if (this.chests[c.id]) return;
         let texture;
         const isStation = (c.type === 'STATION');
-        
+
         if (isStation) {
             texture = Phaser.Math.RND.pick(['station1', 'station2', 'station3', 'station4']);
             const sprite = this.scene.add.sprite(c.x, c.y, texture);
             sprite.setDisplaySize(c.width || 86, c.height || 24);
             sprite.setTint(0xDDDDDD);
-            
+
             this.scene.tweens.add({
                 targets: sprite,
                 angle: 360,
@@ -223,19 +223,37 @@ export class EntityManager {
 
     // --- ITEM LOGIC ---
     updateItems(packet) {
+        // 1. Tạo Set chứa các ID bị xóa để tra cứu cho nhanh
+        const removedIds = new Set();
         if (packet.itemsRemoved) {
-            packet.itemsRemoved.forEach(id => {
+            packet.itemsRemoved.forEach(id => removedIds.add(String(id)));
+        }
+
+        // 2. Xử lý XÓA trước (dọn dẹp các item cũ trên màn hình)
+        if (packet.itemsRemoved) {
+            packet.itemsRemoved.forEach(rawId => {
+                const id = String(rawId);
                 if (this.items[id]) {
                     this.items[id].destroy();
                     delete this.items[id];
                 }
             });
         }
-        if (packet.itemsAdded) packet.itemsAdded.forEach(i => this.createItemSprite(i));
-        if (packet.items) {
-            this.itemGroup.clear(true, true);
-            this.items = {};
-            packet.items.forEach(i => this.createItemSprite(i));
+
+        // 3. Xử lý THÊM MỚI
+        if (packet.itemsAdded) {
+            packet.itemsAdded.forEach(itemData => {
+                const id = String(itemData.id);
+
+                // === [FIX LOGIC GHOST ITEM] ===
+                // Nếu item này vừa sinh ra mà đã nằm trong danh sách bị xóa (removedIds)
+                // Nghĩa là nó bị ăn ngay trong cùng 1 frame -> ĐỪNG VẼ NÓ RA
+                if (removedIds.has(id)) {
+                    return; // Bỏ qua, không tạo sprite
+                }
+
+                this.createItemSprite(itemData);
+            });
         }
     }
 
@@ -245,7 +263,7 @@ export class EntityManager {
         if (!config) return;
 
         const container = this.scene.add.container(itemData.x, itemData.y);
-        
+
         // Visual construction (Glows, Sprite, Particles) - Giữ nguyên logic cũ nhưng gọn hơn
         const outerGlow = this.scene.add.circle(0, 0, 25, 0xFFFFFF, 0.2).setStrokeStyle(2, 0xFFFFFF, 0.4);
         const innerGlow = this.scene.add.circle(0, 0, 18, config.glowColor, 0.3).setStrokeStyle(2, config.glowColor, 0.6);
