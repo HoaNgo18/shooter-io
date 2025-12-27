@@ -19,8 +19,7 @@ class NetworkManager {
 
   connect(authOptions) {
     return new Promise((resolve, reject) => {
-      const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3000';
-      this.ws = new WebSocket(wsUrl);
+      this.ws = new WebSocket('ws://localhost:3000');
 
       this.ws.onopen = () => {
         this.isConnected = true;

@@ -45,6 +45,23 @@ const HomeScreen = ({ user, onPlayClick, onArenaClick, onLogout, onLoginSuccess 
                 console.log("Update received:", data);
                 setLocalUser(prev => ({ ...prev, ...data }));
             }
+
+            // ✅ Xử lý phản hồi khi mua skin
+            if (data.type === 'BUY_SKIN_RESPONSE') {
+                if (data.success) {
+                    setError(''); // Clear error
+                    alert(`✅ ${data.message}`);
+                    setLocalUser(prev => ({
+                        ...prev,
+                        coins: data.coins,
+                        skins: data.skins
+                    }));
+                } else {
+                    setError(`❌ Cannot buy: ${data.error}`);
+                    // Tự động xóa error sau 3 giây
+                    setTimeout(() => setError(''), 3000);
+                }
+            }
         };
 
         // Đăng ký lắng nghe qua hàm subscribe của socket.js mới
@@ -407,7 +424,7 @@ const HomeScreen = ({ user, onPlayClick, onArenaClick, onLogout, onLoginSuccess 
 
             {/* Menu Card if logged in */}
             {localUser && (
-                <div style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)' }}>
+                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
                     <div style={styles.menuCard}>
                         <div style={styles.sidebar}>
                             <div style={styles.userSection}>
@@ -448,6 +465,19 @@ const HomeScreen = ({ user, onPlayClick, onArenaClick, onLogout, onLoginSuccess 
 
                             {activeTab === 'shop' && (
                                 <div>
+                                    {error && (
+                                        <div style={{
+                                            background: 'rgba(255, 0, 0, 0.8)',
+                                            color: '#fff',
+                                            padding: '12px 20px',
+                                            borderRadius: '4px',
+                                            marginBottom: '20px',
+                                            border: '1px solid #FF4444',
+                                            textAlign: 'center'
+                                        }}>
+                                            {error}
+                                        </div>
+                                    )}
                                     <h2 style={{ fontSize: '24px', marginBottom: '30px', textTransform: 'uppercase', borderBottom: '2px solid #FFD700', display: 'inline-block' }}>Skin Collection</h2>
                                     <div style={styles.skinGrid}>
                                         {skins.map(s => {

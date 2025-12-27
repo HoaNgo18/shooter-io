@@ -281,24 +281,63 @@ export class Server {
       const user = await User.findById(client.userId);
       const skinInfo = SKINS.find(s => s.id === skinId);
 
-      if (!user || !skinInfo) return;
-
-      // Kiểm tra: Chưa sở hữu và Đủ tiền
-      if (!user.skins.includes(skinId) && user.coins >= skinInfo.price) {
-        user.coins -= skinInfo.price;
-        user.skins.push(skinId);
-        await user.save();
-
-        console.log(`User ${user.username} bought skin ${skinId}`);
-
+      if (!user || !skinInfo) {
         this.sendToClient(clientId, {
-          type: 'USER_DATA_UPDATE',
-          coins: user.coins,
-          skins: user.skins
+          type: 'BUY_SKIN_RESPONSE',
+          success: false,
+          error: 'Skin not found'
         });
+        return;
       }
+
+      // Kiểm tra: Đã sở hữu
+      if (user.skins.includes(skinId)) {
+        this.sendToClient(clientId, {
+          type: 'BUY_SKIN_RESPONSE',
+          success: false,
+          error: 'Already owned'
+        });
+        return;
+      }
+
+      // Kiểm tra: Không đủ tiền
+      if (user.coins < skinInfo.price) {
+        this.sendToClient(clientId, {
+          type: 'BUY_SKIN_RESPONSE',
+          success: false,
+          error: `Need ${skinInfo.price - user.coins} more coins`,
+          coins: user.coins
+        });
+        return;
+      }
+
+      // ✅ Mua thành công
+      user.coins -= skinInfo.price;
+      user.skins.push(skinId);
+      await user.save();
+
+      console.log(`User ${user.username} bought skin ${skinId}`);
+
+      this.sendToClient(clientId, {
+        type: 'BUY_SKIN_RESPONSE',
+        success: true,
+        message: 'Skin purchased!',
+        coins: user.coins,
+        skins: user.skins
+      });
+
+      this.sendToClient(clientId, {
+        type: 'USER_DATA_UPDATE',
+        coins: user.coins,
+        skins: user.skins
+      });
     } catch (err) {
       console.error("Error handling buy skin:", err);
+      this.sendToClient(clientId, {
+        type: 'BUY_SKIN_RESPONSE',
+        success: false,
+        error: 'Server error'
+      });
     }
   }
 

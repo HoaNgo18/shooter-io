@@ -261,7 +261,7 @@ export class ArenaRoom {
 
     // ✅ SỬA: Giảm broadcast rate xuống
     const SIMULATION_RATE = 60;
-    const BROADCAST_RATE = 20; // Giảm từ 15 xuống 10 FPS
+    const BROADCAST_RATE = 60; // Giảm từ 15 xuống 10 FPS
 
     this.tickInterval = setInterval(() => this.tick(), 1000 / SIMULATION_RATE);
     this.broadcastInterval = setInterval(() => this.sendStateUpdate(), 1000 / BROADCAST_RATE);
@@ -568,6 +568,8 @@ export class ArenaRoom {
     }
 
     this.broadcast(state);
+    
+    // ✅ Reset Delta SAU khi broadcast
     this.world.resetDelta();
   }
 }
