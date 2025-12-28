@@ -212,28 +212,13 @@ const HomeScreen = ({ user, onPlayClick, onArenaClick, onLogout, onLoginSuccess 
                 )}
             </div>
 
-            {/* Main Content */}
-            <div className="main-content">
-                <h1 className="game-title">SHOOTER<span style={{ color: '#FFD700' }}>.IO</span></h1>
-                <p className="game-subtitle">Battle Royale Multiplayer</p>
-                {localUser && (
-                    <div className="button-container">
-                        <button
-                            onClick={() => onPlayClick(localUser.equippedSkin)}
-                            className="game-mode-btn play-btn"
-                        >
-                            ENDLESS
-                        </button>
-
-                        <button
-                            onClick={() => onArenaClick(localUser.equippedSkin)}
-                            className="game-mode-btn arena-btn"
-                        >
-                            ARENA
-                        </button>
-                    </div>
-                )}
-            </div>
+            {/* Main Content - only show when menu card is not displayed */}
+            {!localUser && (
+                <div className="main-content">
+                    <h1 className="game-title">SHOOTER<span style={{ color: '#FFD700' }}>.IO</span></h1>
+                    <p className="game-subtitle">Battle Royale Multiplayer</p>
+                </div>
+            )}
 
             {/* Menu Card if logged in */}
             {localUser && (
@@ -402,7 +387,7 @@ const HomeScreen = ({ user, onPlayClick, onArenaClick, onLogout, onLoginSuccess 
                                 />
                                 <input
                                     type="text"
-                                    placeholder="Display Name (optional)"
+                                    placeholder="Display Name (Optional)"
                                     value={displayName}
                                     onChange={(e) => setDisplayName(e.target.value)}
                                     className="modal-input"
@@ -438,7 +423,7 @@ const HomeScreen = ({ user, onPlayClick, onArenaClick, onLogout, onLoginSuccess 
                                 />
                                 <input
                                     type="text"
-                                    placeholder="Display Name (optional)"
+                                    placeholder="Display Name (Optional)"
                                     value={displayName}
                                     onChange={(e) => setDisplayName(e.target.value)}
                                     className="modal-input"

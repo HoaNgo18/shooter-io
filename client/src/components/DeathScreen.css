@@ -85,3 +85,12 @@
     background: linear-gradient(to bottom, #FF5252, #D32F2F);
     box-shadow: 0 4px 0 #C62828;
 }
+
+.victory-mode {
+    background: rgba(20, 10, 0, 0.9) !important;
+}
+
+.victory-text {
+    color: #FFD700 !important;
+    text-shadow: 0 0 40px rgba(255, 215, 0, 0.6);
+}

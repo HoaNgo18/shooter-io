@@ -139,7 +139,10 @@ export class CollisionResolver {
       killerName: killerName || 'Unknown',
       score: player.score,
       coins: player.coins,
-      kills: player.sessionKills
+      kills: player.sessionKills,
+      rank: (this.game.getTotalAliveCount && typeof this.game.getTotalAliveCount === 'function')
+        ? this.game.getTotalAliveCount() + 1
+        : undefined
     };
 
     if (this.game.broadcast) {

@@ -1,77 +1,107 @@
-/* ArenaUI.css */
 .arena-waiting-container {
     width: 100vw;
     height: 100vh;
-    background: linear-gradient(135deg, #1a0a0a 0%, #2d1515 50%, #1a0a0a 100%);
+    background:
+        linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)),
+        url('/Backgrounds/public.avif');
+    background-size: cover;
+    background-position: center;
+    backdrop-filter: blur(8px);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     color: #fff;
-    font-family: Arial, sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .arena-title {
-    font-size: 48px;
-    color: #FF4444;
-    margin-bottom: 20px;
+    font-size: 64px;
+    font-weight: 900;
+    color: #FFD700;
+    margin-bottom: 40px;
+    letter-spacing: -2px;
+    text-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
+    text-transform: uppercase;
 }
+
+
 
 .arena-countdown-container,
 .arena-status-container {
     text-align: center;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 40px 60px;
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    min-width: 400px;
 }
 
 .arena-countdown-text {
     font-size: 24px;
+    color: #dedede;
     margin-bottom: 20px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
 }
 
 .arena-countdown-number {
-    font-size: 80px;
-    font-weight: bold;
+    font-size: 120px;
+    font-weight: 900;
     color: #FFD700;
-    text-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+    text-shadow: 0 0 40px rgba(255, 215, 0, 0.6);
+    line-height: 1;
 }
 
 .arena-status-text {
-    font-size: 24px;
+    font-size: 20px;
+    color: #aaa;
     margin-bottom: 10px;
+    letter-spacing: 1px;
 }
 
 .arena-player-count {
-    font-size: 48px;
-    font-weight: bold;
-    color: #FFD700;
-    margin-bottom: 20px;
+    font-size: 64px;
+    font-weight: 800;
+    color: #fff;
+    margin: 20px 0;
+    font-variant-numeric: tabular-nums;
 }
 
 .arena-wait-time {
-    font-size: 18px;
+    font-size: 16px;
     color: #888;
+    margin-top: 20px;
 }
 
 .arena-hint {
     font-size: 14px;
-    color: #666;
+    color: #555;
     margin-top: 10px;
+    font-style: italic;
 }
 
 .arena-cancel-btn {
     margin-top: 40px;
-    padding: 15px 40px;
-    font-size: 18px;
-    font-weight: bold;
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid #FF4444;
-    color: #FF4444;
+    padding: 16px 40px;
+    font-size: 16px;
+    font-weight: 700;
+    background: transparent;
+    border: 2px solid #555;
+    color: #888;
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .arena-cancel-btn:hover {
-    background: rgba(255, 68, 68, 0.1);
+    border-color: #FF4444;
+    color: #FF4444;
+    background: rgba(255, 68, 68, 0.05);
 }
 
 .phaser-container {
@@ -82,93 +112,5 @@
     left: 0;
 }
 
-/* Victory / End Screen */
-.arena-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.8);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    color: #fff;
-    font-family: Arial, sans-serif;
-}
-
-.victory-title {
-    font-size: 64px;
-    color: #FFD700;
-    margin-bottom: 20px;
-}
-
-.end-title {
-    font-size: 48px;
-    color: #FF4444;
-    margin-bottom: 20px;
-}
-
-.result-text {
-    font-size: 24px;
-}
-
-.result-highlight {
-    font-size: 32px;
-    color: #FFD700;
-    margin-top: 20px;
-}
-
-.result-sub {
-    font-size: 36px;
-    color: #FFD700;
-    margin-top: 10px;
-}
-
-.return-text {
-    font-size: 18px;
-    color: #888;
-    margin-top: 30px;
-}
-
-.eliminated-title {
-    font-size: 48px;
-    color: #FF4444;
-}
-
-.eliminated-info {
-    font-size: 24px;
-    margin-top: 20px;
-}
-
-.eliminated-highlight {
-    color: #FFD700;
-}
-
-.score-info {
-    font-size: 20px;
-    margin-top: 10px;
-}
-
-.spectating-text {
-    font-size: 16px;
-    color: #888;
-    margin-top: 30px;
-}
-
-.quit-menu-btn {
-    margin-top: 20px;
-    padding: 12px 30px;
-    font-size: 16px;
-    background: #333;
-    border: none;
-    color: #fff;
-    border-radius: 8px;
-    cursor: pointer;
-}
-
-.quit-menu-btn:hover {
-    background: #444;
-}
+/* Victory / End Screen handled by DeathScreen component now, 
+   but specific styles for Arena overlays if any can go here */

@@ -15,6 +15,7 @@ function App() {
   const [isDead, setIsDead] = useState(false);
   const [killerName, setKillerName] = useState('');
   const [finalScore, setFinalScore] = useState(0);
+  const [arenaRank, setArenaRank] = useState(null);
 
   // Arena state
   const [arenaCountdown, setArenaCountdown] = useState(null);
@@ -184,6 +185,7 @@ function App() {
         setIsDead(true);
         setKillerName(packet.killerName);
         setFinalScore(packet.score);
+        setArenaRank(packet.rank || '?');
 
         // Handle Guest Data update
         setUser(prevUser => {
@@ -214,12 +216,7 @@ function App() {
 
       if (packet.type === PacketType.ARENA_END) {
         clearArenaTimeout();
-        arenaTimeoutRef.current = setTimeout(() => {
-          setGameState('home');
-          setArenaWinner(null);
-          socket.resetGameScene();
-          arenaTimeoutRef.current = null;
-        }, 5000);
+        // Removed auto-redirect. User must manually exit.
       }
     };
 
@@ -289,28 +286,30 @@ function App() {
       {/* Arena Waiting Room */}
       {gameState === 'arena_waiting' && (
         <div className="arena-waiting-container">
-          <h1 className="arena-title">
-            ⚔️ ĐẤU TRƯỜNG
-          </h1>
+
+
+          <h1 className="arena-title">ARENA</h1>
 
           {arenaCountdown !== null ? (
             <div className="arena-countdown-container">
-              <p className="arena-countdown-text">Trận đấu bắt đầu trong...</p>
+              <p className="arena-countdown-text">Match starts in...</p>
               <div className="arena-countdown-number">
                 {arenaCountdown}
               </div>
             </div>
           ) : (
             <div className="arena-status-container">
-              <p className="arena-status-text">Đang chờ người chơi...</p>
+              <p className="arena-status-text">Waiting for players...</p>
               <div className="arena-player-count">
                 {arenaPlayerCount} / 10
               </div>
+
+              {/* Simplified text form */}
               <p className="arena-wait-time">
-                Phòng sẽ tự động bắt đầu sau {arenaWaitTime}s
+                Auto-start in {arenaWaitTime}s
               </p>
               <p className="arena-hint">
-                (Bot sẽ được thêm nếu không đủ người)
+                (Bots will join if not full)
               </p>
             </div>
           )}
@@ -319,7 +318,7 @@ function App() {
             onClick={handleLeaveArena}
             className="arena-cancel-btn"
           >
-            HỦY
+            CANCEL
           </button>
         </div>
       )}
@@ -330,56 +329,32 @@ function App() {
           <div id="phaser-container" className="phaser-container" />
           {!isDead && !arenaWinner && <HUD isArena={true} />}
 
+
           {/* Victory Screen */}
           {arenaWinner && (
-            <div className="arena-overlay">
-              {arenaWinner.isMe ? (
-                <>
-                  <h1 className="victory-title">
-                    🏆 CHIẾN THẮNG! 🏆
-                  </h1>
-                  <p className="result-text">Bạn là người sống sót cuối cùng!</p>
-                  <p className="result-highlight">
-                    Điểm: {arenaWinner.score}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <h1 className="end-title">
-                    TRẬN ĐẤU KẾT THÚC
-                  </h1>
-                  <p className="result-text">Người chiến thắng:</p>
-                  <p className="result-sub">
-                    {arenaWinner.name}
-                  </p>
-                </>
-              )}
-              <p className="return-text">
-                Đang quay về menu...
-              </p>
-            </div>
+            <DeathScreen
+              isVictory={true}
+              killerName={null}
+              score={arenaWinner.score}
+              rank={1}
+              onQuit={() => {
+                handleQuitToMenu();
+                socket.fullReset(); // Ensure full reset on quit
+              }}
+              onRespawn={null} // No respawn in Arena
+            />
           )}
 
           {/* Death screen - no respawn */}
           {isDead && !arenaWinner && (
-            <div className="arena-overlay">
-              <h1 className="eliminated-title">BẠN ĐÃ BỊ LOẠI!</h1>
-              <p className="eliminated-info">
-                Bị tiêu diệt bởi: <span className="eliminated-highlight">{killerName}</span>
-              </p>
-              <p className="score-info">
-                Điểm của bạn: {finalScore}
-              </p>
-              <p className="spectating-text">
-                Đang theo dõi trận đấu...
-              </p>
-              <button
-                onClick={handleQuitToMenu}
-                className="quit-menu-btn"
-              >
-                THOÁT VỀ MENU
-              </button>
-            </div>
+            <DeathScreen
+              isVictory={false}
+              killerName={killerName}
+              score={finalScore}
+              rank={arenaRank}
+              onQuit={handleQuitToMenu}
+              onRespawn={null}
+            />
           )}
         </>
       )}

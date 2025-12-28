@@ -212,7 +212,8 @@ export class ArenaRoom {
       type: PacketType.PLAYER_DIED,
       victimId: player.id,
       killerId: 'ZONE',
-      killerName: 'The Zone'
+      killerName: 'The Zone',
+      rank: this.getTotalAliveCount() + 1
     });
 
     this.checkGameEnd();

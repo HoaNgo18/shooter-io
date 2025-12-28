@@ -31,7 +31,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
 
   const handleGuestPlay = async () => {
     if (!username) {
-      setError('Vui lòng nhập tên!');
+      setError('Please enter a name!');
       return;
     }
     setConnecting(true);
@@ -60,13 +60,13 @@ const LoginScreen = ({ onLoginSuccess }) => {
       }
       onLoginSuccess({ username: username, coins: 0, highScore: 0, isGuest: true });
     } catch (err) {
-      setError('Không thể kết nối Server Game!');
+      setError('Cannot connect to Game Server!');
       setConnecting(false);
     }
   };
 
   const handleLogin = async () => {
-    if (!username || !password) return setError('Thiếu thông tin đăng nhập');
+    if (!username || !password) return setError('Missing login info');
     setError('');
     setConnecting(true);
 
@@ -79,7 +79,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || 'Đăng nhập thất bại');
+      if (!res.ok) throw new Error(data.error || 'Login failed');
 
       localStorage.setItem('game_token', data.token);
       localStorage.setItem('game_username', data.user.username);
@@ -106,7 +106,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
   };
 
   const handleRegister = async () => {
-    if (!username || !password || !email) return setError('Điền đầy đủ thông tin!');
+    if (!username || !password || !email) return setError('Please fill all fields!');
     setError('');
     setConnecting(true);
 
@@ -118,7 +118,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Đăng ký thất bại');
+      if (!res.ok) throw new Error(data.error || 'Registration failed');
 
       localStorage.setItem('game_token', data.token);
 
@@ -152,9 +152,9 @@ const LoginScreen = ({ onLoginSuccess }) => {
         {/* GUEST FORM */}
         {tab === 'guest' && (
           <div>
-            <input type="text" placeholder="Tên nhân vật..." className="form-input" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={stopPropagation} />
+            <input type="text" placeholder="Enter name..." className="form-input" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={stopPropagation} />
             <button onClick={handleGuestPlay} disabled={connecting} className="submit-btn guest-btn">
-              {connecting ? 'ĐANG VÀO...' : 'CHƠI NGAY'}
+              {connecting ? 'JOINING...' : 'PLAY AS GUEST'}
             </button>
           </div>
         )}
@@ -162,13 +162,13 @@ const LoginScreen = ({ onLoginSuccess }) => {
         {/* LOGIN FORM */}
         {tab === 'login' && (
           <div>
-            <input type="text" placeholder="Tên đăng nhập" className="form-input" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={stopPropagation} />
-            <input type="password" placeholder="Mật khẩu" className="form-input" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={stopPropagation} />
+            <input type="text" placeholder="Username" className="form-input" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={stopPropagation} />
+            <input type="password" placeholder="Password" className="form-input" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={stopPropagation} />
             <div className="optional-field">
-              <label className="optional-label">Tên hiển thị trong game (Tùy chọn):</label>
+              <label className="optional-label">Display Name (Optional):</label>
               <input
                 type="text"
-                placeholder={username || "Tên nhân vật..."}
+                placeholder={username || "Display Name..."}
                 className="form-input"
                 value={displayName}
                 onChange={e => setDisplayName(e.target.value)}
@@ -176,7 +176,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
               />
             </div>
             <button onClick={handleLogin} disabled={connecting} className="submit-btn login-btn">
-              {connecting ? 'ĐANG KẾT NỐI...' : 'ĐĂNG NHẬP & CHƠI'}
+              {connecting ? 'CONNECTING...' : 'LOGIN & PLAY'}
             </button>
           </div>
         )}
@@ -184,14 +184,14 @@ const LoginScreen = ({ onLoginSuccess }) => {
         {/* REGISTER FORM */}
         {tab === 'register' && (
           <div>
-            <input type="text" placeholder="Tên đăng nhập" className="form-input" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={stopPropagation} />
+            <input type="text" placeholder="Username" className="form-input" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={stopPropagation} />
             <input type="email" placeholder="Email" className="form-input" value={email} onChange={e => setEmail(e.target.value)} />
-            <input type="password" placeholder="Mật khẩu" className="form-input" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={stopPropagation} />
+            <input type="password" placeholder="Password" className="form-input" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={stopPropagation} />
             <div className="optional-field">
-              <label className="optional-label">Tên trong game (Tùy chọn):</label>
+              <label className="optional-label">Display Name (Optional):</label>
               <input
                 type="text"
-                placeholder={username || "Tên nhân vật..."}
+                placeholder={username || "Display Name..."}
                 className="form-input"
                 value={displayName}
                 onChange={e => setDisplayName(e.target.value)}
@@ -199,7 +199,7 @@ const LoginScreen = ({ onLoginSuccess }) => {
               />
             </div>
             <button onClick={handleRegister} disabled={connecting} className="submit-btn register-btn">
-              {connecting ? 'ĐANG ĐĂNG KÝ...' : 'ĐĂNG KÝ & CHƠI'}
+              {connecting ? 'REGISTERING...' : 'REGISTER & PLAY'}
             </button>
           </div>
         )}
