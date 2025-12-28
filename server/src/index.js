@@ -4,7 +4,7 @@ import cors from 'cors';
 import { connectDB } from './db/mongo.js';
 import authRouter from './api/auth.js';
 import config from './config.js';
-import { User } from './db/models/User.model.js'; 
+import { User } from './db/models/User.model.js';
 
 const app = express();
 
@@ -21,8 +21,8 @@ app.get('/api/leaderboard', async (req, res) => {
     const topPlayers = await User.find()
       .sort({ highScore: -1 })
       .limit(10)
-      .select('username highScore');
-    
+      .select('username highScore totalKills totalDeaths arenaWins arenaTop2 arenaTop3');
+
     res.json(topPlayers);
   } catch (err) {
     console.error('Leaderboard error:', err);
@@ -43,7 +43,7 @@ app.listen(PORT, () => {
 // Connect to MongoDB
 connectDB().then(() => {
   console.log('MongoDB connected');
-  
+
   // Start WebSocket game server
   const gameServer = new Server(config.WS_PORT || 3000);
   gameServer.start();

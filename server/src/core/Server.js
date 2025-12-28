@@ -161,6 +161,10 @@ export class Server {
       case PacketType.USE_ITEM:
         this.game.handleUseItem(clientId);
         break;
+
+      case PacketType.REQUEST_USER_DATA:
+        await this.handleRequestUserData(clientId);
+        break;
     }
   }
 
@@ -310,6 +314,33 @@ export class Server {
 
     } catch (err) {
       console.error("Error handling equip skin:", err);
+    }
+  }
+
+  async handleRequestUserData(clientId) {
+    const client = this.clients.get(clientId);
+    if (!client || !client.userId) return;
+
+    try {
+      const user = await User.findById(client.userId);
+      if (!user) return;
+
+      this.sendToClient(clientId, {
+        type: 'USER_DATA_UPDATE',
+        username: user.username,
+        displayName: user.displayName,
+        coins: user.coins,
+        highScore: user.highScore,
+        totalKills: user.totalKills,
+        totalDeaths: user.totalDeaths,
+        skins: user.skins,
+        equippedSkin: user.equippedSkin,
+        arenaWins: user.arenaWins,
+        arenaTop2: user.arenaTop2,
+        arenaTop3: user.arenaTop3
+      });
+    } catch (err) {
+      console.error("Error handling request user data:", err);
     }
   }
 

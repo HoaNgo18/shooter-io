@@ -99,7 +99,10 @@ router.post('/login', async (req, res) => {
         totalKills: user.totalKills || 0,
         totalDeaths: user.totalDeaths || 0,
         skins: user.skins,
-        equippedSkin: user.equippedSkin || 'default'
+        equippedSkin: user.equippedSkin || 'default',
+        arenaWins: user.arenaWins || 0,
+        arenaTop2: user.arenaTop2 || 0,
+        arenaTop3: user.arenaTop3 || 0
       }
     });
   } catch (error) {

@@ -32,6 +32,10 @@ const HomeScreen = ({ user, onPlayClick, onArenaClick, onLogout, onLoginSuccess 
     const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
     const API_URL = `${BASE_URL}/api`;
 
+    // Track if we've already requested fresh data to prevent infinite loop
+    const hasRequestedData = React.useRef(false);
+
+    // Sync local user state with prop (only on user change)
     useEffect(() => {
         setLocalUser(user);
         setShowLogin(!user);
@@ -39,16 +43,21 @@ const HomeScreen = ({ user, onPlayClick, onArenaClick, onLogout, onLoginSuccess 
             loadSkins();
             loadLeaderboard();
         }
-
-        const handleSocketMessage = (data) => {
-            if (data.type === 'USER_DATA_UPDATE' || data.type === 'init') {
-                setLocalUser(prev => ({ ...prev, ...data }));
-            }
-        };
-
-        const unsubscribe = socket.subscribe(handleSocketMessage);
-        return () => unsubscribe();
+        // Reset the request flag when user changes (e.g., login/logout)
+        hasRequestedData.current = false;
     }, [user]);
+
+    // Request fresh data ONCE after mount when user exists
+    useEffect(() => {
+        if (user && socket.isConnected && !hasRequestedData.current) {
+            console.log('[HomeScreen] Requesting fresh user data from server (once)');
+            socket.send({ type: PacketType.REQUEST_USER_DATA });
+            hasRequestedData.current = true;
+        }
+    }, [user]);
+
+    // Note: USER_DATA_UPDATE is handled by App.jsx which updates the `user` prop
+    // HomeScreen just syncs localUser from the prop - no separate listener needed
 
     useEffect(() => {
         if (activeTab === 'leaderboard') loadLeaderboard();
@@ -182,6 +191,12 @@ const HomeScreen = ({ user, onPlayClick, onArenaClick, onLogout, onLoginSuccess 
     };
 
     const handleEquipSkin = (skinId) => {
+        if (!socket.isConnected) {
+            console.error('[HomeScreen] Cannot equip skin - socket not connected');
+            setError('Connection lost. Please refresh the page.');
+            return;
+        }
+        console.log('[HomeScreen] Equipping skin:', skinId);
         socket.send({
             type: PacketType.EQUIP_SKIN,
             skinId: skinId
@@ -305,18 +320,40 @@ const HomeScreen = ({ user, onPlayClick, onArenaClick, onLogout, onLoginSuccess 
 
                             {activeTab === 'profile' && (
                                 <div>
-                                    <h2 className="section-title">Combat Stats</h2>
-                                    <div className="stats-grid">
-                                        {[
-                                            { label: 'High Score', val: localUser.highScore || 0, color: '#FFD700' },
-                                            { label: 'Total Kills', val: localUser.totalKills || 0, color: '#00E5FF' },
-                                            { label: 'Deaths', val: localUser.totalDeaths || 0, color: '#FF4444' }
-                                        ].map((stat, idx) => (
-                                            <div key={idx} className="stat-card">
-                                                <div className="stat-value" style={{ color: stat.color }}>{stat.val}</div>
-                                                <div className="stat-label">{stat.label}</div>
-                                            </div>
-                                        ))}
+                                    <h2 className="section-title">Player Stats</h2>
+
+                                    {/* Endless Mode Stats */}
+                                    <div style={{ marginBottom: '30px' }}>
+                                        <h3 style={{ color: '#FFD700', fontSize: '20px', marginBottom: '15px', textAlign: 'center' }}>ENDLESS MODE</h3>
+                                        <div className="stats-grid">
+                                            {[
+                                                { label: 'High Score', val: localUser.highScore || 0, color: '#FFD700' },
+                                                { label: 'Total Kills', val: localUser.totalKills || 0, color: '#FFF' },
+                                                { label: 'Deaths', val: localUser.totalDeaths || 0, color: '#FFF' }
+                                            ].map((stat, idx) => (
+                                                <div key={idx} className="stat-card">
+                                                    <div className="stat-value" style={{ color: stat.color }}>{stat.val}</div>
+                                                    <div className="stat-label">{stat.label}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Arena Mode Stats */}
+                                    <div>
+                                        <h3 style={{ color: '#FFD700', fontSize: '20px', marginBottom: '15px', textAlign: 'center' }}>ARENA MODE</h3>
+                                        <div className="stats-grid">
+                                            {[
+                                                { label: 'Top 1', val: localUser.arenaWins || 0, color: '#FFD700' },
+                                                { label: 'Top 2', val: localUser.arenaTop2 || 0, color: '#FFF' },
+                                                { label: 'Top 3', val: localUser.arenaTop3 || 0, color: '#FFF' }
+                                            ].map((stat, idx) => (
+                                                <div key={idx} className="stat-card">
+                                                    <div className="stat-value" style={{ color: stat.color }}>{stat.val}</div>
+                                                    <div className="stat-label">{stat.label}</div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             )}

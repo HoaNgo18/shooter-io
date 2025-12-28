@@ -19,6 +19,15 @@ class NetworkManager {
 
   connect(authOptions) {
     return new Promise((resolve, reject) => {
+      // Close any existing connection first
+      if (this.ws) {
+        if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+          this.ws.close();
+        }
+        this.ws = null;
+        this.isConnected = false;
+      }
+
       const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3000';
       this.ws = new WebSocket(wsUrl);
 
@@ -37,6 +46,7 @@ class NetworkManager {
 
       this.ws.onerror = (err) => {
         console.error('WebSocket error', err);
+        this.isConnected = false;
         reject(err);
       };
 
@@ -116,10 +126,11 @@ class NetworkManager {
     }
   }
 
-  // Full reset including listeners (used for logout)
+  // Full reset (used for logout) - DON'T clear listeners as they're set up once in App.jsx
   fullReset() {
     this.disconnect();
-    this.listeners = [];
+    // DON'T clear listeners - App.jsx sets them up once on mount
+    // this.listeners = [];  // REMOVED - caused skin equip to fail after logout+login
     this.initData = null;
     this.gameScene = null;
   }

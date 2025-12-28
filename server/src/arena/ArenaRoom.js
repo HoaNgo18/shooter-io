@@ -208,13 +208,21 @@ export class ArenaRoom {
     player.dead = true;
     player.deathTime = Date.now();
 
+    // Calculate current rank (alive count + 1 = final rank)
+    const finalRank = this.getTotalAliveCount() + 1;
+
     this.broadcast({
       type: PacketType.PLAYER_DIED,
       victimId: player.id,
       killerId: 'ZONE',
       killerName: 'The Zone',
-      rank: this.getTotalAliveCount() + 1
+      rank: finalRank
     });
+
+    // Save arena ranking stats for real players
+    if (!player.isBot && player.userId) {
+      this.savePlayerRanking(player, finalRank);
+    }
 
     this.checkGameEnd();
   }
@@ -266,6 +274,16 @@ export class ArenaRoom {
     }, clientId);
 
     this.broadcastRoomStatus();
+
+    // Also send direct status to the joining player to ensure they receive it immediately
+    this.sendToClient(clientId, {
+      type: PacketType.ARENA_STATUS,
+      roomId: this.id,
+      status: this.status,
+      playerCount: this.getRealPlayerCount(),
+      maxPlayers: this.maxPlayers,
+      waitTimeRemaining: Math.max(0, this.waitTime - (Date.now() - this.createdAt))
+    });
 
     if (this.getRealPlayerCount() >= this.maxPlayers) {
       this.startCountdown();
@@ -338,19 +356,9 @@ export class ArenaRoom {
   // ========================================
 
   startWaitTimer() {
-    let lastPlayerCount = this.getRealPlayerCount();
-    let lastWaitTime = Math.ceil((this.waitTime - (Date.now() - this.createdAt)) / 1000);
-
     this.waitUpdateInterval = setInterval(() => {
       if (this.status === 'waiting') {
-        const currentCount = this.getRealPlayerCount();
-        const currentWait = Math.ceil((this.waitTime - (Date.now() - this.createdAt)) / 1000);
-
-        if (currentCount !== lastPlayerCount || currentWait !== lastWaitTime) {
-          this.broadcastRoomStatus();
-          lastPlayerCount = currentCount;
-          lastWaitTime = currentWait;
-        }
+        this.broadcastRoomStatus();
       }
     }, 1000);
 
@@ -612,6 +620,33 @@ export class ArenaRoom {
       }
     } catch (err) {
       console.error('[Arena] Error saving winner stats:', err);
+    }
+  }
+
+  async savePlayerRanking(player, rank) {
+    try {
+      const { User } = await import('../db/models/User.model.js');
+      const user = await User.findById(player.userId);
+
+      if (user) {
+        // Update ranking stats based on final position
+        if (rank === 2) {
+          user.arenaTop2 = (user.arenaTop2 || 0) + 1;
+        } else if (rank === 3) {
+          user.arenaTop3 = (user.arenaTop3 || 0) + 1;
+        }
+
+        await user.save();
+
+        // Send update to client
+        this.sendToClient(player.id, {
+          type: 'USER_DATA_UPDATE',
+          arenaTop2: user.arenaTop2,
+          arenaTop3: user.arenaTop3
+        });
+      }
+    } catch (err) {
+      console.error('[Arena] Error saving player ranking:', err);
     }
   }
 

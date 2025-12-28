@@ -54,6 +54,14 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  arenaTop2: {
+    type: Number,
+    default: 0
+  },
+  arenaTop3: {
+    type: Number,
+    default: 0
+  },
   createdAt: {
     type: Date,
     default: Date.now

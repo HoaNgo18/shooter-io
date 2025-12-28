@@ -8,7 +8,7 @@ export const PacketType = {
   RESPAWN: 'respawn',
   SELECT_SLOT: 'SELECT_SLOT', // Khi bấm 1, 2, 3, 4
   USE_ITEM: 'USE_ITEM',
-  
+
   // Server -> Client
   INIT: 'init',
   UPDATE: 'update',
@@ -21,6 +21,7 @@ export const PacketType = {
   BUY_SKIN: 'buy_skin',
   EQUIP_SKIN: 'equip_skin',
   USER_DATA_UPDATE: 'user_data_update',
+  REQUEST_USER_DATA: 'request_user_data',
 
   // Arena Mode
   ARENA_JOIN: 'arena_join',           // Client -> Server: Xin vào đấu trường

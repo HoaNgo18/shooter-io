@@ -129,11 +129,8 @@ function App() {
     setArenaCountdown(null);
     if (socket.isInArena) {
       socket.leaveArena();
-      if (socket.ws) {
-        socket.ws.close();
-        socket.ws = null;
-        socket.isConnected = false;
-      }
+      // DO NOT close socket here - we need it for HomeScreen to work
+      // socket.ws.close() was causing skin equip to fail after Arena
     }
   };
 
@@ -158,7 +155,9 @@ function App() {
             totalDeaths: packet.totalDeaths !== undefined ? packet.totalDeaths : prevUser.totalDeaths,
             skins: packet.skins !== undefined ? packet.skins : prevUser.skins,
             equippedSkin: packet.equippedSkin !== undefined ? packet.equippedSkin : prevUser.equippedSkin,
-            arenaWins: packet.arenaWins !== undefined ? packet.arenaWins : prevUser.arenaWins
+            arenaWins: packet.arenaWins !== undefined ? packet.arenaWins : prevUser.arenaWins,
+            arenaTop2: packet.arenaTop2 !== undefined ? packet.arenaTop2 : prevUser.arenaTop2,
+            arenaTop3: packet.arenaTop3 !== undefined ? packet.arenaTop3 : prevUser.arenaTop3
           };
         });
       }

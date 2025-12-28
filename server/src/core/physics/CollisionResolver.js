@@ -148,6 +148,11 @@ export class CollisionResolver {
     if (this.game.broadcast) {
       // This is an ArenaRoom
       this.game.broadcast(broadcastData);
+
+      // Save arena ranking for PvP deaths (if not a bot and has userId)
+      if (!player.isBot && player.userId && broadcastData.rank) {
+        this.game.savePlayerRanking(player, broadcastData.rank);
+      }
     } else if (this.game.server) {
       // This is the main Game
       this.game.server.broadcast(broadcastData);
