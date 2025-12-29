@@ -111,12 +111,17 @@ export class CollisionResolver {
   // --- DEATH LOGIC ---
 
   handlePlayerDeath(player, killerId, killerName) {
-    this.game.world.spawnItem(player.x, player.y, 'ENEMY');
+    // GUARD: Chỉ xử lý 1 lần - nếu đã dead thì skip
+    if (player.dead) return;
 
+    // Mark as dead FIRST to prevent duplicate calls
     player.dead = true;
     player.lives = 0;
     player.deathTime = Date.now();
     player.inventory = [null, null, null, null, null];
+
+    // Spawn drops
+    this.game.world.spawnItem(player.x, player.y, 'ENEMY');
 
     const killer = this.game.players.get(killerId);
     if (killer) {
