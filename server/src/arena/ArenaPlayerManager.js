@@ -3,6 +3,7 @@ import { Player } from '../entities/Player.js';
 import { Bot } from '../entities/Bot.js';
 import { MAP_SIZE } from '../../../shared/src/constants.js';
 import { PacketType } from '../../../shared/src/packetTypes.js';
+import { getRandomPositionInCircle } from '../../../shared/src/utils.js';
 
 /**
  * Manages players and bots in Arena room
@@ -27,6 +28,13 @@ export class ArenaPlayerManager {
         if (this.players.size >= this.room.maxPlayers) return false;
 
         const player = new Player(clientId, name, userId, skinId);
+        
+        // Spawn player within current safe zone (arena only)
+        const zone = this.room.zoneManager.zone;
+        const spawnPos = getRandomPositionInCircle(zone.x, zone.y, zone.radius * 0.8);
+        player.x = spawnPos.x;
+        player.y = spawnPos.y;
+        
         player.dead = false;
 
         this.players.set(clientId, player);
@@ -66,14 +74,16 @@ export class ArenaPlayerManager {
      */
     fillWithBots() {
         const needed = this.room.maxPlayers - this.players.size;
+        const zone = this.room.zoneManager.zone;
 
         for (let i = 0; i < needed; i++) {
             const botId = `arena_bot_${this.room.id}_${Date.now()}_${i}`;
             const bot = new Bot(botId);
 
-            const r = MAP_SIZE / 2;
-            bot.x = (Math.random() * r * 2) - r;
-            bot.y = (Math.random() * r * 2) - r;
+            // Spawn bot within safe zone (80% of radius for safety margin)
+            const spawnPos = getRandomPositionInCircle(zone.x, zone.y, zone.radius * 0.8);
+            bot.x = spawnPos.x;
+            bot.y = spawnPos.y;
             bot.dead = false;
 
             this.players.set(botId, bot);

@@ -46,6 +46,16 @@ export function getRandomPosition(mapSize) {
   };
 }
 
+export function getRandomPositionInCircle(centerX, centerY, radius) {
+  // Spawn uniformly within circular zone
+  const angle = Math.random() * Math.PI * 2;
+  const distance = Math.sqrt(Math.random()) * radius;
+  return {
+    x: centerX + Math.cos(angle) * distance,
+    y: centerY + Math.sin(angle) * distance
+  };
+}
+
 export function circleRotatedRectCollision(cx, cy, cr, rectX, rectY, width, height, rotation) {
   const cos = Math.cos(-rotation);
   const sin = Math.sin(-rotation);
