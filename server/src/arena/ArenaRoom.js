@@ -1,12 +1,15 @@
 // server/src/arena/ArenaRoom.js
-import { TICK_RATE, MAP_SIZE } from '../../../shared/src/constants.js';
+import { TICK_RATE, MAP_SIZE, ARENA_CONFIG } from '../../../shared/src/constants.js';
 import { PacketType } from '../../../shared/src/packetTypes.js';
-import { Player } from '../entities/Player.js';
-import { Bot } from '../entities/Bot.js';
 import { Physics } from '../core/Physics.js';
 import { WorldManager } from '../core/managers/WorldManager.js';
 import { Explosion } from '../entities/Explosion.js';
-import { StatsService } from '../core/managers/StatsService.js';
+
+// Import Arena Modules
+import { ArenaZoneManager } from './ArenaZoneManager.js';
+import { ArenaPlayerManager } from './ArenaPlayerManager.js';
+import { ArenaStatsHandler } from './ArenaStatsHandler.js';
+import { ArenaInputHandler } from './ArenaInputHandler.js';
 
 export class ArenaRoom {
   constructor(id, manager) {
@@ -16,104 +19,89 @@ export class ArenaRoom {
 
     // Room settings
     this.maxPlayers = 10;
-    this.waitTime = 60000; // 60 giây chờ
-    this.countdownTime = 5000; // 5 giây đếm ngược
+    this.waitTime = ARENA_CONFIG.WAITING_TIME;
+    this.countdownTime = ARENA_CONFIG.COUNTDOWN_TIME;
+    this.gameDuration = ARENA_CONFIG.GAME_DURATION;
 
     // State
     this.status = 'waiting'; // waiting, countdown, playing, ended
     this.createdAt = Date.now();
     this.startedAt = null;
 
-    // Players in this room (clientId -> Player)
-    this.players = new Map();
-    this.clientIds = new Set(); // Track connected clients
+    // Managers
+    this.zoneManager = new ArenaZoneManager(this);
+    this.playerManager = new ArenaPlayerManager(this);
 
-    // Game state (similar to Game.js)
+    // Game state
     this.projectiles = [];
     this.explosions = [];
     this.world = new WorldManager();
     this.physics = new Physics(this);
 
+    // Intervals & Timers
     this.tickInterval = null;
     this.broadcastInterval = null;
+    this.waitUpdateInterval = null;
     this.lastTick = Date.now();
-
-    // Timers
     this.waitTimer = null;
     this.countdownTimer = null;
 
-    console.log(`[Arena] Room ${id} created`);
+    this.startWaitTimer();
   }
 
-  // Get player count (excluding bots)
-  getRealPlayerCount() {
-    let count = 0;
-    this.players.forEach(p => {
-      if (!p.isBot) count++;
-    });
-    return count;
-  }
+  // PLAYER MANAGEMENT (Delegated)
 
-  getBotCount() {
-    let count = 0;
-    this.players.forEach(p => {
-      if (p.isBot) count++;
-    });
-    return count;
-  }
+  get players() { return this.playerManager.players; }
+  get clientIds() { return this.playerManager.clientIds; }
+  get zone() { return this.zoneManager.zone; }
 
-  getAlivePlayerCount() {
-    let count = 0;
-    this.players.forEach(p => {
-      if (!p.dead && !p.isBot) count++;
-    });
-    return count;
-  }
-
-  getAliveBotCount() {
-    let count = 0;
-    this.players.forEach(p => {
-      if (!p.dead && p.isBot) count++;
-    });
-    return count;
-  }
-
-  getTotalAliveCount() {
-    let count = 0;
-    this.players.forEach(p => {
-      if (!p.dead) count++;
-    });
-    return count;
-  }
-
-  // Add a real player to room
   addPlayer(clientId, name, userId = null, skinId = 'default') {
-    if (this.status !== 'waiting' && this.status !== 'countdown') {
-      return false;
+    const player = this.playerManager.addPlayer(clientId, name, userId, skinId);
+    if (!player) return false;
+
+    this.sendInitPacket(clientId, player);
+    this.broadcast({
+      type: PacketType.PLAYER_JOIN,
+      player: player.serialize()
+    }, clientId);
+
+    this.broadcastRoomStatus();
+
+    this.sendToClient(clientId, {
+      type: PacketType.ARENA_STATUS,
+      roomId: this.id,
+      status: this.status,
+      playerCount: this.playerManager.getRealPlayerCount(),
+      maxPlayers: this.maxPlayers,
+      waitTimeRemaining: Math.max(0, this.waitTime - (Date.now() - this.createdAt))
+    });
+
+    if (this.playerManager.getRealPlayerCount() >= this.maxPlayers) {
+      this.startCountdown();
     }
 
-    if (this.players.size >= this.maxPlayers) {
-      return false;
-    }
+    return true;
+  }
 
-    const player = new Player(clientId, name, userId, skinId);
-    player.dead = false;
-    this.players.set(clientId, player);
-    this.clientIds.add(clientId);
+  removePlayer(clientId) {
+    const player = this.playerManager.removePlayer(clientId);
+    if (!player) return;
 
-    // Mark client as in arena
-    const client = this.server.clients.get(clientId);
-    if (client) {
-      client.arenaRoomId = this.id;
-      client.player = player;
-    }
+    this.broadcast({
+      type: PacketType.PLAYER_LEAVE,
+      id: clientId
+    });
 
-    // Send init to joining player
+    this.broadcastRoomStatus();
+    this.checkGameEnd();
+  }
+
+  sendInitPacket(clientId, player) {
     this.sendToClient(clientId, {
       type: PacketType.INIT,
       id: clientId,
       player: player.serialize(),
-      players: Array.from(this.players.values()).map(p => p.serialize()),
+      players: this.playerManager.serializeAll(),
       foods: this.world.foods,
       obstacles: this.world.obstacles,
       nebulas: this.world.nebulas,
@@ -122,189 +110,176 @@ export class ArenaRoom {
       isArena: true,
       roomId: this.id
     });
-
-    // Notify others
-    this.broadcast({
-      type: PacketType.PLAYER_JOIN,
-      player: player.serialize()
-    }, clientId);
-
-    // ✅ CHỈ GỌI 1 LẦN DUY NHẤT Ở CUỐI
-    this.broadcastRoomStatus();
-
-    console.log(`[Arena] Player ${name} joined room ${this.id} (${this.getRealPlayerCount()}/${this.maxPlayers})`);
-
-    // Start countdown if full
-    if (this.getRealPlayerCount() >= this.maxPlayers) {
-      this.startCountdown();
-    }
-
-    return true;
   }
 
-  removePlayer(clientId) {
-    const player = this.players.get(clientId);
-    if (!player) return;
+  getRealPlayerCount() { return this.playerManager.getRealPlayerCount(); }
+  getBotCount() { return this.playerManager.getBotCount(); }
+  getAlivePlayerCount() { return this.playerManager.getAlivePlayerCount(); }
+  getAliveBotCount() { return this.playerManager.getAliveBotCount(); }
+  getTotalAliveCount() { return this.playerManager.getTotalAliveCount(); }
 
-    this.players.delete(clientId);
-    this.clientIds.delete(clientId);
+  // ZONE MANAGEMENT (Delegated)
 
-    // Clear arena reference from client
-    const client = this.server.clients.get(clientId);
-    if (client) {
-      client.arenaRoomId = null;
-      client.player = null;
+  checkZoneDamage(dt) {
+    this.playerManager.forEach(player => {
+      if (player.dead) return;
+
+      if (this.zoneManager.isOutsideZone(player.x, player.y)) {
+        this.applyZoneDamage(player, dt);
+      } else {
+        player.zoneDamageAccumulated = 0;
+      }
+    });
+  }
+
+  applyZoneDamage(player, dt) {
+    if (!player.zoneDamageAccumulated) {
+      player.zoneDamageAccumulated = 0;
     }
 
+    player.zoneDamageAccumulated += dt;
+
+    const DAMAGE_INTERVAL = 3;
+    if (player.zoneDamageAccumulated >= DAMAGE_INTERVAL) {
+      player.zoneDamageAccumulated -= DAMAGE_INTERVAL;
+      player.lives = Math.max(0, player.lives - 1);
+      player.lastDamageTime = Date.now();
+
+      this.broadcast({
+        type: PacketType.PLAYER_DAMAGED,
+        victimId: player.id,
+        damage: 1,
+        source: 'ZONE',
+        newLives: player.lives
+      });
+
+      if (player.lives <= 0 && !player.dead) {
+        this.handlePlayerDeath(player);
+      }
+    }
+  }
+
+  handlePlayerDeath(player) {
+    player.dead = true;
+    player.deathTime = Date.now();
+
+    const finalRank = this.getTotalAliveCount() + 1;
+
     this.broadcast({
-      type: PacketType.PLAYER_LEAVE,
-      id: clientId
+      type: PacketType.PLAYER_DIED,
+      victimId: player.id,
+      killerId: 'ZONE',
+      killerName: 'The Zone',
+      rank: finalRank
     });
 
-    console.log(`[Arena] Player ${player.name} left room ${this.id}`);
+    if (!player.isBot && player.userId) {
+      ArenaStatsHandler.savePlayerRanking(player, finalRank, this);
+    }
 
-    // ✅ CHỈ GỌI 1 LẦN
-    this.broadcastRoomStatus();
     this.checkGameEnd();
   }
 
-  // Fill remaining slots with bots
-  fillWithBots() {
-    const needed = this.maxPlayers - this.players.size;
-    for (let i = 0; i < needed; i++) {
-      const botId = `arena_bot_${this.id}_${Date.now()}_${i}`;
-      const bot = new Bot(botId);
-      bot.dead = false;
-      this.players.set(botId, bot);
+  // GAME FLOW
 
-      this.broadcast({
-        type: PacketType.PLAYER_JOIN,
-        player: bot.serialize()
-      });
-
-      console.log(`[Arena] Bot ${bot.name} added to room ${this.id}`);
-    }
-  }
-
-  // Start waiting timer
   startWaitTimer() {
-    // Send periodic updates about wait time (every 1 second for accurate countdown)
-    let lastPlayerCount = this.getRealPlayerCount();
-    let lastWaitTime = Math.ceil((this.waitTime - (Date.now() - this.createdAt)) / 1000);
-
     this.waitUpdateInterval = setInterval(() => {
       if (this.status === 'waiting') {
-        const currentCount = this.getRealPlayerCount();
-        const currentWait = Math.ceil((this.waitTime - (Date.now() - this.createdAt)) / 1000);
-
-        // Chỉ broadcast khi số người hoặc thời gian thay đổi
-        if (currentCount !== lastPlayerCount || currentWait !== lastWaitTime) {
-          this.broadcastRoomStatus();
-          lastPlayerCount = currentCount;
-          lastWaitTime = currentWait;
-        }
+        this.broadcastRoomStatus();
       }
     }, 1000);
 
     this.waitTimer = setTimeout(() => {
       if (this.status === 'waiting') {
-        // Time's up, fill with bots and start
-        if (this.getRealPlayerCount() > 0) {
+        if (this.playerManager.getRealPlayerCount() > 0) {
           this.startCountdown();
         } else {
-          // No real players, destroy room
           this.destroy();
         }
       }
     }, this.waitTime);
   }
 
-  // Start countdown before game
   startCountdown() {
     if (this.status !== 'waiting') return;
 
-    clearTimeout(this.waitTimer);
-    clearInterval(this.waitUpdateInterval);
+    this.clearWaitTimers();
     this.status = 'countdown';
+    this.playerManager.fillWithBots();
 
-    // Fill with bots if needed
-    this.fillWithBots();
-
-    let countdown = 5;
-
-    const countdownTick = () => {
-      if (countdown > 0) {
-        this.broadcast({
-          type: PacketType.ARENA_COUNTDOWN,
-          seconds: countdown
-        });
-        countdown--;
-        this.countdownTimer = setTimeout(countdownTick, 1000);
-      } else {
-        this.startGame();
-      }
-    };
-
-    countdownTick();
+    this.runCountdown(5);
   }
 
-  // Start the actual game
+  clearWaitTimers() {
+    clearTimeout(this.waitTimer);
+    clearInterval(this.waitUpdateInterval);
+  }
+
+  runCountdown(seconds) {
+    if (seconds > 0) {
+      this.broadcast({
+        type: PacketType.ARENA_COUNTDOWN,
+        seconds: seconds
+      });
+      this.countdownTimer = setTimeout(() => this.runCountdown(seconds - 1), 1000);
+    } else {
+      this.startGame();
+    }
+  }
+
   startGame() {
     this.status = 'playing';
     this.startedAt = Date.now();
 
+    this.zoneManager.resetForGame();
+
     this.broadcast({
       type: PacketType.ARENA_START,
       roomId: this.id,
-      playerCount: this.players.size
+      playerCount: this.playerManager.size,
+      gameDuration: this.gameDuration
     });
 
-    // ✅ SỬA: Giảm broadcast rate xuống
     const SIMULATION_RATE = 60;
-    const BROADCAST_RATE = 60; // Giảm từ 15 xuống 10 FPS
+    const BROADCAST_RATE = 20;
 
     this.tickInterval = setInterval(() => this.tick(), 1000 / SIMULATION_RATE);
     this.broadcastInterval = setInterval(() => this.sendStateUpdate(), 1000 / BROADCAST_RATE);
-
-    console.log(`[Arena] Room ${this.id} game started with ${this.players.size} players`);
   }
 
   tick() {
     if (this.status !== 'playing') return;
 
+    const dt = this.calculateDeltaTime();
+
+    const gameTime = Date.now() - this.startedAt;
+    if (gameTime >= this.gameDuration) {
+      this.endGameByTime();
+      return;
+    }
+
+    this.zoneManager.update(dt);
+    this.checkZoneDamage(dt);
+    this.updateProjectiles(dt);
+    this.playerManager.updatePlayers(dt);
+    this.playerManager.updateBots();
+    this.physics.checkCollisions();
+    this.updateWorld(dt);
+    this.checkGameEnd();
+  }
+
+  calculateDeltaTime() {
     const now = Date.now();
     let dt = (now - this.lastTick) / 1000;
     this.lastTick = now;
-    if (dt > 0.05) dt = 0.05;
+    return dt > 0.05 ? 0.05 : dt;
+  }
 
-    // Update projectiles
-    this.updateProjectiles(dt);
-
-    // Update players
-    this.players.forEach(player => {
-      if (!player.dead) player.update(dt);
-    });
-
-    // Update bots AI
-    this.players.forEach(player => {
-      if (!player.dead && player instanceof Bot) {
-        player.think(this);
-      }
-    });
-
-    // Physics
-    this.physics.checkCollisions();
-
-    // Update chests
+  updateWorld(dt) {
     this.world.chests.forEach(chest => chest.update(dt));
-
-    // World spawns
     this.world.spawnFood();
     this.world.spawnNormalChestIfNeeded();
     this.world.spawnStationIfNeeded();
-
-    // Check win condition
-    this.checkGameEnd();
   }
 
   updateProjectiles(dt) {
@@ -312,109 +287,114 @@ export class ArenaRoom {
       const proj = this.projectiles[i];
       proj.update(dt);
 
-      const isExpired = proj.distanceTraveled >= proj.range && !proj.isMine;
-      const shouldRemove = proj.shouldRemove();
-      const isHit = proj.hit;
-
-      if (isExpired || shouldRemove || isHit) {
+      if (this.shouldRemoveProjectile(proj)) {
         if (proj.weaponType === 'BOMB') {
-          const explosion = new Explosion(
-            proj.x, proj.y, 100, proj.damage, proj.ownerId, proj.ownerName
-          );
-          this.explosions.push(explosion);
+          this.createExplosion(proj);
         }
         this.projectiles.splice(i, 1);
       }
     }
   }
 
+  shouldRemoveProjectile(proj) {
+    return (proj.distanceTraveled >= proj.range && !proj.isMine) ||
+      proj.shouldRemove() ||
+      proj.hit;
+  }
+
+  createExplosion(proj) {
+    const explosion = new Explosion(
+      proj.x, proj.y, 100, proj.damage, proj.ownerId, proj.ownerName
+    );
+    this.explosions.push(explosion);
+  }
+
+  // GAME END
+
+  endGameByTime() {
+    this.status = 'ended';
+    this.clearGameIntervals();
+
+    let winner = null;
+    let maxScore = -1;
+
+    this.playerManager.forEach(player => {
+      if (!player.isBot && !player.dead && player.score > maxScore) {
+        maxScore = player.score;
+        winner = player;
+      }
+    });
+
+    if (winner) {
+      this.announceWinner(winner);
+      if (winner.userId) {
+        ArenaStatsHandler.saveWinnerStats(winner, this);
+      }
+    } else {
+      this.broadcast({
+        type: PacketType.ARENA_END,
+        reason: 'time_up'
+      });
+    }
+
+    setTimeout(() => this.destroy(), 5000);
+  }
+
   checkGameEnd() {
     if (this.status !== 'playing') return;
+    if (Date.now() - this.startedAt < 2000) return;
 
     const aliveRealPlayers = [];
     let aliveBots = 0;
 
-    this.players.forEach(p => {
+    this.playerManager.forEach(p => {
       if (!p.dead) {
-        if (p.isBot) {
-          aliveBots++;
-        } else {
-          aliveRealPlayers.push(p);
-        }
+        p.isBot ? aliveBots++ : aliveRealPlayers.push(p);
       }
     });
 
-    // Only bots alive -> end game
     if (aliveRealPlayers.length === 0 && aliveBots > 0) {
       this.endGame(null);
       return;
     }
 
-    // Only 1 player alive (real or bot) -> winner
     const totalAlive = aliveRealPlayers.length + aliveBots;
     if (totalAlive <= 1) {
-      const winner = aliveRealPlayers[0] || null;
-      this.endGame(winner);
+      this.endGame(aliveRealPlayers[0] || null);
     }
   }
 
   endGame(winner) {
     this.status = 'ended';
-
-    clearInterval(this.tickInterval);
-    clearInterval(this.broadcastInterval);
+    this.clearGameIntervals();
 
     if (winner) {
-      // Announce victory
-      this.broadcast({
-        type: PacketType.ARENA_VICTORY,
-        winnerId: winner.id,
-        winnerName: winner.name,
-        score: winner.score
-      });
-
-      // Save winner stats
+      this.announceWinner(winner);
       if (winner.userId) {
-        this.saveWinnerStats(winner);
+        ArenaStatsHandler.saveWinnerStats(winner, this);
       }
-
-      console.log(`[Arena] Room ${this.id} - Winner: ${winner.name}`);
     } else {
       this.broadcast({
         type: PacketType.ARENA_END,
         reason: 'no_players'
       });
-      console.log(`[Arena] Room ${this.id} ended - No real players remaining`);
     }
 
-    // Destroy room after delay
-    setTimeout(() => {
-      this.destroy();
-    }, 5000);
+    setTimeout(() => this.destroy(), 5000);
   }
 
-  async saveWinnerStats(winner) {
-    try {
-      const { User } = await import('../db/models/User.model.js');
-      const user = await User.findById(winner.userId);
-      if (user) {
-        user.coins += winner.score + 100; // Bonus for winning
-        user.arenaWins = (user.arenaWins || 0) + 1;
-        if (winner.score > user.highScore) {
-          user.highScore = winner.score;
-        }
-        await user.save();
+  clearGameIntervals() {
+    clearInterval(this.tickInterval);
+    clearInterval(this.broadcastInterval);
+  }
 
-        this.sendToClient(winner.id, {
-          type: 'USER_DATA_UPDATE',
-          coins: user.coins,
-          highScore: user.highScore,
-          arenaWins: user.arenaWins
-        });
-      }
-    } catch (err) {
-      console.error('[Arena] Error saving winner stats:', err);
-    }
+  announceWinner(winner) {
+    this.broadcast({
+      type: PacketType.ARENA_VICTORY,
+      winnerId: winner.id,
+      winnerName: winner.name,
+      score: winner.score
+    });
   }
 
   destroy() {
@@ -424,14 +404,14 @@ export class ArenaRoom {
     clearInterval(this.broadcastInterval);
     clearInterval(this.waitUpdateInterval);
 
-    // Notify all clients
-    this.broadcast({
-      type: PacketType.ARENA_END,
-      reason: 'room_closed'
-    });
+    if (this.status !== 'ended') {
+      this.broadcast({
+        type: PacketType.ARENA_END,
+        reason: 'room_closed'
+      });
+    }
 
-    // Clear arena reference from all clients
-    this.clientIds.forEach(clientId => {
+    this.playerManager.clientIds.forEach(clientId => {
       const client = this.server.clients.get(clientId);
       if (client) {
         client.arenaRoomId = null;
@@ -439,62 +419,48 @@ export class ArenaRoom {
       }
     });
 
-    this.players.clear();
-    this.clientIds.clear();
-
+    this.playerManager.clear();
     this.manager.removeRoom(this.id);
-    console.log(`[Arena] Room ${this.id} destroyed`);
   }
 
-  // Input handlers (same as Game.js)
+  // INPUT HANDLERS (Delegated)
+
   handleInput(clientId, inputData) {
-    const player = this.players.get(clientId);
-    if (player && !player.dead) {
-      player.setInput(inputData);
-    }
+    ArenaInputHandler.handleInput(this, clientId, inputData);
   }
 
   handleAttack(clientId) {
-    const player = this.players.get(clientId);
-    if (player && !player.dead) {
-      const newProjectiles = player.attack();
-      if (newProjectiles) {
-        this.projectiles.push(...newProjectiles);
-      }
-    }
+    ArenaInputHandler.handleAttack(this, clientId);
   }
 
   handleSelectSlot(clientId, slotIndex) {
-    const player = this.players.get(clientId);
-    if (player && !player.dead && slotIndex >= 0 && slotIndex <= 4) {
-      player.selectedSlot = slotIndex;
-    }
+    ArenaInputHandler.handleSelectSlot(this, clientId, slotIndex);
   }
 
   handleUseItem(clientId) {
-    const player = this.players.get(clientId);
-    if (player && !player.dead) {
-      player.activateCurrentItem(this);
-    }
+    ArenaInputHandler.handleUseItem(this, clientId);
   }
 
   handleDash(clientId) {
-    const player = this.players.get(clientId);
-    if (player && typeof player.performDash === 'function') {
-      player.performDash();
-    }
+    ArenaInputHandler.handleDash(this, clientId);
   }
 
-  // Stats saving for arena
+  // STATS (Delegated)
+
   async savePlayerScore(player) {
-    await StatsService.savePlayerScore(this.server, player);
+    await ArenaStatsHandler.savePlayerScore(player, this.server);
   }
 
   async saveKillerStats(player) {
-    await StatsService.saveKillerStats(this.server, player);
+    await ArenaStatsHandler.saveKillerStats(player, this.server);
   }
 
-  // Network
+  async savePlayerRanking(player, rank) {
+    await ArenaStatsHandler.savePlayerRanking(player, rank, this);
+  }
+
+  // NETWORK
+
   sendToClient(clientId, data) {
     const client = this.server.clients.get(clientId);
     if (client?.ws.readyState === 1) {
@@ -504,7 +470,7 @@ export class ArenaRoom {
 
   broadcast(data, excludeId = null) {
     const message = JSON.stringify(data);
-    this.clientIds.forEach(clientId => {
+    this.playerManager.clientIds.forEach(clientId => {
       if (clientId !== excludeId) {
         const client = this.server.clients.get(clientId);
         if (client?.ws.readyState === 1) {
@@ -519,57 +485,42 @@ export class ArenaRoom {
       type: PacketType.ARENA_STATUS,
       roomId: this.id,
       status: this.status,
-      playerCount: this.getRealPlayerCount(),
+      playerCount: this.playerManager.getRealPlayerCount(),
       maxPlayers: this.maxPlayers,
       waitTimeRemaining: Math.max(0, this.waitTime - (Date.now() - this.createdAt))
     });
   }
 
   sendStateUpdate() {
-    const alivePlayers = [];
-    this.players.forEach(p => {
-      if (!p.dead || (Date.now() - (p.deathTime || 0)) < 2000) {
-        alivePlayers.push(p.serialize());
-      }
-    });
-
-    // Chuẩn bị state packet
     const state = {
       type: PacketType.ARENA_UPDATE,
       t: Date.now(),
-      players: alivePlayers,
+      players: this.playerManager.serializeAlive(),
       projectiles: this.projectiles.map(p => p.serialize()),
       explosions: this.explosions.map(e => e.serialize()),
-      aliveCount: this.getTotalAliveCount()
+      aliveCount: this.getTotalAliveCount(),
+      zone: this.zoneManager.serialize()
     };
 
-    // ✅ CHỈ GỬI DELTA KHI CÓ THAY ĐỔI (giống Game.js)
-    if (this.world.delta.foodsAdded.length > 0) {
-      state.foodsAdded = this.world.delta.foodsAdded;
-    }
-    if (this.world.delta.foodsRemoved.length > 0) {
-      state.foodsRemoved = this.world.delta.foodsRemoved;
-    }
-    if (this.world.delta.chestsAdded.length > 0) {
-      state.chestsAdded = this.world.delta.chestsAdded.map(c => ({
+    this.addWorldDelta(state);
+
+    this.broadcast(state);
+    this.world.resetDelta();
+  }
+
+  addWorldDelta(state) {
+    const delta = this.world.delta;
+
+    if (delta.foodsAdded.length > 0) state.foodsAdded = delta.foodsAdded;
+    if (delta.foodsRemoved.length > 0) state.foodsRemoved = delta.foodsRemoved;
+    if (delta.chestsAdded.length > 0) {
+      state.chestsAdded = delta.chestsAdded.map(c => ({
         ...c,
         rotation: c.rotation || 0
       }));
     }
-    if (this.world.delta.chestsRemoved.length > 0) {
-      state.chestsRemoved = this.world.delta.chestsRemoved;
-    }
-    if (this.world.delta.itemsAdded.length > 0) {
-      state.itemsAdded = this.world.delta.itemsAdded;
-    }
-    // ⭐ QUAN TRỌNG: Phải gửi itemsRemoved khi có item bị xóa
-    if (this.world.delta.itemsRemoved.length > 0) {
-      state.itemsRemoved = this.world.delta.itemsRemoved;
-    }
-
-    this.broadcast(state);
-    
-    // ✅ Reset Delta SAU khi broadcast
-    this.world.resetDelta();
+    if (delta.chestsRemoved.length > 0) state.chestsRemoved = delta.chestsRemoved;
+    if (delta.itemsAdded.length > 0) state.itemsAdded = delta.itemsAdded;
+    if (delta.itemsRemoved.length > 0) state.itemsRemoved = delta.itemsRemoved;
   }
 }

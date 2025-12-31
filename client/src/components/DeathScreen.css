@@ -1,0 +1,96 @@
+/* DeathScreen.css */
+.death-screen-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(4px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    z-index: 100;
+    font-family: Arial, sans-serif;
+}
+
+.death-title {
+    color: #FF4444;
+    font-size: 60px;
+    margin: 0 0 10px 0;
+    text-transform: uppercase;
+    letter-spacing: 5px;
+    text-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+}
+
+.death-info {
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: #ddd;
+}
+
+.killer-name {
+    color: #FFD700;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.final-score-box {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 15px 40px;
+    border-radius: 10px;
+    margin-bottom: 40px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.score-label {
+    font-size: 20px;
+    margin-right: 10px;
+}
+
+.score-value {
+    font-size: 32px;
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+.death-btn-group {
+    display: flex;
+    gap: 20px;
+}
+
+.death-btn {
+    padding: 15px 40px;
+    font-size: 18px;
+    font-weight: bold;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.death-btn:active {
+    transform: translateY(4px);
+}
+
+.respawn-btn {
+    background: linear-gradient(to bottom, #4CAF50, #388E3C);
+    box-shadow: 0 4px 0 #2E7D32;
+}
+
+.quit-btn {
+    background: linear-gradient(to bottom, #FF5252, #D32F2F);
+    box-shadow: 0 4px 0 #C62828;
+}
+
+.victory-mode {
+    background: rgba(20, 10, 0, 0.9) !important;
+}
+
+.victory-text {
+    color: #FFD700 !important;
+    text-shadow: 0 0 40px rgba(255, 215, 0, 0.6);
+}

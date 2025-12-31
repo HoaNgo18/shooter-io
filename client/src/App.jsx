@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Phaser from 'phaser';
 import { GameScene } from './game/scenes/GameScene';
 import { ArenaScene } from './game/scenes/ArenaScene';
@@ -7,32 +7,42 @@ import DeathScreen from './components/DeathScreen';
 import HomeScreen from './components/HomeScreen';
 import { socket } from './network/socket';
 import { PacketType } from '@shared/packetTypes';
+import './components/ArenaUI.css';
 
 function App() {
-  const [gameState, setGameState] = useState('home'); // home, playing, arena_waiting, arena_playing
+  const [gameState, setGameState] = useState('home');
   const [user, setUser] = useState(null);
   const [isDead, setIsDead] = useState(false);
   const [killerName, setKillerName] = useState('');
   const [finalScore, setFinalScore] = useState(0);
-  
+  const [arenaRank, setArenaRank] = useState(null);
+
   // Arena state
   const [arenaCountdown, setArenaCountdown] = useState(null);
   const [arenaPlayerCount, setArenaPlayerCount] = useState(0);
   const [arenaWinner, setArenaWinner] = useState(null);
   const [arenaWaitTime, setArenaWaitTime] = useState(60);
+  const arenaTimeoutRef = useRef(null);
+
+  // Safe timeout cleanup
+  const clearArenaTimeout = () => {
+    if (arenaTimeoutRef.current) {
+      clearTimeout(arenaTimeoutRef.current);
+      arenaTimeoutRef.current = null;
+    }
+  };
 
   const handleStartGame = async (selectedSkinId) => {
+    clearArenaTimeout();
     setIsDead(false);
     setKillerName('');
     setFinalScore(0);
 
     const skinToUse = selectedSkinId || user.equippedSkin || 'default';
 
-    // Reset arena state if coming from arena
     socket.isInArena = false;
     socket.arenaRoomId = null;
 
-    // Always create fresh connection for normal game
     if (socket.ws) {
       socket.ws.close();
       socket.ws = null;
@@ -51,19 +61,18 @@ function App() {
       return;
     }
 
-    // Wait for socket to stabilize
+    // Small delay to ensure connection
     await new Promise(resolve => setTimeout(resolve, 100));
     socket.send({
       type: PacketType.RESPAWN,
       skinId: skinToUse
     });
-    // Directly start game, assuming HomeScreen handles login
-    // Set game state to playing
     setGameState('playing');
   };
 
-  // Arena mode handlers
   const handleStartArena = async (selectedSkinId) => {
+    clearArenaTimeout();
+
     setIsDead(false);
     setKillerName('');
     setFinalScore(0);
@@ -75,19 +84,12 @@ function App() {
     const skinToUse = selectedSkinId || user.equippedSkin || 'default';
 
     try {
-      // Close existing connection but keep listeners
-      if (socket.ws) {
-        socket.ws.close();
-        socket.ws = null;
-        socket.isConnected = false;
-      }
-      
       await socket.connectArena({
         token: localStorage.getItem('game_token'),
         name: user.username,
         skinId: skinToUse
       });
-      
+
       setGameState('arena_waiting');
     } catch (err) {
       console.error('Arena connection error:', err);
@@ -97,7 +99,6 @@ function App() {
 
   const handleLeaveArena = () => {
     socket.leaveArena();
-    // Close websocket connection to force clean reconnect later
     if (socket.ws) {
       socket.ws.close();
       socket.ws = null;
@@ -120,18 +121,16 @@ function App() {
   };
 
   const handleQuitToMenu = () => {
+    clearArenaTimeout();
+
     setIsDead(false);
     setGameState('home');
     setArenaWinner(null);
     setArenaCountdown(null);
     if (socket.isInArena) {
       socket.leaveArena();
-      // Close websocket to force clean state
-      if (socket.ws) {
-        socket.ws.close();
-        socket.ws = null;
-        socket.isConnected = false;
-      }
+      // DO NOT close socket here - we need it for HomeScreen to work
+      // socket.ws.close() was causing skin equip to fail after Arena
     }
   };
 
@@ -141,15 +140,10 @@ function App() {
     socket.send({ type: PacketType.RESPAWN });
   };
 
-  // --- 1. GLOBAL LISTENER: Luôn lắng nghe cập nhật Coin/Stats/Skin ---
-  // (Chạy độc lập với việc đang chơi hay ở Home)
+  // GLOBAL LISTENER
   useEffect(() => {
     const handleGlobalMessage = (packet) => {
-      // Debug log
-      if (packet.type && packet.type.startsWith('arena')) {
-        console.log('[App] Received arena packet:', packet.type, packet);
-      }
-
+      // User data updates
       if (packet.type === 'USER_DATA_UPDATE') {
         setUser(prevUser => {
           if (!prevUser) return null;
@@ -161,15 +155,15 @@ function App() {
             totalDeaths: packet.totalDeaths !== undefined ? packet.totalDeaths : prevUser.totalDeaths,
             skins: packet.skins !== undefined ? packet.skins : prevUser.skins,
             equippedSkin: packet.equippedSkin !== undefined ? packet.equippedSkin : prevUser.equippedSkin,
-            arenaWins: packet.arenaWins !== undefined ? packet.arenaWins : prevUser.arenaWins
+            arenaWins: packet.arenaWins !== undefined ? packet.arenaWins : prevUser.arenaWins,
+            arenaTop2: packet.arenaTop2 !== undefined ? packet.arenaTop2 : prevUser.arenaTop2,
+            arenaTop3: packet.arenaTop3 !== undefined ? packet.arenaTop3 : prevUser.arenaTop3
           };
         });
       }
 
-      // Arena-specific packets
+      // Arena packets
       if (packet.type === PacketType.ARENA_STATUS) {
-        console.log('[Arena] Status update:', packet.playerCount, 'players, wait:', packet.waitTimeRemaining);
-        // Always update from server
         setArenaPlayerCount(packet.playerCount || 0);
         if (packet.waitTimeRemaining !== undefined) {
           setArenaWaitTime(Math.ceil(packet.waitTimeRemaining / 1000));
@@ -185,6 +179,32 @@ function App() {
         setArenaCountdown(null);
       }
 
+      // PLAYER DIED EVENT
+      if (packet.type === PacketType.PLAYER_DIED && packet.victimId === socket.myId) {
+        setIsDead(true);
+        setKillerName(packet.killerName);
+        setFinalScore(packet.score);
+        setArenaRank(packet.rank || '?');
+
+        // Handle Guest Data update
+        setUser(prevUser => {
+          if (prevUser && prevUser.isGuest) {
+            const savedGuest = localStorage.getItem('guest_data');
+            const oldData = savedGuest ? JSON.parse(savedGuest) : prevUser;
+            const updatedGuest = {
+              ...oldData,
+              coins: (oldData.coins || 0) + (packet.coins || 0),
+              highScore: Math.max(oldData.highScore || 0, packet.score),
+              totalKills: (oldData.totalKills || 0) + (packet.kills || 0),
+              totalDeaths: (oldData.totalDeaths || 0) + 1
+            };
+            localStorage.setItem('guest_data', JSON.stringify(updatedGuest));
+            return updatedGuest;
+          }
+          return prevUser;
+        });
+      }
+
       if (packet.type === PacketType.ARENA_VICTORY) {
         setArenaWinner({
           name: packet.winnerName,
@@ -194,32 +214,24 @@ function App() {
       }
 
       if (packet.type === PacketType.ARENA_END) {
-        // Arena ended, go back to home after delay
-        setTimeout(() => {
-          setGameState('home');
-          setArenaWinner(null);
-          socket.resetGameScene();
-        }, 5000);
+        clearArenaTimeout();
+        // Removed auto-redirect. User must manually exit.
       }
     };
 
-    // Đăng ký lắng nghe
     const unsubscribe = socket.subscribe(handleGlobalMessage);
-
-    // Hủy đăng ký khi component unmount (tắt app)
     return () => {
       unsubscribe();
       socket.resetGameScene();
+      clearArenaTimeout();
     };
-  }, []); // [] nghĩa là chỉ chạy 1 lần khi App bật lên
+  }, []);
 
-  // --- 2. GAME LOGIC LISTENER: Chỉ chạy khi gameState = playing hoặc arena_playing ---
+  // GAME INITIALIZATION
   useEffect(() => {
     let game = null;
 
     if (gameState === 'playing') {
-      console.log("🎮 Game Started - Init Phaser");
-
       const config = {
         type: Phaser.AUTO,
         width: window.innerWidth,
@@ -231,49 +243,13 @@ function App() {
       };
       game = new Phaser.Game(config);
 
-      // Lắng nghe sự kiện chết (Gameplay specific)
-      const handleGameMessage = (packet) => {
-        if (packet.type === PacketType.PLAYER_DIED && packet.victimId === socket.myId) {
-          console.log("💀 Player Died Packet Received");
-          setIsDead(true);
-          setKillerName(packet.killerName);
-          setFinalScore(packet.score);
-
-          // Xử lý riêng cho Guest (vì server không gửi USER_DATA_UPDATE cho guest)
-          setUser(prevUser => {
-            if (prevUser && prevUser.isGuest) {
-              const savedGuest = localStorage.getItem('guest_data');
-              const oldData = savedGuest ? JSON.parse(savedGuest) : prevUser;
-              const updatedGuest = {
-                ...oldData,
-                coins: (oldData.coins || 0) + (packet.coins || 0),
-                highScore: Math.max(oldData.highScore || 0, packet.score),
-                totalKills: (oldData.totalKills || 0) + (packet.kills || 0),
-                totalDeaths: (oldData.totalDeaths || 0) + 1
-              };
-              localStorage.setItem('guest_data', JSON.stringify(updatedGuest));
-              return updatedGuest;
-            }
-            return prevUser;
-          });
-        }
-      };
-
-      const unsubscribe = socket.subscribe(handleGameMessage);
-
       return () => {
-        console.log("🛑 Game Cleanup");
-        unsubscribe();
         if (game) game.destroy(true);
         socket.resetGameScene();
       };
     }
-    
-    // Arena game mode
+
     if (gameState === 'arena_playing') {
-      console.log("⚔️ Arena Started - Init Phaser");
-      
-      // Reset socket state before creating new game
       socket.resetGameScene();
 
       const config = {
@@ -287,21 +263,7 @@ function App() {
       };
       game = new Phaser.Game(config);
 
-      // Lắng nghe sự kiện chết trong Arena
-      const handleArenaMessage = (packet) => {
-        if (packet.type === PacketType.PLAYER_DIED && packet.victimId === socket.myId) {
-          console.log("💀 Arena Player Died");
-          setIsDead(true);
-          setKillerName(packet.killerName);
-          setFinalScore(packet.score);
-        }
-      };
-
-      const unsubscribe = socket.subscribe(handleArenaMessage);
-
       return () => {
-        console.log("🛑 Arena Cleanup");
-        unsubscribe();
         if (game) game.destroy(true);
         socket.resetGameScene();
       };
@@ -322,58 +284,40 @@ function App() {
 
       {/* Arena Waiting Room */}
       {gameState === 'arena_waiting' && (
-        <div style={{
-          width: '100vw', height: '100vh',
-          background: 'linear-gradient(135deg, #1a0a0a 0%, #2d1515 50%, #1a0a0a 100%)',
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontFamily: 'Arial, sans-serif'
-        }}>
-          <h1 style={{ fontSize: '48px', color: '#FF4444', marginBottom: '20px' }}>
-            ⚔️ ĐẤU TRƯỜNG
-          </h1>
-          
+        <div className="arena-waiting-container">
+
+
+          <h1 className="arena-title">ARENA</h1>
+
           {arenaCountdown !== null ? (
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: '24px', marginBottom: '20px' }}>Trận đấu bắt đầu trong...</p>
-              <div style={{
-                fontSize: '80px', fontWeight: 'bold',
-                color: '#FFD700',
-                textShadow: '0 0 30px rgba(255,215,0,0.5)'
-              }}>
+            <div className="arena-countdown-container">
+              <p className="arena-countdown-text">Match starts in...</p>
+              <div className="arena-countdown-number">
                 {arenaCountdown}
               </div>
             </div>
           ) : (
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: '24px', marginBottom: '10px' }}>Đang chờ người chơi...</p>
-              <div style={{
-                fontSize: '48px', fontWeight: 'bold',
-                color: '#FFD700', marginBottom: '20px'
-              }}>
+            <div className="arena-status-container">
+              <p className="arena-status-text">Waiting for players...</p>
+              <div className="arena-player-count">
                 {arenaPlayerCount} / 10
               </div>
-              <p style={{ fontSize: '18px', color: '#888' }}>
-                Phòng sẽ tự động bắt đầu sau {arenaWaitTime}s
+
+              {/* Simplified text form */}
+              <p className="arena-wait-time">
+                Auto-start in {arenaWaitTime}s
               </p>
-              <p style={{ fontSize: '14px', color: '#666', marginTop: '10px' }}>
-                (Bot sẽ được thêm nếu không đủ người)
+              <p className="arena-hint">
+                (Bots will join if not full)
               </p>
             </div>
           )}
-          
+
           <button
             onClick={handleLeaveArena}
-            style={{
-              marginTop: '40px', padding: '15px 40px',
-              fontSize: '18px', fontWeight: 'bold',
-              background: 'rgba(255,255,255,0.1)',
-              border: '2px solid #FF4444',
-              color: '#FF4444', borderRadius: '8px',
-              cursor: 'pointer'
-            }}
+            className="arena-cancel-btn"
           >
-            HỦY
+            CANCEL
           </button>
         </div>
       )}
@@ -381,85 +325,43 @@ function App() {
       {/* Arena Playing */}
       {gameState === 'arena_playing' && (
         <>
-          <div id="phaser-container" style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }} />
+          <div id="phaser-container" className="phaser-container" />
           {!isDead && !arenaWinner && <HUD isArena={true} />}
-          
-          {/* Arena Victory Screen */}
+
+
+          {/* Victory Screen */}
           {arenaWinner && (
-            <div style={{
-              position: 'absolute', top: 0, left: 0,
-              width: '100%', height: '100%',
-              background: 'rgba(0,0,0,0.8)',
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center',
-              zIndex: 1000, color: '#fff'
-            }}>
-              {arenaWinner.isMe ? (
-                <>
-                  <h1 style={{ fontSize: '64px', color: '#FFD700', marginBottom: '20px' }}>
-                    🏆 CHIẾN THẮNG! 🏆
-                  </h1>
-                  <p style={{ fontSize: '24px' }}>Bạn là người sống sót cuối cùng!</p>
-                  <p style={{ fontSize: '32px', color: '#FFD700', marginTop: '20px' }}>
-                    Điểm: {arenaWinner.score}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <h1 style={{ fontSize: '48px', color: '#FF4444', marginBottom: '20px' }}>
-                    TRẬN ĐẤU KẾT THÚC
-                  </h1>
-                  <p style={{ fontSize: '24px' }}>Người chiến thắng:</p>
-                  <p style={{ fontSize: '36px', color: '#FFD700', marginTop: '10px' }}>
-                    {arenaWinner.name}
-                  </p>
-                </>
-              )}
-              <p style={{ fontSize: '18px', color: '#888', marginTop: '30px' }}>
-                Đang quay về menu...
-              </p>
-            </div>
+            <DeathScreen
+              isVictory={true}
+              killerName={null}
+              score={arenaWinner.score}
+              rank={1}
+              onQuit={() => {
+                handleQuitToMenu();
+                socket.fullReset(); // Ensure full reset on quit
+              }}
+              onRespawn={null} // No respawn in Arena
+            />
           )}
-          
-          {/* Death screen trong arena - không có respawn */}
+
+          {/* Death screen - no respawn */}
           {isDead && !arenaWinner && (
-            <div style={{
-              position: 'absolute', top: 0, left: 0,
-              width: '100%', height: '100%',
-              background: 'rgba(0,0,0,0.7)',
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center',
-              zIndex: 1000, color: '#fff'
-            }}>
-              <h1 style={{ fontSize: '48px', color: '#FF4444' }}>BẠN ĐÃ BỊ LOẠI!</h1>
-              <p style={{ fontSize: '24px', marginTop: '20px' }}>
-                Bị tiêu diệt bởi: <span style={{ color: '#FFD700' }}>{killerName}</span>
-              </p>
-              <p style={{ fontSize: '20px', marginTop: '10px' }}>
-                Điểm của bạn: {finalScore}
-              </p>
-              <p style={{ fontSize: '16px', color: '#888', marginTop: '30px' }}>
-                Đang theo dõi trận đấu...
-              </p>
-              <button
-                onClick={handleQuitToMenu}
-                style={{
-                  marginTop: '20px', padding: '12px 30px',
-                  fontSize: '16px', background: '#333',
-                  border: 'none', color: '#fff',
-                  borderRadius: '8px', cursor: 'pointer'
-                }}
-              >
-                THOÁT VỀ MENU
-              </button>
-            </div>
+            <DeathScreen
+              isVictory={false}
+              killerName={killerName}
+              score={finalScore}
+              rank={arenaRank}
+              onQuit={handleQuitToMenu}
+              onRespawn={null}
+            />
           )}
         </>
       )}
 
+      {/* Normal Game */}
       {gameState === 'playing' && (
         <>
-          <div id="phaser-container" style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }} />
+          <div id="phaser-container" className="phaser-container" />
           {!isDead && <HUD />}
           {isDead && (
             <DeathScreen

@@ -20,7 +20,7 @@ export class CollisionDetector {
       // Trap Logic
       if (proj.isTrap && !proj.hit) {
         this.checkTrapTrigger(proj, projectiles, qt);
-        if (proj.hit) continue; 
+        if (proj.hit) continue;
       }
 
       // Skip cleanup or hit projectiles
@@ -69,41 +69,74 @@ export class CollisionDetector {
   // 3. EXPLOSIONS LOOP
   checkExplosions() {
     for (const explosion of this.game.explosions) {
-      if ((Date.now() - explosion.createdAt) > 50) continue;
+      // Xử lý damage trong 200ms đầu tiên
+      if ((Date.now() - explosion.createdAt) > 200) continue;
+      if (explosion.damageApplied) continue;
 
       this.game.players.forEach(player => {
-        if (player.dead || player.id === explosion.ownerId) return;
-        if (distance(player.x, player.y, explosion.x, explosion.y) < explosion.radius + player.radius) {
+        if (player.dead) return;
+        if (player.id === explosion.ownerId) return;
+
+        const playerRadius = player.radius || SHIP_RADIUS;
+        const dist = distance(player.x, player.y, explosion.x, explosion.y);
+        const checkRadius = explosion.radius + playerRadius;
+
+        if (dist < checkRadius) {
           this.resolver.applyExplosionDamage(player, explosion);
         }
       });
+
+      explosion.damageApplied = true;
     }
   }
 
   // --- SUB-LOGIC ---
 
   checkTrapTrigger(bomb, allProjectiles, qt) {
-    // Bomb vs Bullets
+    // Nếu bomb đã triggered và đã sẵn sàng nổ -> set hit = true
+    if (bomb.isTriggered && bomb.isReadyToExplode()) {
+      bomb.hit = true;
+      return;
+    }
+
+    // Nếu đã triggered nhưng chưa đủ 0.5s -> đợi tiếp
+    if (bomb.isTriggered) {
+      return;
+    }
+
+    // Bomb vs Bullets - bắn trúng bomb sẽ trigger ngay
     for (const bullet of allProjectiles) {
       if (bullet === bomb || bullet.isTrap) continue;
       if (circleCollision(bomb.x, bomb.y, bomb.radius, bullet.x, bullet.y, bullet.radius)) {
-        bomb.hit = true;
+        bomb.trigger();
         bullet.hit = true;
         bomb.ownerId = bullet.ownerId;
         bomb.ownerName = bullet.ownerName;
         return;
       }
     }
-    // Bomb vs Players
-    if (Date.now() > bomb.armingTime) {
-      const range = { x: bomb.x, y: bomb.y, width: BOMB_STATS.TRIGGER_RADIUS * 2, height: BOMB_STATS.TRIGGER_RADIUS * 2 };
-      const candidates = qt.query(range);
-      for (const point of candidates) {
-        const player = point.userData;
-        if (circleCollision(bomb.x, bomb.y, BOMB_STATS.TRIGGER_RADIUS, player.x, player.y, player.radius)) {
-          bomb.hit = true;
-          return;
-        }
+
+    // Bomb vs Players - chỉ check nếu đã armed
+    if (!bomb.armingTime || Date.now() <= bomb.armingTime) return;
+
+    const range = {
+      x: bomb.x - BOMB_STATS.TRIGGER_RADIUS,
+      y: bomb.y - BOMB_STATS.TRIGGER_RADIUS,
+      width: BOMB_STATS.TRIGGER_RADIUS * 2,
+      height: BOMB_STATS.TRIGGER_RADIUS * 2
+    };
+    const candidates = qt.query(range);
+
+    for (const point of candidates) {
+      const player = point.userData;
+      if (!player || player.dead) continue;
+      // Không trigger với người đặt bomb
+      if (player.id === bomb.ownerId) continue;
+
+      const playerRadius = player.radius || SHIP_RADIUS;
+      if (circleCollision(bomb.x, bomb.y, BOMB_STATS.TRIGGER_RADIUS, player.x, player.y, playerRadius)) {
+        bomb.trigger();
+        return;
       }
     }
   }
@@ -111,7 +144,7 @@ export class CollisionDetector {
   checkProjectileVsPlayers(proj, qt) {
     const range = { x: proj.x, y: proj.y, width: SHIP_RADIUS * 2, height: SHIP_RADIUS * 2 };
     const candidates = qt.query(range);
-    
+
     for (const point of candidates) {
       const player = point.userData;
       if (player.id === proj.ownerId) continue;

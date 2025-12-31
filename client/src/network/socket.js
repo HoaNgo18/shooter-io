@@ -11,7 +11,7 @@ class NetworkManager {
     this.isConnected = false;
     this.listeners = [];
     this.initData = null;
-    
+
     // Arena state
     this.isInArena = false;
     this.arenaRoomId = null;
@@ -19,11 +19,21 @@ class NetworkManager {
 
   connect(authOptions) {
     return new Promise((resolve, reject) => {
-      this.ws = new WebSocket('ws://localhost:3000');
+      // Close any existing connection first
+      if (this.ws) {
+        if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+          this.ws.close();
+        }
+        this.ws = null;
+        this.isConnected = false;
+      }
+
+      const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3000';
+      this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
         this.isConnected = true;
-        console.log('✅ Connected via WebSocket');
+        // Connected via WebSocket
 
         // Gửi gói tin JOIN kèm thông tin xác thực
         this.send({
@@ -36,6 +46,7 @@ class NetworkManager {
 
       this.ws.onerror = (err) => {
         console.error('WebSocket error', err);
+        this.isConnected = false;
         reject(err);
       };
 
@@ -45,7 +56,6 @@ class NetworkManager {
         this.isConnected = false;
         this.isInArena = false;
         this.arenaRoomId = null;
-        console.log('🔌 Disconnected');
       };
     });
   }
@@ -58,7 +68,7 @@ class NetworkManager {
 
         this.ws.onopen = () => {
           this.isConnected = true;
-          console.log('✅ Connected via WebSocket (Arena)');
+          // Connected via WebSocket (Arena)
 
           // Send arena join request
           this.send({
@@ -81,7 +91,6 @@ class NetworkManager {
           this.isConnected = false;
           this.isInArena = false;
           this.arenaRoomId = null;
-          console.log('🔌 Disconnected');
         };
       } else {
         // Already connected, just send arena join
@@ -102,7 +111,6 @@ class NetworkManager {
     this.gameScene = null;
     this.initData = null;
     this.myId = null;
-    console.log('[Socket] Left arena, state reset');
   }
 
   // Ngắt kết nối
@@ -115,14 +123,14 @@ class NetworkManager {
       this.isInArena = false;
       this.arenaRoomId = null;
       // DON'T clear listeners here - they're still needed for reconnection
-      console.log('Manually disconnected');
     }
   }
 
-  // Full reset including listeners (used for logout)
+  // Full reset (used for logout) - DON'T clear listeners as they're set up once in App.jsx
   fullReset() {
     this.disconnect();
-    this.listeners = [];
+    // DON'T clear listeners - App.jsx sets them up once on mount
+    // this.listeners = [];  // REMOVED - caused skin equip to fail after logout+login
     this.initData = null;
     this.gameScene = null;
   }
@@ -130,9 +138,7 @@ class NetworkManager {
   setGameScene(scene) {
     if (!scene) return;
     this.gameScene = scene;
-    console.log('[Socket] GameScene set, initData:', this.initData ? 'available' : 'null');
     if (this.initData) {
-      console.log('[Socket] Applying buffered INIT data with', this.initData.foods?.length, 'foods,', this.initData.obstacles?.length, 'obstacles');
       this.gameScene.initGame(this.initData);
       // Don't clear initData - keep it for potential reconnect
     }
@@ -161,10 +167,9 @@ class NetworkManager {
       const packet = JSON.parse(event.data);
 
       // 1. Xử lý Logic Global (Luôn chạy dù có GameScene hay không)
-      
+
       // Init ID (for both normal and arena)
       if (packet.type === PacketType.INIT) {
-        console.log('Received INIT packet. My ID:', packet.id);
         this.myId = packet.id;
         this.initData = packet;
         if (packet.isArena) {

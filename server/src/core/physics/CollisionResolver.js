@@ -27,7 +27,6 @@ export class CollisionResolver {
       if (idx !== -1) this.game.world.chests.splice(idx, 1);
 
       if (chest.type === CHEST_TYPES.STATION) {
-        console.log("Station Destroyed!");
         setTimeout(() => this.game.world.spawnStationIfNeeded(), 60000);
       }
     }
@@ -102,17 +101,27 @@ export class CollisionResolver {
 
   applyExplosionDamage(player, explosion) {
     player.takeDamage(explosion.damage, explosion.ownerId);
+
+    // Check death after damage
+    if (player.isDead()) {
+      this.handlePlayerDeath(player, explosion.ownerId, explosion.ownerName);
+    }
   }
 
   // --- DEATH LOGIC ---
 
   handlePlayerDeath(player, killerId, killerName) {
-    this.game.world.spawnItem(player.x, player.y, 'ENEMY');
+    // GUARD: Chỉ xử lý 1 lần - nếu đã dead thì skip
+    if (player.dead) return;
 
+    // Mark as dead FIRST to prevent duplicate calls
     player.dead = true;
     player.lives = 0;
     player.deathTime = Date.now();
     player.inventory = [null, null, null, null, null];
+
+    // Spawn drops
+    this.game.world.spawnItem(player.x, player.y, 'ENEMY');
 
     const killer = this.game.players.get(killerId);
     if (killer) {
@@ -121,12 +130,8 @@ export class CollisionResolver {
       killer.sessionKills = (killer.sessionKills || 0) + 1;
 
       if (!killer.isBot) {
-        // Logic tìm Top 1 để thưởng coin
-        const sortedPlayers = Array.from(this.game.players.values()).sort((a, b) => b.score - a.score);
-        const kingId = sortedPlayers.length > 0 ? sortedPlayers[0].id : null;
-        const isKing = (player.id === kingId);
-
-        killer.coins += isKing ? 5 : 1;
+        // Chỉ cộng điểm và save stats, không tự cộng coin
+        // Coin sẽ rơi ra từ enemy drops
         this.game.saveKillerStats(killer);
       }
     }
@@ -140,12 +145,20 @@ export class CollisionResolver {
       killerName: killerName || 'Unknown',
       score: player.score,
       coins: player.coins,
-      kills: player.sessionKills
+      kills: player.sessionKills,
+      rank: (this.game.getTotalAliveCount && typeof this.game.getTotalAliveCount === 'function')
+        ? this.game.getTotalAliveCount() + 1
+        : undefined
     };
 
     if (this.game.broadcast) {
       // This is an ArenaRoom
       this.game.broadcast(broadcastData);
+
+      // Save arena ranking for PvP deaths (if not a bot and has userId)
+      if (!player.isBot && player.userId && broadcastData.rank) {
+        this.game.savePlayerRanking(player, broadcastData.rank);
+      }
     } else if (this.game.server) {
       // This is the main Game
       this.game.server.broadcast(broadcastData);
@@ -162,7 +175,6 @@ export class CollisionResolver {
               type: PacketType.PLAYER_LEAVE,
               id: player.id
             });
-            console.log(`[Arena] Bot ${player.name} removed`);
           }
         } else if (this.game.bots) {
           // Normal game

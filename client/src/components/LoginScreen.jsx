@@ -1,6 +1,6 @@
-// client/src/components/LoginScreen.jsx
 import React, { useState, useEffect } from 'react';
 import { socket } from '../network/socket';
+import './LoginScreen.css';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const API_URL = `${BASE_URL}/api/auth`;
@@ -14,7 +14,6 @@ const LoginScreen = ({ onLoginSuccess }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
-
   const [displayName, setDisplayName] = useState('');
 
   // Tự động điền token nếu đã lưu trước đó
@@ -22,19 +21,17 @@ const LoginScreen = ({ onLoginSuccess }) => {
     const savedToken = localStorage.getItem('game_token');
     const savedName = localStorage.getItem('game_username');
     if (savedToken && savedName) {
-      setTab('login'); // Chuyển sang tab login để người dùng biết mình đang có acc
-      // Bạn có thể thêm logic tự động login ở đây nếu muốn
+      setTab('login');
     }
   }, []);
 
-  // Ngăn chặn sự kiện bắn lan khi nhấn Enter trong form
   const stopPropagation = (e) => {
     e.stopPropagation();
   };
 
   const handleGuestPlay = async () => {
     if (!username) {
-      setError('Vui lòng nhập tên!');
+      setError('Please enter a name!');
       return;
     }
     setConnecting(true);
@@ -43,20 +40,17 @@ const LoginScreen = ({ onLoginSuccess }) => {
       const savedGuest = localStorage.getItem('guest_data');
       let guestData;
       if (savedGuest) {
-        // Nếu có, lấy coin và highscore cũ, nhưng update tên mới (nếu người chơi đổi tên)
         const parsed = JSON.parse(savedGuest);
         guestData = {
           ...parsed,
           username: username,
           isGuest: true,
-          // Đảm bảo load đủ các trường này (nếu thiếu thì gán = 0)
           totalKills: parsed.totalKills || 0,
           totalDeaths: parsed.totalDeaths || 0,
           coins: parsed.coins || 0,
           highScore: parsed.highScore || 0
         };
       } else {
-        // Nếu chưa có, tạo mới
         guestData = {
           username: username,
           coins: 0,
@@ -66,18 +60,17 @@ const LoginScreen = ({ onLoginSuccess }) => {
       }
       onLoginSuccess({ username: username, coins: 0, highScore: 0, isGuest: true });
     } catch (err) {
-      setError('Không thể kết nối Server Game!');
+      setError('Cannot connect to Game Server!');
       setConnecting(false);
     }
   };
 
   const handleLogin = async () => {
-    if (!username || !password) return setError('Thiếu thông tin đăng nhập');
+    if (!username || !password) return setError('Missing login info');
     setError('');
     setConnecting(true);
 
     try {
-      // 1. Gọi API Login
       const res = await fetch(`${API_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -86,13 +79,11 @@ const LoginScreen = ({ onLoginSuccess }) => {
 
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || 'Đăng nhập thất bại');
+      if (!res.ok) throw new Error(data.error || 'Login failed');
 
-      // 2. Lưu token
       localStorage.setItem('game_token', data.token);
       localStorage.setItem('game_username', data.user.username);
 
-      // 3. Kết nối Socket
       await socket.connect({
         token: data.token,
         name: displayName || data.user.username
@@ -115,12 +106,11 @@ const LoginScreen = ({ onLoginSuccess }) => {
   };
 
   const handleRegister = async () => {
-    if (!username || !password || !email) return setError('Điền đầy đủ thông tin!');
+    if (!username || !password || !email) return setError('Please fill all fields!');
     setError('');
     setConnecting(true);
 
     try {
-      // 1. Gọi API Register
       const res = await fetch(`${API_URL}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,12 +118,10 @@ const LoginScreen = ({ onLoginSuccess }) => {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Đăng ký thất bại');
+      if (!res.ok) throw new Error(data.error || 'Registration failed');
 
-      // 2. Lưu token & Login luôn
       localStorage.setItem('game_token', data.token);
 
-      // 3. Kết nối Socket
       await socket.connect({
         token: data.token,
         name: displayName || username
@@ -146,34 +134,27 @@ const LoginScreen = ({ onLoginSuccess }) => {
     }
   };
 
-  // Styles đơn giản
-  const inputStyle = { padding: '10px', fontSize: '16px', marginBottom: '10px', width: '100%', boxSizing: 'border-box' };
-  const btnStyle = { padding: '10px', width: '100%', cursor: 'pointer', fontWeight: 'bold', border: 'none', borderRadius: '5px', marginTop: '10px' };
-  const tabStyle = (isActive) => ({
-    padding: '10px 20px', cursor: 'pointer', borderBottom: isActive ? '3px solid #4CAF50' : '3px solid transparent', color: isActive ? '#4CAF50' : '#888', fontWeight: 'bold'
-  });
-
   return (
-    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'rgba(0,0,0,0.85)', zIndex: 10 }}>
-      <div style={{ background: '#fff', padding: '30px', borderRadius: '10px', width: '350px', textAlign: 'center' }}>
-        <h1 style={{ color: '#333', marginTop: 0 }}>MY IO GAME</h1>
+    <div className="login-screen-overlay">
+      <div className="login-card">
+        <h1 className="login-title">MY IO GAME</h1>
 
         {/* TABS */}
-        <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: '20px', borderBottom: '1px solid #eee' }}>
-          <div onClick={() => setTab('guest')} style={tabStyle(tab === 'guest')}>GUEST</div>
-          <div onClick={() => setTab('login')} style={tabStyle(tab === 'login')}>LOGIN</div>
-          <div onClick={() => setTab('register')} style={tabStyle(tab === 'register')}>SIGN UP</div>
+        <div className="login-tabs">
+          <div onClick={() => setTab('guest')} className={`login-tab-btn ${tab === 'guest' ? 'active' : ''}`}>GUEST</div>
+          <div onClick={() => setTab('login')} className={`login-tab-btn ${tab === 'login' ? 'active' : ''}`}>LOGIN</div>
+          <div onClick={() => setTab('register')} className={`login-tab-btn ${tab === 'register' ? 'active' : ''}`}>SIGN UP</div>
         </div>
 
         {/* ERROR MSG */}
-        {error && <div style={{ color: 'red', marginBottom: '10px', fontSize: '14px' }}>{error}</div>}
+        {error && <div className="login-error">{error}</div>}
 
         {/* GUEST FORM */}
         {tab === 'guest' && (
           <div>
-            <input type="text" placeholder="Tên nhân vật..." style={inputStyle} value={username} onChange={e => setUsername(e.target.value)} onKeyDown={stopPropagation} />
-            <button onClick={handleGuestPlay} disabled={connecting} style={{ ...btnStyle, background: '#FF9800', color: 'white' }}>
-              {connecting ? 'ĐANG VÀO...' : 'CHƠI NGAY'}
+            <input type="text" placeholder="Enter name..." className="form-input" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={stopPropagation} />
+            <button onClick={handleGuestPlay} disabled={connecting} className="submit-btn guest-btn">
+              {connecting ? 'JOINING...' : 'PLAY AS GUEST'}
             </button>
           </div>
         )}
@@ -181,21 +162,21 @@ const LoginScreen = ({ onLoginSuccess }) => {
         {/* LOGIN FORM */}
         {tab === 'login' && (
           <div>
-            <input type="text" placeholder="Tên đăng nhập" style={inputStyle} value={username} onChange={e => setUsername(e.target.value)} onKeyDown={stopPropagation} />
-            <input type="password" placeholder="Mật khẩu" style={inputStyle} value={password} onChange={e => setPassword(e.target.value)} onKeyDown={stopPropagation} />
-            <div style={{ margin: '15px 0', borderTop: '1px dashed #ccc', paddingTop: '10px' }}>
-              <label style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '5px', textAlign: 'left' }}>Tên hiển thị trong game (Tùy chọn):</label>
+            <input type="text" placeholder="Username" className="form-input" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={stopPropagation} />
+            <input type="password" placeholder="Password" className="form-input" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={stopPropagation} />
+            <div className="optional-field">
+              <label className="optional-label">Display Name (Optional):</label>
               <input
                 type="text"
-                placeholder={username || "Tên nhân vật..."} // Placeholder gợi ý theo username
-                style={inputStyle}
+                placeholder={username || "Display Name..."}
+                className="form-input"
                 value={displayName}
                 onChange={e => setDisplayName(e.target.value)}
                 onKeyDown={stopPropagation}
               />
             </div>
-            <button onClick={handleLogin} disabled={connecting} style={{ ...btnStyle, background: '#4CAF50', color: 'white' }}>
-              {connecting ? 'ĐANG KẾT NỐI...' : 'ĐĂNG NHẬP & CHƠI'}
+            <button onClick={handleLogin} disabled={connecting} className="submit-btn login-btn">
+              {connecting ? 'CONNECTING...' : 'LOGIN & PLAY'}
             </button>
           </div>
         )}
@@ -203,22 +184,22 @@ const LoginScreen = ({ onLoginSuccess }) => {
         {/* REGISTER FORM */}
         {tab === 'register' && (
           <div>
-            <input type="text" placeholder="Tên đăng nhập" style={inputStyle} value={username} onChange={e => setUsername(e.target.value)} onKeyDown={stopPropagation} />
-            <input type="email" placeholder="Email" style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} />
-            <input type="password" placeholder="Mật khẩu" style={inputStyle} value={password} onChange={e => setPassword(e.target.value)} onKeyDown={stopPropagation} />
-            <div style={{ margin: '15px 0', borderTop: '1px dashed #ccc', paddingTop: '10px' }}>
-              <label style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '5px', textAlign: 'left' }}>Tên trong game (Tùy chọn):</label>
+            <input type="text" placeholder="Username" className="form-input" value={username} onChange={e => setUsername(e.target.value)} onKeyDown={stopPropagation} />
+            <input type="email" placeholder="Email" className="form-input" value={email} onChange={e => setEmail(e.target.value)} />
+            <input type="password" placeholder="Password" className="form-input" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={stopPropagation} />
+            <div className="optional-field">
+              <label className="optional-label">Display Name (Optional):</label>
               <input
                 type="text"
-                placeholder={username || "Tên nhân vật..."}
-                style={inputStyle}
+                placeholder={username || "Display Name..."}
+                className="form-input"
                 value={displayName}
                 onChange={e => setDisplayName(e.target.value)}
                 onKeyDown={stopPropagation}
               />
             </div>
-            <button onClick={handleRegister} disabled={connecting} style={{ ...btnStyle, background: '#2196F3', color: 'white' }}>
-              {connecting ? 'ĐANG ĐĂNG KÝ...' : 'ĐĂNG KÝ & CHƠI'}
+            <button onClick={handleRegister} disabled={connecting} className="submit-btn register-btn">
+              {connecting ? 'REGISTERING...' : 'REGISTER & PLAY'}
             </button>
           </div>
         )}

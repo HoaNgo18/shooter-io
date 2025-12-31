@@ -9,7 +9,7 @@ const router = express.Router();
 // Register
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password, displayName } = req.body;
 
     // Validation
     if (!username || !email || !password) {
@@ -26,9 +26,13 @@ router.post('/register', async (req, res) => {
     }
 
     // Create user
-    const user = await User.findOne({
-      username: { $eq: username } // Explicit operator
+    const user = new User({
+      username,
+      email,
+      password,
+      displayName: displayName || username // Default to username if empty
     });
+
     await user.save();
 
     // Generate token
@@ -41,6 +45,7 @@ router.post('/register', async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
+        displayName: user.displayName, // Return displayName
         email: user.email,
         highScore: user.highScore,
         // --- Cập nhật thêm ---
@@ -57,7 +62,7 @@ router.post('/register', async (req, res) => {
 // Login
 router.post('/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, displayName } = req.body;
 
     // Find user
     const user = await User.findOne({ username });
@@ -71,6 +76,12 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Update displayName if provided
+    if (displayName && displayName !== user.displayName) {
+      user.displayName = displayName;
+      await user.save();
+    }
+
     // Generate token
     const token = jwt.sign({ id: user._id }, config.JWT_SECRET, {
       expiresIn: '7d'
@@ -81,13 +92,17 @@ router.post('/login', async (req, res) => {
       user: {
         id: user._id,
         username: user.username,
+        displayName: user.displayName || user.username, // Ensure fallback
         email: user.email,
         highScore: user.highScore || 0,
         coins: user.coins || 0,
         totalKills: user.totalKills || 0,
         totalDeaths: user.totalDeaths || 0,
         skins: user.skins,
-        equippedSkin: user.equippedSkin || 'default'
+        equippedSkin: user.equippedSkin || 'default',
+        arenaWins: user.arenaWins || 0,
+        arenaTop2: user.arenaTop2 || 0,
+        arenaTop3: user.arenaTop3 || 0
       }
     });
   } catch (error) {

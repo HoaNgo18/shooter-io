@@ -18,7 +18,6 @@ export class Player extends Entity {
 
     this.id = id;
     this.name = name;
-    // SỬA: Dùng constant thay vì số 3
     this.lives = 3;
     this.maxLives = SHIP_MAX_LIVES;
     this.score = 0;
@@ -117,7 +116,6 @@ export class Player extends Entity {
 
     // SPEED LIMIT
     let maxSpeedActual = this.maxSpeed;
-    // Sử dụng this.speedMultiplier được set từ Item Config
     if (Date.now() < this.speedBuffEndTime) {
       maxSpeedActual *= this.speedMultiplier;
     }
@@ -168,15 +166,11 @@ export class Player extends Entity {
 
     if (this.weapon === 'BLUE') {
       // === BLUE: BẮN SONG SONG (PARALLEL) ===
-      // Level 1: [0]
-      // Level 2: [-10, 10]
-      // Level 3: [-15, 0, 15]
       let offsets = [0];
       if (this.weaponLevel === 2) offsets = [-10, 10];
       if (this.weaponLevel === 3) offsets = [-15, 0, 15];
 
       offsets.forEach(offset => {
-        // Tọa độ xuất phát cơ bản (tại nòng súng)
         let spawnX = this.x + Math.cos(baseAngle) * spawnDistance;
         let spawnY = this.y + Math.sin(baseAngle) * spawnDistance;
 
@@ -187,9 +181,8 @@ export class Player extends Entity {
         }
 
         // 2. Dịch chuyển DỌC (Forward Offset - Để viên giữa cao hơn)
-        // Chỉ áp dụng khi Level 3 và là viên ở giữa (offset === 0)
         if (this.weaponLevel === 3 && offset === 0) {
-          const forwardBoost = 15; // Đẩy lên trước 15 pixel
+          const forwardBoost = 15;
           spawnX += Math.cos(baseAngle) * forwardBoost;
           spawnY += Math.sin(baseAngle) * forwardBoost;
         }
@@ -203,24 +196,18 @@ export class Player extends Entity {
 
     } else if (this.weapon === 'GREEN') {
       // === GREEN: BẮN HÌNH NÓN (CONE SPREAD) ===
-      // Level 1: [0]
-      // Level 2: [-5 độ, +5 độ]
-      // Level 3: [-8 độ, 0, +8 độ]
-      // Lưu ý: Đơn vị là Radian (0.08 rad ~ 4.5 độ) -> Spread nhỏ
       let angleOffsets = [0];
       if (this.weaponLevel === 2) angleOffsets = [-0.08, 0.08];
       if (this.weaponLevel === 3) angleOffsets = [-0.12, 0, 0.12];
 
       angleOffsets.forEach(angleOffset => {
-        // Vị trí xuất phát giống nhau (từ nòng súng)
         const spawnX = this.x + Math.cos(baseAngle) * spawnDistance;
         const spawnY = this.y + Math.sin(baseAngle) * spawnDistance;
 
-        // Góc bắn thay đổi (Hình nón)
         const spreadAngle = baseAngle + angleOffset;
 
         projectiles.push(new Projectile(
-          spawnX, spawnY, spreadAngle, // Góc thay đổi
+          spawnX, spawnY, spreadAngle,
           projectileSpeed, stats.damage, this.id, this.name,
           this.weapon, stats.range, 8
         ));
@@ -228,8 +215,6 @@ export class Player extends Entity {
 
     } else {
       // === RED (VÀ MẶC ĐỊNH): BẮN 1 VIÊN THẲNG ===
-      // Red tăng cấp chỉ tăng số lượng đạn dự trữ (Max Ammo), 
-      // không thay đổi cách bắn.
       const spawnX = this.x + Math.cos(baseAngle) * spawnDistance;
       const spawnY = this.y + Math.sin(baseAngle) * spawnDistance;
 
@@ -244,44 +229,33 @@ export class Player extends Entity {
   }
 
   performDash() {
-    // 1. Kiểm tra Cooldown
     if (Date.now() < this.dashCooldownTime) return;
 
-    // 2. Tính góc Dash (Bot hướng xuống, Player hướng lên)
     const dashAngle = this.spritePointsDown ? this.angle : (this.angle - Math.PI / 2);
 
-    // 3. --- LOGIC DỊCH CHUYỂN TỨC THỜI (BLINK) ---
-    const BLINK_DISTANCE = DASH_BOOST; // Khoảng cách dịch chuyển (pixel)
+    const BLINK_DISTANCE = DASH_BOOST;
 
-    // Tính tọa độ đích đến
     let targetX = this.x + Math.cos(dashAngle) * BLINK_DISTANCE;
     let targetY = this.y + Math.sin(dashAngle) * BLINK_DISTANCE;
 
-    // 4. Giới hạn trong bản đồ
     const maxBound = (MAP_SIZE / 2) - 50;
 
     this.x = Math.max(-maxBound, Math.min(maxBound, targetX));
     this.y = Math.max(-maxBound, Math.min(maxBound, targetY));
 
-    // 5. (Tùy chọn) Hãm phanh sau khi dịch chuyển
     this.vx *= 0.5;
     this.vy *= 0.5;
 
-    // 6. Set thời gian hồi chiêu
     this.dashEndTime = Date.now() + DASH_DURATION;
     this.dashCooldownTime = Date.now() + DASH_COOLDOWN;
-
-    console.log(`Player ${this.name} blinked to ${Math.round(this.x)}, ${Math.round(this.y)}`);
   }
 
   checkLevelUp() {
     const scaleFactor = 1 + (this.score / 1000);
-    // SỬA: Thay PLAYER_RADIUS bằng SHIP_RADIUS
     this.radius = SHIP_RADIUS * scaleFactor;
     if (this.radius > SHIP_RADIUS * 1.5) this.radius = SHIP_RADIUS * 1.5;
   }
 
-  // Cập nhật phương thức applyItem() 
   applyItem(type) {
     const config = ITEM_CONFIG[type];
     if (!config) return;
@@ -289,22 +263,18 @@ export class Player extends Entity {
     const effect = config.effect;
 
     // NHÓM 1: Dùng ngay lập tức (Máu, Xu, Súng, Đạn)
-    // Lưu ý: Đảm bảo kiểm tra đúng string type trong ITEM_CONFIG
     if (['heal', 'coin', 'weapon', 'ammo_refill'].includes(effect.type)) {
 
       switch (effect.type) {
         case 'heal':
           this.lives = Math.min(this.lives + effect.value, this.maxLives);
-          console.log(`${this.name} healed +${effect.value}`);
           break;
 
         case 'coin':
           this.coins += effect.value;
-          console.log(`${this.name} got ${effect.value} coins`);
-          break; // <-- Coin xử lý xong ở đây
+          break;
 
         case 'weapon':
-          // Logic đổi súng (giữ nguyên code cũ của bạn)
           if (this.weapon === effect.weaponType) {
             this.weaponLevel = Math.min(this.weaponLevel + 1, 3);
           } else {
@@ -316,7 +286,6 @@ export class Player extends Entity {
           break;
       }
 
-      // QUAN TRỌNG: Phải return ngay để không chạy xuống dòng addToInventory bên dưới
       return;
     }
 
@@ -338,12 +307,10 @@ export class Player extends Entity {
     const stats = WEAPON_STATS[this.weapon];
     if (!stats) return 0;
 
-    // Nếu là Đạn Đỏ: Level 1 = Gốc, Level 2 = +1 viên, Level 3 = +2 viên
     if (this.weapon === 'RED') {
       return stats.maxAmmo + (this.weaponLevel - 1);
     }
 
-    // Các súng khác giữ nguyên maxAmmo mặc định
     return stats.maxAmmo;
   }
 
@@ -351,17 +318,14 @@ export class Player extends Entity {
     const stats = WEAPON_STATS[this.weapon];
     if (!stats) return;
 
-    // SỬA: Dùng this.getMaxAmmo() thay vì stats.maxAmmo cố định
     const currentMax = this.getMaxAmmo();
 
-    // TRƯỜNG HỢP 1: Đạn đã đầy
     if (this.currentAmmo >= currentMax) {
       this.currentAmmo = currentMax;
       this.lastAmmoRegen = Date.now();
       return;
     }
 
-    // TRƯỜNG HỢP 2: Đang thiếu đạn -> Tính toán hồi
     const now = Date.now();
     if (now - this.lastAmmoRegen >= stats.regenTime) {
       this.currentAmmo++;
@@ -370,7 +334,6 @@ export class Player extends Entity {
       if (this.lastAmmoRegen < now - stats.regenTime) {
         this.lastAmmoRegen = now;
       }
-      // console.log(`${this.name} recovered 1 ammo.`);
     }
   }
 
@@ -396,7 +359,7 @@ export class Player extends Entity {
 
     this.weapon = 'BLUE';
     this.weaponLevel = 1;
-    this.currentAmmo = WEAPON_STATS.BLUE.maxAmmo; // Đạn hiện tại
+    this.currentAmmo = WEAPON_STATS.BLUE.maxAmmo;
     this.lastAmmoRegen = Date.now();
 
     this.inventory = [null, null, null, null, null];
@@ -409,19 +372,15 @@ export class Player extends Entity {
     this.y = Math.max(-max, Math.min(max, this.y));
   }
 
-  // Thêm method mới này vào class Player
-  activateCurrentItem(game) { // Cần tham số 'game' để spawn bomb nếu cần
+  activateCurrentItem(game) {
     if (this.dead) return;
 
     const itemType = this.inventory[this.selectedSlot];
-    if (!itemType) return; // Ô này rỗng
+    if (!itemType) return;
 
     const config = ITEM_CONFIG[itemType];
     const effect = config.effect;
 
-    console.log(`${this.name} used ${itemType}`);
-
-    // Xử lý hiệu ứng
     switch (effect.type) {
       case 'shield':
         this.shieldEndTime = Date.now() + effect.duration;
@@ -434,22 +393,20 @@ export class Player extends Entity {
 
       case 'invisible':
         this.invisibleEndTime = Date.now() + effect.duration;
-        // Logic: Khi tàng hình, bot sẽ không nhìn thấy (sẽ update ở Bot.js sau)
         break;
 
       case 'plant_bomb':
         const bomb = new Projectile(
-          this.x, this.y, 0, 0, // speed = 0
+          this.x, this.y, 0, 0,
           effect.damage,
           this.id, this.name,
           'BOMB',
           0,
           25
         );
-        // SỬA: Thời gian tồn tại đúng 1.5 giây
-        bomb.maxLifetime = BOMB_STATS.LIFETIME; // Tồn tại 60s
-        bomb.isTrap = true; // Đánh dấu là Bẫy
-        bomb.isMine = true; // Để client vẽ kiểu khác (nếu cần)
+        bomb.maxLifetime = BOMB_STATS.LIFETIME;
+        bomb.isTrap = true;
+        bomb.isMine = true;
         bomb.armingTime = Date.now() + BOMB_STATS.ARMING_TIME;
 
         if (game && game.projectiles) {
@@ -458,21 +415,14 @@ export class Player extends Entity {
         break;
     }
 
-    // Dùng xong thì xóa khỏi túi
     this.inventory[this.selectedSlot] = null;
   }
 
-  // Hàm phụ trợ: Tìm ô trống đầu tiên để nhét đồ vào
   addToInventory(itemType) {
-    // 1. Tìm ô trống đầu tiên
     const emptyIndex = this.inventory.findIndex(slot => slot === null);
 
     if (emptyIndex !== -1) {
       this.inventory[emptyIndex] = itemType;
-      console.log(`${this.name} picked up ${itemType} into slot ${emptyIndex}`);
-    } else {
-      console.log(`${this.name} inventory full!`);
-      // (Tùy chọn: Có thể thay thế ô đang chọn hoặc không làm gì)
     }
   }
 
@@ -489,11 +439,11 @@ export class Player extends Entity {
       isSpeedUp: Date.now() < this.speedBuffEndTime,
       isMoving: this.isMoving, isBoosting: this.isBoosting,
       skinId: this.skinId, hi: this.isHidden,
-      weapon: this.weapon, currentAmmo: this.currentAmmo,   // <--- Gửi thêm cái này
-      maxAmmo: this.getMaxAmmo(), // Gửi max để client vẽ thanh đạn
-      isInvisible: Date.now() < this.invisibleEndTime, // Báo cho client biết đang tàng hình để vẽ mờ đi
-      inventory: this.inventory,      // Gửi mảng túi đồ
-      selectedSlot: this.selectedSlot // Gửi ô đang chọn
+      weapon: this.weapon, currentAmmo: this.currentAmmo,
+      maxAmmo: this.getMaxAmmo(),
+      isInvisible: Date.now() < this.invisibleEndTime,
+      inventory: this.inventory,
+      selectedSlot: this.selectedSlot
     };
   }
 }

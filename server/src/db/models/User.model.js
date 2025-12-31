@@ -16,6 +16,11 @@ const userSchema = new mongoose.Schema({
     unique: true, // Mongoose tự động tạo index unique
     lowercase: true
   },
+  displayName: {
+    type: String,
+    trim: true,
+    maxlength: 20
+  },
   password: {
     type: String,
     required: true,
@@ -46,6 +51,14 @@ const userSchema = new mongoose.Schema({
     default: 'default'
   },
   arenaWins: {
+    type: Number,
+    default: 0
+  },
+  arenaTop2: {
+    type: Number,
+    default: 0
+  },
+  arenaTop3: {
     type: Number,
     default: 0
   },
