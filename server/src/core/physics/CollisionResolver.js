@@ -159,6 +159,11 @@ export class CollisionResolver {
       if (!player.isBot && player.userId && broadcastData.rank) {
         this.game.savePlayerRanking(player, broadcastData.rank);
       }
+
+      // Notify spectators that their target died
+      if (this.game.notifySpectatorsOfTargetDeath) {
+        this.game.notifySpectatorsOfTargetDeath(player.id, killerId, killerName);
+      }
     } else if (this.game.server) {
       // This is the main Game
       this.game.server.broadcast(broadcastData);

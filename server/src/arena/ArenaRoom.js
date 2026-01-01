@@ -38,6 +38,9 @@ export class ArenaRoom {
     this.world = new WorldManager();
     this.physics = new Physics(this);
 
+    // Spectator tracking: clientId -> targetId
+    this.spectators = new Map();
+
     // Intervals & Timers
     this.tickInterval = null;
     this.broadcastInterval = null;
@@ -443,6 +446,88 @@ export class ArenaRoom {
 
   handleDash(clientId) {
     ArenaInputHandler.handleDash(this, clientId);
+  }
+
+  // SPECTATE HANDLERS
+
+  /**
+   * Handle spectate start request
+   * @param {string} clientId - The spectator's client ID
+   * @param {string} targetId - The target player to spectate
+   */
+  handleSpectateStart(clientId, targetId) {
+    const client = this.server.clients.get(clientId);
+    if (!client) return;
+
+    const player = this.playerManager.getPlayer(clientId);
+    // Only dead players can spectate
+    if (!player || !player.dead) return;
+
+    const target = this.playerManager.getPlayer(targetId);
+    // Target must exist and be alive
+    if (!target || target.dead) {
+      this.sendToClient(clientId, {
+        type: PacketType.SPECTATE_TARGET_DIED,
+        message: 'Target is no longer available'
+      });
+      return;
+    }
+
+    // Register spectator
+    this.spectators.set(clientId, targetId);
+
+    // Send confirmation with target info
+    this.sendToClient(clientId, {
+      type: PacketType.SPECTATE_UPDATE,
+      targetId: targetId,
+      targetName: target.name,
+      isSpectating: true
+    });
+  }
+
+  /**
+   * Handle spectate stop request
+   * @param {string} clientId - The spectator's client ID
+   */
+  handleSpectateStop(clientId) {
+    this.spectators.delete(clientId);
+
+    this.sendToClient(clientId, {
+      type: PacketType.SPECTATE_UPDATE,
+      targetId: null,
+      isSpectating: false
+    });
+  }
+
+  /**
+   * Notify spectators when their target dies
+   * @param {string} targetId - The player who died
+   * @param {string} killerId - The player who killed them
+   * @param {string} killerName - Name of the killer
+   */
+  notifySpectatorsOfTargetDeath(targetId, killerId, killerName) {
+    this.spectators.forEach((spectatingTargetId, spectatorId) => {
+      if (spectatingTargetId === targetId) {
+        // Check if killer is available to spectate
+        const killer = this.playerManager.getPlayer(killerId);
+        const canSpectateKiller = killer && !killer.dead && !killer.isBot;
+
+        this.sendToClient(spectatorId, {
+          type: PacketType.SPECTATE_TARGET_DIED,
+          oldTargetId: targetId,
+          newTargetId: canSpectateKiller ? killerId : null,
+          newTargetName: canSpectateKiller ? killerName : null,
+          canSpectateKiller: canSpectateKiller
+        });
+
+        // Auto-switch to killer if available
+        if (canSpectateKiller) {
+          this.spectators.set(spectatorId, killerId);
+        } else {
+          this.spectators.delete(spectatorId);
+        }
+      }
+    });
   }
 
   // STATS (Delegated)

@@ -5,6 +5,7 @@ import { ArenaScene } from './game/scenes/ArenaScene';
 import HUD from './components/HUD';
 import DeathScreen from './components/DeathScreen';
 import HomeScreen from './components/HomeScreen';
+import SpectateOverlay from './components/SpectateOverlay';
 import { socket } from './network/socket';
 import { PacketType } from '@shared/packetTypes';
 import './components/ArenaUI.css';
@@ -23,6 +24,11 @@ function App() {
   const [arenaWinner, setArenaWinner] = useState(null);
   const [arenaWaitTime, setArenaWaitTime] = useState(60);
   const arenaTimeoutRef = useRef(null);
+
+  // Spectate state
+  const [isSpectating, setIsSpectating] = useState(false);
+  const [spectateTargetName, setSpectateTargetName] = useState('');
+  const [killerId, setKillerId] = useState(null);
 
   // Safe timeout cleanup
   const clearArenaTimeout = () => {
@@ -127,6 +133,10 @@ function App() {
     setGameState('home');
     setArenaWinner(null);
     setArenaCountdown(null);
+    setIsSpectating(false);
+    setSpectateTargetName('');
+    setKillerId(null);
+    socket.stopSpectate();
     if (socket.isInArena) {
       socket.leaveArena();
       // DO NOT close socket here - we need it for HomeScreen to work
@@ -137,7 +147,26 @@ function App() {
   const handleRespawn = () => {
     setIsDead(false);
     setKillerName('');
+    setKillerId(null);
     socket.send({ type: PacketType.RESPAWN });
+  };
+
+  // Handle starting spectate mode
+  const handleStartSpectate = () => {
+    if (killerId && killerId !== 'ZONE' && killerId !== socket.myId) {
+      socket.startSpectate(killerId);
+      setIsDead(false);
+      setIsSpectating(true);
+      setSpectateTargetName(killerName);
+    }
+  };
+
+  // Handle exiting spectate mode
+  const handleExitSpectate = () => {
+    socket.stopSpectate();
+    setIsSpectating(false);
+    setSpectateTargetName('');
+    handleQuitToMenu();
   };
 
   // GLOBAL LISTENER
@@ -183,6 +212,7 @@ function App() {
       if (packet.type === PacketType.PLAYER_DIED && packet.victimId === socket.myId) {
         setIsDead(true);
         setKillerName(packet.killerName);
+        setKillerId(packet.killerId);
         setFinalScore(packet.score);
         setArenaRank(packet.rank || '?');
 
@@ -216,6 +246,27 @@ function App() {
       if (packet.type === PacketType.ARENA_END) {
         clearArenaTimeout();
         // Removed auto-redirect. User must manually exit.
+      }
+
+      // Spectate updates
+      if (packet.type === PacketType.SPECTATE_UPDATE) {
+        setIsSpectating(packet.isSpectating);
+        if (packet.targetName) {
+          setSpectateTargetName(packet.targetName);
+        }
+      }
+
+      // Spectate target died - update target name
+      if (packet.type === PacketType.SPECTATE_TARGET_DIED) {
+        if (packet.canSpectateKiller && packet.newTargetName) {
+          setSpectateTargetName(packet.newTargetName);
+        } else {
+          // Target died and no new target available
+          setIsSpectating(false);
+          setSpectateTargetName('');
+          // Show a notification or return to death screen
+          setIsDead(true);
+        }
       }
     };
 
@@ -326,8 +377,15 @@ function App() {
       {gameState === 'arena_playing' && (
         <>
           <div id="phaser-container" className="phaser-container" />
-          {!isDead && !arenaWinner && <HUD isArena={true} />}
+          {!isDead && !arenaWinner && !isSpectating && <HUD isArena={true} />}
 
+          {/* Spectate Overlay */}
+          {isSpectating && (
+            <SpectateOverlay
+              targetName={spectateTargetName}
+              onExit={handleExitSpectate}
+            />
+          )}
 
           {/* Victory Screen */}
           {arenaWinner && (
@@ -344,15 +402,18 @@ function App() {
             />
           )}
 
-          {/* Death screen - no respawn */}
-          {isDead && !arenaWinner && (
+          {/* Death screen - no respawn, but can spectate */}
+          {isDead && !arenaWinner && !isSpectating && (
             <DeathScreen
+              isArena={true}
               isVictory={false}
               killerName={killerName}
               score={finalScore}
               rank={arenaRank}
               onQuit={handleQuitToMenu}
               onRespawn={null}
+              onSpectate={handleStartSpectate}
+              canSpectate={killerId && killerId !== 'ZONE' && killerId !== socket.myId}
             />
           )}
         </>

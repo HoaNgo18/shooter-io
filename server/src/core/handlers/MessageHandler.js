@@ -190,6 +190,14 @@ export class MessageHandler {
                     client.player.lastPong = Date.now();
                 }
                 break;
+
+            case PacketType.SPECTATE_START:
+                room.handleSpectateStart(clientId, packet.targetId);
+                break;
+
+            case PacketType.SPECTATE_STOP:
+                room.handleSpectateStop(clientId);
+                break;
         }
     }
 

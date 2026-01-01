@@ -15,6 +15,11 @@ class NetworkManager {
     // Arena state
     this.isInArena = false;
     this.arenaRoomId = null;
+
+    // Spectate state
+    this.isSpectating = false;
+    this.spectateTargetId = null;
+    this.spectateTargetName = null;
   }
 
   connect(authOptions) {
@@ -111,6 +116,25 @@ class NetworkManager {
     this.gameScene = null;
     this.initData = null;
     this.myId = null;
+    this.stopSpectate();
+  }
+
+  // Spectate methods
+  startSpectate(targetId) {
+    if (!this.isInArena) return;
+    this.send({ type: PacketType.SPECTATE_START, targetId });
+  }
+
+  stopSpectate() {
+    this.isSpectating = false;
+    this.spectateTargetId = null;
+    this.spectateTargetName = null;
+    if (this.isInArena) {
+      this.send({ type: PacketType.SPECTATE_STOP });
+    }
+    if (this.gameScene && this.gameScene.stopSpectate) {
+      this.gameScene.stopSpectate();
+    }
   }
 
   // Ngắt kết nối
@@ -133,6 +157,9 @@ class NetworkManager {
     // this.listeners = [];  // REMOVED - caused skin equip to fail after logout+login
     this.initData = null;
     this.gameScene = null;
+    this.isSpectating = false;
+    this.spectateTargetId = null;
+    this.spectateTargetName = null;
   }
 
   setGameScene(scene) {
@@ -182,6 +209,37 @@ class NetworkManager {
       if (packet.type === PacketType.ARENA_STATUS) {
         if (packet.roomId) {
           this.arenaRoomId = packet.roomId;
+        }
+      }
+
+      // Spectate updates
+      if (packet.type === PacketType.SPECTATE_UPDATE) {
+        this.isSpectating = packet.isSpectating;
+        this.spectateTargetId = packet.targetId;
+        this.spectateTargetName = packet.targetName;
+
+        if (this.gameScene && packet.isSpectating && packet.targetId) {
+          this.gameScene.startSpectate(packet.targetId);
+        } else if (this.gameScene && !packet.isSpectating) {
+          this.gameScene.stopSpectate();
+        }
+      }
+
+      // Spectate target died
+      if (packet.type === PacketType.SPECTATE_TARGET_DIED) {
+        if (packet.canSpectateKiller && packet.newTargetId) {
+          this.spectateTargetId = packet.newTargetId;
+          this.spectateTargetName = packet.newTargetName;
+          if (this.gameScene && this.gameScene.switchSpectateTarget) {
+            this.gameScene.switchSpectateTarget(packet.newTargetId);
+          }
+        } else {
+          this.isSpectating = false;
+          this.spectateTargetId = null;
+          this.spectateTargetName = null;
+          if (this.gameScene && this.gameScene.stopSpectate) {
+            this.gameScene.stopSpectate();
+          }
         }
       }
 

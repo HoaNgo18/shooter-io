@@ -1,0 +1,95 @@
+/* SpectateOverlay.css */
+.spectate-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 150;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 30px;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent);
+    pointer-events: none;
+}
+
+.spectate-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+.spectate-icon {
+    font-size: 24px;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.spectate-label {
+    font-size: 14px;
+    color: #9C27B0;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.spectate-target-name {
+    font-size: 20px;
+    font-weight: bold;
+    color: #FFD700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.spectate-exit-btn {
+    pointer-events: auto;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: bold;
+    color: white;
+    background: linear-gradient(to bottom, #FF5252, #D32F2F);
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    box-shadow: 0 3px 0 #C62828;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.spectate-exit-btn:hover {
+    background: linear-gradient(to bottom, #FF6E6E, #E53935);
+}
+
+.spectate-exit-btn:active {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 #C62828;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Spectate info at bottom */
+.spectate-info {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px 25px;
+    border-radius: 20px;
+    color: white;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    pointer-events: none;
+    z-index: 150;
+}
+
+.spectate-info span {
+    color: #9C27B0;
+    font-weight: bold;
+}

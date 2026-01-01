@@ -32,5 +32,11 @@ export const PacketType = {
   ARENA_VICTORY: 'arena_victory',     // Server -> Client: Thông báo người thắng
   ARENA_END: 'arena_end',             // Server -> Client: Trận đấu kết thúc
   ARENA_COUNTDOWN: 'arena_countdown', // Server -> Client: Đếm ngược trước khi bắt đầu
-  ARENA_PLAYER_COUNT: 'arena_player_count' // Server -> Client: Số người trong phòng
+  ARENA_PLAYER_COUNT: 'arena_player_count', // Server -> Client: Số người trong phòng
+
+  // Spectate Mode
+  SPECTATE_START: 'spectate_start',   // Client -> Server: Bắt đầu quan sát
+  SPECTATE_STOP: 'spectate_stop',     // Client -> Server: Dừng quan sát
+  SPECTATE_UPDATE: 'spectate_update', // Server -> Client: Cập nhật target spectate
+  SPECTATE_TARGET_DIED: 'spectate_target_died' // Server -> Client: Target đã chết
 };

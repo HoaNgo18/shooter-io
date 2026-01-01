@@ -1,10 +1,20 @@
 import React from 'react';
 import './DeathScreen.css';
 
-const DeathScreen = ({ killerName, score, onQuit, onRespawn, isArena = false, rank = null, isVictory = false }) => {
+const DeathScreen = ({ 
+  killerName, 
+  score, 
+  onQuit, 
+  onRespawn, 
+  isArena = false, 
+  rank = null, 
+  isVictory = false,
+  onSpectate = null,
+  canSpectate = false
+}) => {
 
   // Kiểm tra xem có phải tự sát không?
-  const isSuicide = !killerName || killerName === 'Yourself';
+  const isSuicide = !killerName || killerName === 'Yourself' || killerName === 'The Zone';
 
   return (
     <div className={`death-screen-container ${isVictory ? 'victory-mode' : ''}`}>
@@ -65,6 +75,16 @@ const DeathScreen = ({ killerName, score, onQuit, onRespawn, isArena = false, ra
             className="death-btn respawn-btn"
           >
             PLAY AGAIN
+          </button>
+        )}
+
+        {/* Nút Spectate - chỉ hiện khi có thể quan sát (bị giết bởi người khác, không phải zone) */}
+        {canSpectate && onSpectate && !isVictory && (
+          <button
+            onClick={onSpectate}
+            className="death-btn spectate-btn"
+          >
+            👁 SPECTATE
           </button>
         )}
 
