@@ -121,7 +121,6 @@ class NetworkManager {
 
   // Spectate methods
   startSpectate(targetId) {
-    if (!this.isInArena) return;
     this.send({ type: PacketType.SPECTATE_START, targetId });
   }
 
@@ -129,9 +128,7 @@ class NetworkManager {
     this.isSpectating = false;
     this.spectateTargetId = null;
     this.spectateTargetName = null;
-    if (this.isInArena) {
-      this.send({ type: PacketType.SPECTATE_STOP });
-    }
+    this.send({ type: PacketType.SPECTATE_STOP });
     if (this.gameScene && this.gameScene.stopSpectate) {
       this.gameScene.stopSpectate();
     }

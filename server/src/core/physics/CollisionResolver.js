@@ -143,6 +143,7 @@ export class CollisionResolver {
       victimId: player.id,
       killerId: killerId,
       killerName: killerName || 'Unknown',
+      killerIsBot: killer ? killer.isBot : false,
       score: player.score,
       coins: player.coins,
       kills: player.sessionKills,
@@ -167,6 +168,11 @@ export class CollisionResolver {
     } else if (this.game.server) {
       // This is the main Game
       this.game.server.broadcast(broadcastData);
+
+      // Notify spectators that their target died (for endless mode)
+      if (this.game.notifySpectatorsOfTargetDeath) {
+        this.game.notifySpectatorsOfTargetDeath(player.id, killerId, killerName);
+      }
     }
 
     // Handle bot cleanup - only for normal game mode (arena handles its own cleanup)

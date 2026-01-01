@@ -88,6 +88,14 @@ export class MessageHandler {
             case PacketType.REQUEST_USER_DATA:
                 await this.handleRequestUserData(clientId);
                 break;
+
+            case PacketType.SPECTATE_START:
+                this.server.game.handleSpectateStart(clientId, packet.targetId);
+                break;
+
+            case PacketType.SPECTATE_STOP:
+                this.server.game.handleSpectateStop(clientId);
+                break;
         }
     }
 

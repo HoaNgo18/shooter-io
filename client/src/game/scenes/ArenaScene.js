@@ -104,7 +104,7 @@ export class ArenaScene extends Phaser.Scene {
 
     updateRangeCircle() {
         const myPlayer = this.players[socket.myId];
-        if (myPlayer && myPlayer.container.visible) {
+        if (myPlayer && myPlayer.container.visible && !this.isSpectating) {
             const weaponType = myPlayer.weaponType || 'BLUE';
             const stats = WEAPON_STATS[weaponType] || WEAPON_STATS.BLUE;
 

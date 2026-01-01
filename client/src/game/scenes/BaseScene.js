@@ -16,6 +16,10 @@ export class BaseScene extends Phaser.Scene {
         this.inputManager = null;
         this.rangeCircle = null;
         this.isArena = false; // Mặc định là Endless
+
+        // Spectate mode
+        this.isSpectating = false;
+        this.spectateTargetId = null;
     }
 
     preload() {
@@ -50,9 +54,14 @@ export class BaseScene extends Phaser.Scene {
         // Update Range Circle
         this.updateRangeCircle();
 
-        // Send Input
-        const inputData = this.inputManager.getInputData();
-        socket.send({ type: PacketType.INPUT, data: inputData });
+        // Send Input (only if not spectating)
+        if (!this.isSpectating) {
+            const inputData = this.inputManager.getInputData();
+            socket.send({ type: PacketType.INPUT, data: inputData });
+        }
+
+        // Update camera follow for spectate mode
+        this.updateSpectateCamera();
     }
 
     // --- LOGIC XỬ LÝ SERVER CHUNG ---
@@ -82,8 +91,8 @@ export class BaseScene extends Phaser.Scene {
             packet.players.forEach(p => this.updateOrAddPlayer(p));
         }
 
-        // Camera check
-        if (socket.myId && this.players[socket.myId] && !this.cameras.main._follow) {
+        // Camera check - only follow own player if NOT spectating
+        if (!this.isSpectating && socket.myId && this.players[socket.myId] && !this.cameras.main._follow) {
             this.cameras.main.startFollow(this.players[socket.myId].container);
         }
 
@@ -142,6 +151,83 @@ export class BaseScene extends Phaser.Scene {
             this.rangeCircle.setStrokeStyle(2, myPlayer.isMoving && stats.requireStill ? 0xFF0000 : 0xFFFFFF, 0.5);
         } else {
             this.rangeCircle.setVisible(false);
+        }
+    }
+
+    // --- SPECTATE MODE ---
+
+    /**
+     * Start spectating a target player
+     * @param {string} targetId - ID of player to spectate
+     */
+    startSpectate(targetId) {
+        console.log('[Spectate] Starting spectate for target:', targetId);
+        console.log('[Spectate] Available players:', Object.keys(this.players));
+        
+        this.isSpectating = true;
+        this.spectateTargetId = targetId;
+
+        // Stop following current player first
+        this.cameras.main.stopFollow();
+
+        const target = this.players[targetId];
+        console.log('[Spectate] Target found:', target ? 'YES' : 'NO');
+        if (target && target.container) {
+            console.log('[Spectate] Following target container');
+            this.cameras.main.startFollow(target.container, true, 0.1, 0.1);
+        } else {
+            console.log('[Spectate] Target not found or no container, will retry in updateSpectateCamera');
+        }
+    }
+
+    /**
+     * Stop spectating and return to normal mode
+     */
+    stopSpectate() {
+        this.isSpectating = false;
+        this.spectateTargetId = null;
+
+        this.cameras.main.stopFollow();
+
+        // Return camera to own player if still exists
+        const myPlayer = this.players[socket.myId];
+        if (myPlayer && myPlayer.container) {
+            this.cameras.main.startFollow(myPlayer.container);
+        }
+    }
+
+    /**
+     * Update camera to follow spectate target
+     */
+    updateSpectateCamera() {
+        if (!this.isSpectating || !this.spectateTargetId) return;
+
+        const target = this.players[this.spectateTargetId];
+        if (target && target.container) {
+            // Always ensure we're following the target when spectating
+            if (this.cameras.main._follow !== target.container) {
+                console.log('[Spectate] updateSpectateCamera - now following target:', this.spectateTargetId);
+                this.cameras.main.startFollow(target.container, true, 0.1, 0.1);
+            }
+        }
+    }
+
+    /**
+     * Switch spectate target to a new player
+     * @param {string} newTargetId - New target player ID
+     */
+    switchSpectateTarget(newTargetId) {
+        if (!newTargetId) {
+            this.stopSpectate();
+            return;
+        }
+
+        this.spectateTargetId = newTargetId;
+        this.cameras.main.stopFollow();
+        
+        const newTarget = this.players[newTargetId];
+        if (newTarget && newTarget.container) {
+            this.cameras.main.startFollow(newTarget.container, true, 0.1, 0.1);
         }
     }
 }

@@ -109,7 +109,7 @@ export class ArenaRoom {
       obstacles: this.world.obstacles,
       nebulas: this.world.nebulas,
       chests: this.world.chests,
-      items: this.world.items,
+      items: this.world.items.map(item => item.serialize ? item.serialize() : item),
       isArena: true,
       roomId: this.id
     });
@@ -459,15 +459,22 @@ export class ArenaRoom {
     const client = this.server.clients.get(clientId);
     if (!client) return;
 
-    const player = this.playerManager.getPlayer(clientId);
-    // Only dead players can spectate
-    if (!player || !player.dead) return;
+    // Check if spectator is dead - use client.player OR playerManager
+    const player = client.player || this.playerManager.getPlayer(clientId);
+    // Only dead players can spectate (or players who have left but want to watch)
+    if (player && !player.dead) {
+      // Player is alive, can't spectate
+      return;
+    }
 
     const target = this.playerManager.getPlayer(targetId);
     // Target must exist and be alive
     if (!target || target.dead) {
       this.sendToClient(clientId, {
         type: PacketType.SPECTATE_TARGET_DIED,
+        canSpectateKiller: false,
+        newTargetId: null,
+        newTargetName: null,
         message: 'Target is no longer available'
       });
       return;
@@ -605,7 +612,9 @@ export class ArenaRoom {
       }));
     }
     if (delta.chestsRemoved.length > 0) state.chestsRemoved = delta.chestsRemoved;
-    if (delta.itemsAdded.length > 0) state.itemsAdded = delta.itemsAdded;
+    if (delta.itemsAdded.length > 0) {
+      state.itemsAdded = delta.itemsAdded.map(item => item.serialize ? item.serialize() : item);
+    }
     if (delta.itemsRemoved.length > 0) state.itemsRemoved = delta.itemsRemoved;
   }
 }

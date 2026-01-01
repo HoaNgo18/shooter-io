@@ -330,6 +330,21 @@ export class EntityManager {
 
     // --- ITEM LOGIC ---
     updateItems(packet) {
+        // Full sync - clear all and recreate
+        if (packet.items) {
+            // Destroy all existing items
+            Object.values(this.items).forEach(item => {
+                if (item && item.destroy) item.destroy();
+            });
+            this.items = {};
+            
+            // Create all items from server
+            packet.items.forEach(itemData => {
+                this.createItemSprite(itemData);
+            });
+            return;
+        }
+
         // 1. Tạo Set chứa các ID bị xóa để tra cứu cho nhanh
         const removedIds = new Set();
         if (packet.itemsRemoved) {

@@ -29,6 +29,7 @@ function App() {
   const [isSpectating, setIsSpectating] = useState(false);
   const [spectateTargetName, setSpectateTargetName] = useState('');
   const [killerId, setKillerId] = useState(null);
+  const [killerIsBot, setKillerIsBot] = useState(false);
 
   // Safe timeout cleanup
   const clearArenaTimeout = () => {
@@ -136,6 +137,7 @@ function App() {
     setIsSpectating(false);
     setSpectateTargetName('');
     setKillerId(null);
+    setKillerIsBot(false);
     socket.stopSpectate();
     if (socket.isInArena) {
       socket.leaveArena();
@@ -148,6 +150,8 @@ function App() {
     setIsDead(false);
     setKillerName('');
     setKillerId(null);
+    setKillerIsBot(false);
+    setIsSpectating(false);
     socket.send({ type: PacketType.RESPAWN });
   };
 
@@ -213,6 +217,7 @@ function App() {
         setIsDead(true);
         setKillerName(packet.killerName);
         setKillerId(packet.killerId);
+        setKillerIsBot(packet.killerIsBot || false);
         setFinalScore(packet.score);
         setArenaRank(packet.rank || '?');
 
@@ -264,7 +269,7 @@ function App() {
           // Target died and no new target available
           setIsSpectating(false);
           setSpectateTargetName('');
-          // Show a notification or return to death screen
+          // Show death screen again
           setIsDead(true);
         }
       }
@@ -413,7 +418,7 @@ function App() {
               onQuit={handleQuitToMenu}
               onRespawn={null}
               onSpectate={handleStartSpectate}
-              canSpectate={killerId && killerId !== 'ZONE' && killerId !== socket.myId}
+              canSpectate={killerId && killerId !== 'ZONE' && killerId !== socket.myId && !killerIsBot}
             />
           )}
         </>
@@ -423,13 +428,25 @@ function App() {
       {gameState === 'playing' && (
         <>
           <div id="phaser-container" className="phaser-container" />
-          {!isDead && <HUD />}
-          {isDead && (
+          {!isDead && !isSpectating && <HUD />}
+
+          {/* Spectate Overlay */}
+          {isSpectating && (
+            <SpectateOverlay
+              targetName={spectateTargetName}
+              onExit={handleExitSpectate}
+            />
+          )}
+
+          {/* Death screen - can respawn or spectate */}
+          {isDead && !isSpectating && (
             <DeathScreen
               killerName={killerName}
               score={finalScore}
               onQuit={handleQuitToMenu}
               onRespawn={handleRespawn}
+              onSpectate={handleStartSpectate}
+              canSpectate={killerId && killerId !== socket.myId && !killerIsBot}
             />
           )}
         </>

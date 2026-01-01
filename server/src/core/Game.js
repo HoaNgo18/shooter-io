@@ -16,6 +16,9 @@ export class Game {
     this.projectiles = [];
     this.explosions = [];
 
+    // Spectate tracking
+    this.spectators = new Map(); // clientId -> { targetId, targetName }
+
     // Initialize Managers
     this.world = new WorldManager();
     this.bots = new BotManager(this);
@@ -87,7 +90,7 @@ export class Game {
       obstacles: this.world.obstacles,
       nebulas: this.world.nebulas,
       chests: this.world.chests,
-      items: this.world.items
+      items: this.world.items.map(item => item.serialize ? item.serialize() : item)
     });
 
     this.server.broadcast({
@@ -134,6 +137,88 @@ export class Game {
     }
   }
 
+  // --- SPECTATE MODE ---
+  handleSpectateStart(clientId, targetId) {
+    // Check if spectator is dead
+    const spectator = this.players.get(clientId);
+    if (spectator && !spectator.dead) {
+      // Spectator is alive, can't spectate
+      return;
+    }
+
+    const target = this.players.get(targetId);
+    if (!target || target.dead) {
+      // Target not found or dead, can't spectate
+      this.server.sendToClient(clientId, {
+        type: PacketType.SPECTATE_UPDATE,
+        isSpectating: false,
+        targetId: null,
+        targetName: null
+      });
+      return;
+    }
+
+    // Store spectator info
+    this.spectators.set(clientId, {
+      targetId: targetId,
+      targetName: target.name
+    });
+
+    // Notify client
+    this.server.sendToClient(clientId, {
+      type: PacketType.SPECTATE_UPDATE,
+      isSpectating: true,
+      targetId: targetId,
+      targetName: target.name
+    });
+  }
+
+  handleSpectateStop(clientId) {
+    this.spectators.delete(clientId);
+
+    this.server.sendToClient(clientId, {
+      type: PacketType.SPECTATE_UPDATE,
+      isSpectating: false,
+      targetId: null,
+      targetName: null
+    });
+  }
+
+  // Called when a spectated player dies
+  notifySpectatorTargetDied(killedPlayerId, killerId, killerName) {
+    // Find all spectators watching this player
+    for (const [spectatorId, spectateInfo] of this.spectators.entries()) {
+      if (spectateInfo.targetId === killedPlayerId) {
+        // If killer exists and is alive, switch to watching killer
+        const killer = this.players.get(killerId);
+        if (killer && !killer.dead && killerId !== killedPlayerId) {
+          // Update spectator's target
+          this.spectators.set(spectatorId, {
+            targetId: killerId,
+            targetName: killer.name
+          });
+
+          // Notify client to switch target
+          this.server.sendToClient(spectatorId, {
+            type: PacketType.SPECTATE_TARGET_DIED,
+            canSpectateKiller: true,
+            newTargetId: killerId,
+            newTargetName: killer.name
+          });
+        } else {
+          // No valid killer to spectate, end spectate mode
+          this.spectators.delete(spectatorId);
+          this.server.sendToClient(spectatorId, {
+            type: PacketType.SPECTATE_TARGET_DIED,
+            canSpectateKiller: false,
+            newTargetId: null,
+            newTargetName: null
+          });
+        }
+      }
+    }
+  }
+
   respawnPlayer(clientId, skinId) {
     const player = this.players.get(clientId);
     if (player) {
@@ -151,7 +236,7 @@ export class Game {
         obstacles: this.world.obstacles,
         nebulas: this.world.nebulas,
         chests: this.world.chests,
-        items: this.world.items
+        items: this.world.items.map(item => item.serialize ? item.serialize() : item)
       });
 
       // 3. Notify other players
@@ -216,7 +301,7 @@ export class Game {
       })),
 
       chestsRemoved: this.world.delta.chestsRemoved,
-      itemsAdded: this.world.delta.itemsAdded,
+      itemsAdded: this.world.delta.itemsAdded.map(item => item.serialize ? item.serialize() : item),
       itemsRemoved: this.world.delta.itemsRemoved,
 
     };
