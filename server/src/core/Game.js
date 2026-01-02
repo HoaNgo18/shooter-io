@@ -130,6 +130,18 @@ export class Game {
     }
   }
 
+  handleEmoji(clientId, emoji) {
+    const player = this.players.get(clientId);
+    if (player && !player.dead) {
+      // Broadcast emoji to all players
+      this.server.broadcast({
+        type: PacketType.EMOJI_BROADCAST,
+        playerId: clientId,
+        emoji: emoji
+      });
+    }
+  }
+
   handleUseItem(clientId) {
     const player = this.players.get(clientId);
     if (player && !player.dead) {

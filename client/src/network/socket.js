@@ -283,12 +283,24 @@ class NetworkManager {
           case PacketType.PLAYER_LEAVE:
             this.gameScene.removePlayer(packet.id);
             break;
+
+          case PacketType.EMOJI_BROADCAST:
+            // Handle emoji broadcast
+            if (this.gameScene && this.gameScene.handleEmoji) {
+              this.gameScene.handleEmoji(packet.playerId, packet.emoji);
+            }
+            break;
         }
       }
 
     } catch (e) {
       console.error('Socket handling error:', e);
     }
+  }
+
+  // Send emoji
+  sendEmoji(emoji) {
+    this.send({ type: PacketType.EMOJI, emoji });
   }
 
   notifyReact(data) {

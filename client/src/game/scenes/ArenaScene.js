@@ -280,6 +280,14 @@ export class ArenaScene extends Phaser.Scene {
         }
     }
 
+    // --- EMOJI HANDLER ---
+    handleEmoji(playerId, emoji) {
+        const player = this.players[playerId];
+        if (player && player.showEmoji) {
+            player.showEmoji(emoji);
+        }
+    }
+
     // --- SPECTATE MODE ---
 
     /**

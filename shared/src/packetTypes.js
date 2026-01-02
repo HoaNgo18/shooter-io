@@ -38,5 +38,9 @@ export const PacketType = {
   SPECTATE_START: 'spectate_start',   // Client -> Server: Bắt đầu quan sát
   SPECTATE_STOP: 'spectate_stop',     // Client -> Server: Dừng quan sát
   SPECTATE_UPDATE: 'spectate_update', // Server -> Client: Cập nhật target spectate
-  SPECTATE_TARGET_DIED: 'spectate_target_died' // Server -> Client: Target đã chết
+  SPECTATE_TARGET_DIED: 'spectate_target_died', // Server -> Client: Target đã chết
+
+  // Emoji
+  EMOJI: 'emoji',                     // Client -> Server -> All: Gửi emoji
+  EMOJI_BROADCAST: 'emoji_broadcast'  // Server -> Client: Broadcast emoji to all
 };

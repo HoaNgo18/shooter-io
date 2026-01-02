@@ -448,6 +448,18 @@ export class ArenaRoom {
     ArenaInputHandler.handleDash(this, clientId);
   }
 
+  handleEmoji(clientId, emoji) {
+    const player = this.playerManager.getPlayer(clientId);
+    if (player && !player.dead) {
+      // Broadcast emoji to all players in the room
+      this.broadcast({
+        type: PacketType.EMOJI_BROADCAST,
+        playerId: clientId,
+        emoji: emoji
+      });
+    }
+  }
+
   // SPECTATE HANDLERS
 
   /**

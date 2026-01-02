@@ -127,6 +127,14 @@ export class BaseScene extends Phaser.Scene {
         }
     }
 
+    // --- EMOJI HANDLER ---
+    handleEmoji(playerId, emoji) {
+        const player = this.players[playerId];
+        if (player && player.showEmoji) {
+            player.showEmoji(emoji);
+        }
+    }
+
     createRangeCircle() {
         this.rangeCircle = this.add.circle(0, 0, 100, 0xFFFFFF, 0);
         this.rangeCircle.setStrokeStyle(2, 0xFFFFFF, 0.3);

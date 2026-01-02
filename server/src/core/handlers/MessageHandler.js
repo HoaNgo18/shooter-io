@@ -96,6 +96,10 @@ export class MessageHandler {
             case PacketType.SPECTATE_STOP:
                 this.server.game.handleSpectateStop(clientId);
                 break;
+
+            case PacketType.EMOJI:
+                this.server.game.handleEmoji(clientId, packet.emoji);
+                break;
         }
     }
 
@@ -205,6 +209,10 @@ export class MessageHandler {
 
             case PacketType.SPECTATE_STOP:
                 room.handleSpectateStop(clientId);
+                break;
+
+            case PacketType.EMOJI:
+                room.handleEmoji(clientId, packet.emoji);
                 break;
         }
     }

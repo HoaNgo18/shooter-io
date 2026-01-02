@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Phaser from 'phaser';
 import { GameScene } from './game/scenes/GameScene';
 import { ArenaScene } from './game/scenes/ArenaScene';
@@ -6,6 +6,7 @@ import HUD from './components/HUD';
 import DeathScreen from './components/DeathScreen';
 import HomeScreen from './components/HomeScreen';
 import SpectateOverlay from './components/SpectateOverlay';
+import EmojiPanel from './components/EmojiPanel';
 import { socket } from './network/socket';
 import { PacketType } from '@shared/packetTypes';
 import './components/ArenaUI.css';
@@ -30,6 +31,9 @@ function App() {
   const [spectateTargetName, setSpectateTargetName] = useState('');
   const [killerId, setKillerId] = useState(null);
   const [killerIsBot, setKillerIsBot] = useState(false);
+
+  // Emoji panel state
+  const [showEmojiPanel, setShowEmojiPanel] = useState(false);
 
   // Safe timeout cleanup
   const clearArenaTimeout = () => {
@@ -172,6 +176,32 @@ function App() {
     setSpectateTargetName('');
     handleQuitToMenu();
   };
+
+  // Handle emoji selection
+  const handleEmojiSelect = useCallback((emoji) => {
+    socket.sendEmoji(emoji);
+    setShowEmojiPanel(false);
+  }, []);
+
+  // Handle E key to toggle emoji panel
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Only handle E key when playing and not dead/spectating
+      if (e.key === 'e' || e.key === 'E') {
+        if ((gameState === 'playing' || gameState === 'arena_playing') && !isDead && !isSpectating) {
+          e.preventDefault();
+          setShowEmojiPanel(prev => !prev);
+        }
+      }
+      // Close emoji panel on Escape
+      if (e.key === 'Escape') {
+        setShowEmojiPanel(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [gameState, isDead, isSpectating]);
 
   // GLOBAL LISTENER
   useEffect(() => {
@@ -384,6 +414,14 @@ function App() {
           <div id="phaser-container" className="phaser-container" />
           {!isDead && !arenaWinner && !isSpectating && <HUD isArena={true} />}
 
+          {/* Emoji Panel */}
+          {showEmojiPanel && !isDead && !isSpectating && !arenaWinner && (
+            <EmojiPanel
+              onSelect={handleEmojiSelect}
+              onClose={() => setShowEmojiPanel(false)}
+            />
+          )}
+
           {/* Spectate Overlay */}
           {isSpectating && (
             <SpectateOverlay
@@ -429,6 +467,14 @@ function App() {
         <>
           <div id="phaser-container" className="phaser-container" />
           {!isDead && !isSpectating && <HUD />}
+
+          {/* Emoji Panel */}
+          {showEmojiPanel && !isDead && !isSpectating && (
+            <EmojiPanel
+              onSelect={handleEmojiSelect}
+              onClose={() => setShowEmojiPanel(false)}
+            />
+          )}
 
           {/* Spectate Overlay */}
           {isSpectating && (

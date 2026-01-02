@@ -55,6 +55,13 @@ export class ClientPlayer {
             stroke: '#000000', strokeThickness: 3, align: 'center'
         }).setOrigin(0.5).setDepth(100);
 
+        // 6. Emoji Display (above name)
+        this.emojiText = scene.add.text(0, -70, '', {
+            fontSize: '32px', align: 'center'
+        }).setOrigin(0.5).setDepth(101);
+        this.emojiText.setVisible(false);
+        this.emojiTimer = null;
+
         // Add to container (Order matters: Flame -> Ammo -> Ship -> Shield)
         this.container.add([this.thrustFlame, this.ammoContainer, this.shipSprite, this.shieldSprite]);
 
@@ -263,6 +270,51 @@ export class ClientPlayer {
             this.text.x = this.container.x;
             this.text.y = this.container.y - 40;
         }
+
+        // Update emoji position
+        if (this.emojiText) {
+            this.emojiText.x = this.container.x;
+            this.emojiText.y = this.container.y - 70;
+        }
+    }
+
+    // Show emoji above player head
+    showEmoji(emoji) {
+        if (!this.emojiText) return;
+
+        // Clear existing timer
+        if (this.emojiTimer) {
+            clearTimeout(this.emojiTimer);
+            this.emojiTimer = null;
+        }
+
+        // Show emoji
+        this.emojiText.setText(emoji);
+        this.emojiText.setVisible(true);
+        this.emojiText.setAlpha(1);
+
+        // Add pop animation
+        this.scene.tweens.killTweensOf(this.emojiText);
+        this.emojiText.setScale(0.5);
+        this.scene.tweens.add({
+            targets: this.emojiText,
+            scale: 1,
+            duration: 200,
+            ease: 'Back.easeOut'
+        });
+
+        // Hide after 5 seconds
+        this.emojiTimer = setTimeout(() => {
+            this.scene.tweens.add({
+                targets: this.emojiText,
+                alpha: 0,
+                scale: 0.5,
+                duration: 300,
+                onComplete: () => {
+                    this.emojiText.setVisible(false);
+                }
+            });
+        }, 5000);
     }
 
     setVisibleState(isVisible) {
@@ -276,9 +328,19 @@ export class ClientPlayer {
     }
 
     destroy() {
+        // Clear emoji timer
+        if (this.emojiTimer) {
+            clearTimeout(this.emojiTimer);
+            this.emojiTimer = null;
+        }
+
         this.scene.tweens.killTweensOf(this.container);
         this.scene.tweens.killTweensOf(this.shieldSprite);
         this.scene.tweens.killTweensOf(this.thrustFlame);
+        if (this.emojiText) {
+            this.scene.tweens.killTweensOf(this.emojiText);
+            this.emojiText.destroy();
+        }
         this.container.destroy();
         // Text nằm trong container sẽ tự hủy, nếu nằm ngoài thì cần destroy thủ công
         this.text.destroy();
